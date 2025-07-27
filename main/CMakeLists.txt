@@ -25,4 +25,8 @@ idf_component_register(
         # --- Componentes propios de DIYMON ---
         # Nuestro componente 'main' necesita usar la UI, por lo que debe requerir 'diymon_ui'.
         diymon_ui
+        
+        # --- [NUEVO] El cerebro del juego ---
+        # Se añade el nuevo componente que contiene toda la lógica de evolución y combate.
+        diymon_core
 )

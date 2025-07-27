@@ -5,9 +5,9 @@
  *
  *    Description:  Punto de entrada principal para el firmware de DIYMON.
  *                  Inicializa los servicios básicos, el gestor de hardware y la
- *                  interfaz de usuario.
+ *                  interfaz de usuario. Ahora también gestiona el temporizador de evolución.
  *
- *        Version:  1.0
+ *        Version:  1.2 (Con corrección del temporizador)
  *        Created:  [Fecha de hoy]
  *       Revision:  none
  *       Compiler:  xtensa-esp32-elf-gcc
@@ -19,22 +19,42 @@
  */
 
 #include <stdio.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "esp_lvgl_port.h"
+#include "esp_timer.h"
 
-#include "hardware_manager.h" // Módulo para gestionar todo el hardware de DIYMON.
-#include "ui.h"               // Módulo principal de la interfaz de usuario (LVGL).
+#include "hardware_manager.h"
+#include "ui.h"
+#include "diymon_evolution.h"
 
-// TAG para los mensajes de log de este fichero. Ayuda a identificar de dónde vienen los mensajes.
 static const char *TAG = "DIYMON_MAIN";
+
+// [CORRECCIÓN] Se declara el handle como 'static' para que no se destruya al salir de app_main
+static esp_timer_handle_t evolution_timer_handle;
+
+static void evolution_timer_callback(void* arg) {
+    const char* current_code = diymon_get_current_code();
+    ESP_LOGI(TAG, "Revisando evolución. DIYMON actual: %s", current_code);
+
+    const char* next_evolution = diymon_get_next_evolution_in_sequence(current_code);
+
+    if (next_evolution != NULL) {
+        ESP_LOGI(TAG, "¡EVOLUCIÓN! Nuevo código: %s", next_evolution);
+        diymon_set_current_code(next_evolution);
+    } else {
+        ESP_LOGI(TAG, "El DIYMON ha alcanzado su forma final. Deteniendo temporizador de evolución.");
+        // Ahora, al llamar a stop, el handle es válido porque es estático.
+        esp_timer_stop(evolution_timer_handle);
+    }
+}
+
 
 void app_main(void)
 {
     /* --- 1. Inicialización del Sistema Base --- */
-    // Se inicializa el Non-Volatile Storage (NVS). Es una memoria flash donde se pueden
-    // guardar datos de forma persistente entre reinicios (p. ej., el estado del DIYMON,
-    // la configuración de WiFi, etc.).
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_LOGW(TAG, "NVS partition was corrupt, erasing and re-initializing...");
@@ -46,23 +66,31 @@ void app_main(void)
 
 
     /* --- 2. Inicialización del Hardware --- */
-    // Se llama a una única función que se encarga de inicializar todos los periféricos:
-    // pantalla, panel táctil, sensores, WiFi, etc. Esto mantiene el main.c limpio.
-    // Si en el futuro se cambia un componente, solo se modifica el hardware_manager.
     hardware_manager_init();
     ESP_LOGI(TAG, "Hardware Manager initialized successfully.");
 
 
-    /* --- 3. Inicialización de la Interfaz de Usuario (UI) --- */
-    // Una vez todo el hardware está listo, se inicializa la interfaz gráfica.
+    /* --- 3. Inicialización del Motor de Lógica del Juego --- */
+    diymon_evolution_init();
+    ESP_LOGI(TAG, "DIYMON Core Logic initialized successfully.");
+
+
+    /* --- 4. Inicialización de la Interfaz de Usuario (UI) --- */
     ESP_LOGI(TAG, "Initializing DIYMON User Interface...");
-    
-    // Se usa un "mutex" (lvgl_port_lock) para asegurar que no se intente dibujar
-    // nada en la pantalla hasta que LVGL esté completamente listo. Es una medida de seguridad.
     if (lvgl_port_lock(0)) {
-        ui_init(); // Esta función (de ui.c) crea la pantalla inicial y los elementos visuales.
-        lvgl_port_unlock(); // Se libera el mutex.
+        ui_init();
+        lvgl_port_unlock();
     }
     
-    ESP_LOGI(TAG, "DIYMON Firmware is running! Welcome, creator!");
+
+    /* --- 5. Creación e Inicio del Temporizador de Evolución --- */
+    const esp_timer_create_args_t evolution_timer_args = {
+            .callback = &evolution_timer_callback,
+            .arg = NULL, // No necesitamos pasar el handle como argumento si es estático/global
+            .name = "evolution-timer"
+    };
+    ESP_ERROR_CHECK(esp_timer_create(&evolution_timer_args, &evolution_timer_handle));
+    ESP_ERROR_CHECK(esp_timer_start_periodic(evolution_timer_handle, 5 * 1000000));
+    
+    ESP_LOGI(TAG, "DIYMON Firmware is running! Evolution timer started. Welcome, creator!");
 }
