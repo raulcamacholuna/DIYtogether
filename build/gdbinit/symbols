@@ -1,9 +1,0 @@
-
-
-# Load bootloader symbols
-set confirm off
-    add-symbol-file C:/Users/rcamacho/Desktop/Firmware_DIYMON/DIYMON/build/bootloader/bootloader.elf
-set confirm on
-
-# Load application symbols
-file C:/Users/rcamacho/Desktop/Firmware_DIYMON/DIYMON/build/app-template.elf

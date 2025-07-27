@@ -1,0 +1,29 @@
+# --- Archivos y Carpetas de Compilación de ESP-IDF ---
+# La carpeta más importante a ignorar. Contiene todos los archivos generados.
+/build/
+
+# Archivos de configuración generados o temporales.
+# sdkconfig es el "cerebro", ¡ESE SÍ DEBE SUBIRSE!
+# Pero la copia de seguridad no nos interesa.
+/sdkconfig.old
+/sdkconfig.h
+
+# --- Componentes Descargados Automáticamente ---
+# Esta carpeta se regenera sola, no debe estar en el repositorio.
+/managed_components/
+
+# --- Archivos del Editor de Código (Visual Studio Code) ---
+# Configuraciones locales de tu editor, no deben compartirse.
+.vscode/
+
+# --- Archivos de Python ---
+# Archivos temporales generados por Python.
+*.pyc
+__pycache__/
+.env
+/venv/
+
+# --- Archivos del Sistema Operativo ---
+# Archivos basura de macOS y Windows.
+.DS_Store
+Thumbs.db
