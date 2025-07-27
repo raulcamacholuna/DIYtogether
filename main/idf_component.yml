@@ -1,0 +1,13 @@
+## IDF Component Manager Manifest File
+dependencies:
+  # Required IDF version
+  idf: ">=5.0"
+
+  # LVGL graphics library
+  lvgl/lvgl: "^8.3.0"
+
+  # Porting layer for LVGL on ESP chips
+  espressif/esp_lvgl_port: "*"
+
+  # General touch driver
+  espressif/esp_lcd_touch: "*"

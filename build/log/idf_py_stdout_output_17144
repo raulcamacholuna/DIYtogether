@@ -1,0 +1,84 @@
+Command: C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe C:\Espressif\frameworks\esp-idf-v5.5\tools/idf_monitor.py -p COM5 -b 115200 --toolchain-prefix riscv32-esp-elf- --target esp32c6 --revision 0 --decode-panic backtrace C:\Users\rcamacho\Desktop\Firmware_DIYMON\DIYMON\build\app-template.elf C:\Users\rcamacho\Desktop\Firmware_DIYMON\DIYMON\build\bootloader\bootloader.elf --force-color -m 'C:\Espressif\python_env\idf5.5_py3.11_env\Scripts\python.exe' 'C:\Espressif\frameworks\esp-idf-v5.5\tools\idf.py' '-p' 'COM5'
+[0;32mI (494) esp_image: segment 1: paddr=0021e6d0 vaddr=40800000 sizeI (594) esp_image: segment 5: paddr=00292678 vaddr=50000000 size=00020h (    ESP-ROM:esp32c6-20220919[0m
+Build:Sep 19 2022
+rst:0x15 (USB_UART_HPSYS),boot:0x7b (SPI_FAST_FLASH_BOOT)
+Saved PC:0x400294a2
+SPIWP:0xee
+mode:DIO, clock div:2
+load:0x40875730,len:0x1744
+load:0x4086b910,len:0xe78
+load:0x4086e610,len:0x31c4
+entry 0x4086b91a
+[0;32mI (23) boot: ESP-IDF v5.5-beta1-215-gcf8dad0746 2nd stage bootloader[0m
+[0;32mI (23) boot: compile time Jul 26 2025 10:16:57[0m
+[0;32mI (24) boot: chip revision: v0.2[0m
+[0;32mI (25) boot: efuse block revision: v0.3[0m
+[0;32mI (28) boot.esp32c6: SPI Speed      : 80MHz[0m
+[0;32mI (32) boot.esp32c6: SPI Mode       : DIO[0m
+[0;32mI (36) boot.esp32c6: SPI Flash Size : 8MB[0m
+[0;32mI (40) boot: Enabling RNG early entropy source...[0m
+[0;32mI (44) boot: Partition Table:[0m
+[0;32mI (47) boot: ## Label            Usage          Type ST Offset   Length[0m
+[0;32mI (53) boot:  0 nvs              WiFi data        01 02 00009000 00006000[0m
+[0;32mI (60) boot:  1 phy_init         RF data          01 01 0000f000 00001000[0m
+[0;32mI (66) boot:  2 factory          factory app      00 00 00010000 00600000[0m
+[0;32mI (73) boot: End of partition table[0m
+[0;32mI (76) esp_image: segment 0: paddr=00010020 vaddr=42070020 size=20e6a8h (2156200) map[0m
+[0;32mI (494) esp_image: segment 1: paddr=0021e6d0 vaddr=40800000 size=01948h (  6472) load[0m
+[0;32mI (496) esp_image: segment 2: paddr=00220020 vaddr=42000020 size=63308h (406280) map[0m
+[0;32mI (575) esp_image: segment 3: paddr=00283330 vaddr=40801948 size=0d654h ( 54868) load[0m
+[0;32mI (588) esp_image: segment 4: paddr=0029098c vaddr=4080efa0 size=01ce4h (  7396) load[0m
+[0;32mI (591) esp_image: segment 5: paddr=00292678 vaddr=50000000 size=00020h (    32) load[0m
+[0;32mI (596) boot: Loaded app from partition at offset 0x10000[0m
+[0;32mI (597) boot: Disabling RNG early entropy source...[0m
+[0;32mI (613) cpu_start: Unicore app[0m
+[0;32mI (622) cpu_start: Pro cpu start user code[0m
+[0;32mI (622) cpu_start: cpu freq: 160000000 Hz[0m
+[0;32mI (622) app_init: Application information:[0m
+[0;32mI (623) app_init: Project name:     app-template[0m
+[0;32mI (626) app_init: App version:      1[0m
+[0;32mI (630) app_init: Compile time:     Jul 26 2025 10:16:40[0m
+[0;32mI (635) app_init: ELF file SHA256:  f1115c1a0...[0m
+[0;32mI (639) app_init: ESP-IDF:          v5.5-beta1-215-gcf8dad0746[0m
+[0;32mI (645) efuse_init: Min chip rev:     v0.0[0m
+[0;32mI (649) efuse_init: Max chip rev:     v0.99 [0m
+[0;32mI (653) efuse_init: Chip rev:         v0.2[0m
+[0;32mI (656) heap_init: Initializing. RAM available for dynamic allocation:[0m
+[0;32mI (663) heap_init: At 4081A280 len 00062390 (392 KiB): RAM[0m
+[0;32mI (668) heap_init: At 4087C610 len 00002F54 (11 KiB): RAM[0m
+[0;32mI (673) heap_init: At 50000020 len 00003FC8 (15 KiB): RTCRAM[0m
+[0;32mI (679) spi_flash: detected chip: generic[0m
+[0;32mI (682) spi_flash: flash io: dio[0m
+[0;32mI (686) sleep_gpio: Configure to isolate all GPIO pins in sleep state[0m
+[0;32mI (691) sleep_gpio: Enable automatic switching of GPIO sleep configuration[0m
+[0;32mI (698) coexist: coex firmware version: 831ec70[0m
+[0;32mI (702) coexist: coexist rom version 5b8dcfa[0m
+[0;32mI (707) main_task: Started on CPU0[0m
+[0;32mI (707) main_task: Calling app_main()[0m
+[0;32mI (727) DIYMON_MAIN: NVS system initialized successfully.[0m
+[0;32mI (727) HW_MANAGER: Initializing I2C and SPI buses...[0m
+[0;32mI (727) bsp_spi: SPI BUS init[0m
+[0;32mI (727) HW_MANAGER: Initializing sensors and peripherals...[0m
+[0;32mI (727) bsp_battery: calibration scheme version is Curve Fitting[0m
+[0;32mI (737) bsp_battery: Calibration Success[0m
+[0;32mI (737) bsp_qmi8658: QMI8658 Initialize[0m
+[0;32mI (747) bsp_qmi8658: Find QMI8658[0m
+[0;32mI (757) bsp_sdcard: Initialize SPI SD Card[0m
+[0;32mI (757) bsp_sdcard: Mounting filesystem[0m
+[1;31mE (777) vfs_fat_sdmmc: sdmmc_card_init failed (0x107).[0m
+[1;31mE (777) bsp_sdcard: Failed to initialize the card (ESP_ERR_TIMEOUT). Make sure SD card lines have pull-up resistors in place.[0m
+[0;32mI (777) HW_MANAGER: Initializing display and touch panel...[0m
+[0;32mI (787) bsp_display: Install panel IO[0m
+[0;33mW (1027) JD9853: The 3Ah command has been used and will be overwritten by external initialization sequence[0m
+[0;32mI (1047) HW_MANAGER: Initializing LVGL graphics library driver...[0m
+[0;32mI (1047) LVGL: Starting LVGL task[0m
+[0;32mI (1047) HW_MANAGER: Initializing display brightness control...[0m
+[0;32mI (1047) bsp_display: LCD brightness set to 100%[0m
+[0;32mI (1047) DIYMON_MAIN: Hardware Manager initialized successfully.[0m
+[0;32mI (1057) DIYMON_MAIN: Initializing DIYMON User Interface...[0m
+[0;32mI (1067) DIYMON_UI: Conectando acciones al sistema dinámico...[0m
+[0;32mI (1067) DIYMON_UI: UI de DIYMON inicializada y lista.[0m
+[0;32mI (1067) DIYMON_MAIN: DIYMON Firmware is running! Welcome, creator![0m
+[0;32mI (1077) main_task: Returned from app_main()[0m
+[0;32mI (23787) DIYMON_ACTIONS: Evento dinámico recibido para la acción ID: 2[0m
+[0;32mI (23787) DIYMON_ACTIONS: Iniciando animación (duración: 3000ms)...[0m
