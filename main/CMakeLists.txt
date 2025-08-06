@@ -1,4 +1,4 @@
-idf_component_register(SRCS "main.c"
+idf_component_register(SRCS "hardware_manager.c" "main.c"
                        # Añade aquí otros ficheros .c o .cpp que tengas en el directorio 'main'
 
                        # Esto añade el directorio 'main' a la ruta de inclusión para este componente.

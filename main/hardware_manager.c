@@ -28,14 +28,16 @@
 #include "lvgl_helpers.h"
 
 // Includes de la BSP (Board Support Package) para el hardware específico
-#include "bsp_i2c.h"
-#include "bsp_spi.h"
-#include "bsp_display.h"
-#include "bsp_touch.h"
-#include "bsp_sdcard.h"
-#include "bsp_battery.h"
-#include "bsp_qmi8658.h"
-#include "bsp_wifi.h"
+// #include "bsp_i2c.h"
+// #include "bsp_spi.h"
+// #include "bsp_display.h"
+// #include "bsp_touch.h"
+// #include "bsp_sdcard.h"
+// #include "bsp_battery.h"
+// #include "bsp_qmi8658.h"
+// #include "bsp_wifi.h"
+#include "bsp_api.h"
+
 
 // Includes de LVGL
 #include "esp_lvgl_port.h"
