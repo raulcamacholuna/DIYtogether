@@ -1,36 +1,58 @@
-# CMakeLists.txt para el componente padre diymon_bsp
-# Este es el único jefe. Él decide qué drivers se compilan.
+# CMakeLists.txt para el componente diymon_bsp
+# Versión final: Modular, robusta y a prueba de futuro.
 
-# 1. Determinamos en qué subcarpeta están los ficheros de la placa elegida.
-if(CONFIG_DIYMON_BOARD_ORIGINAL)
-    set(BSP_SUBDIR ${CMAKE_CURRENT_LIST_DIR}/bsp_original)
-elseif(CONFIG_DIYMON_BOARD_WAVESHARE_C6)
-    set(BSP_SUBDIR ${CMAKE_CURRENT_LIST_DIR}/bsp_waveshare_c6)
-endif()
+# -----------------------------------------------------------------------------
+# PASO 1: PUNTO ÚNICO DE CONFIGURACIÓN
+# -----------------------------------------------------------------------------
+set(BOARD_SUBDIR "WS1.9TS")
 
-# 2. Buscamos TODOS los ficheros .c que haya en esa subcarpeta.
-file(GLOB BSP_SOURCES "${BSP_SUBDIR}/*.c")
+# -----------------------------------------------------------------------------
+# PASO 2: DETECCIÓN AUTOMÁTICA DE FUENTES
+# -----------------------------------------------------------------------------
+set(BSP_PATH ${CMAKE_CURRENT_LIST_DIR}/${BOARD_SUBDIR})
+file(GLOB BSP_SOURCES "${BSP_PATH}/*.c")
 
-# 3. Registramos ESTE componente (diymon_bsp) usando los ficheros que hemos encontrado.
-#    El hijo ya no se registra, solo aporta sus ficheros.
+# -----------------------------------------------------------------------------
+# PASO 3: LISTA COMPLETA DE DEPENDENCIAS (LA CLAVE DE LA SOLUCIÓN)
+# -----------------------------------------------------------------------------
+# Aquí declaramos TODAS las herramientas que CUALQUIER placa pueda necesitar.
+set(BSP_DEPS
+    # Drivers específicos de ESP-IDF
+    esp_driver_i2c
+    esp_driver_gpio
+    esp_driver_spi
+    esp_driver_ledc
+    sdmmc
+    
+    # --- [LA CORRECCIÓN ESTÁ AQUÍ] ---
+    # Al añadir "esp_lcd", le decimos a CMake: "Oye, mi componente necesita
+    # los archivos de cabecera (.h) y las librerías del driver LCD de Espressif".
+    # Esto resuelve el error "esp_lcd.h: No such file or directory".
+    esp_lcd
+    esp_lcd_touch
+    esp_adc
+    log
+    nvs_flash
+    fatfs
+    lwip
+    esp_wifi
+
+    # Tus otros componentes personalizados
+    lvgl
+    esp_lvgl_port
+    esp_lcd_jd9853
+    esp_lcd_touch_axs5106
+)
+
+# -----------------------------------------------------------------------------
+# PASO 4: REGISTRAR EL COMPONENTE
+# -----------------------------------------------------------------------------
+# Finalmente, registramos el componente. La directiva "REQUIRES" consume
+# nuestra lista de dependencias y las enlaza correctamente.
 idf_component_register(
     SRCS ${BSP_SOURCES}
     INCLUDE_DIRS 
         "include"
-        ${BSP_SUBDIR} # Añadimos la carpeta del hijo a las rutas de inclusión
-    
-    # Lista completa de permisos que cualquiera de los drivers pueda necesitar.
-    REQUIRES 
-        "log"
-        "nvs_flash"
-        "lvgl"
-        "esp_lvgl_port"
-        "esp_lcd"
-        "driver"
-        "esp_adc"
-        "fatfs"
-        "lwip"
-        "esp_wifi"
-        "esp_lcd_jd9853"
-        "esp_lcd_touch_axs5106"
+        ${BSP_PATH}
+    REQUIRES ${BSP_DEPS}  # Aquí se usan todas las dependencias definidas arriba
 )

@@ -1,9 +1,15 @@
 dependencies:
   # esp_lvgl_port y lvgl son ahora componentes locales en la carpeta 'components'
   espressif/esp_lcd_touch: "*"
+  espressif/esp_lvgl_port: "~2.6.0"  # Versión del port para LVGL v9
+  lvgl/lvgl: "~9.1.0"  # Nuestra versión de LVGL 9
   idf: ">=5.0"
 
 # Esta sección le indica al gestor de componentes que, si algún componente
 # pide 'lvgl/lvgl', debe usar nuestra versión local en su lugar.
 override_path:
-  lvgl/lvgl: "./components/lvgl__lvgl/"
+  espressif/esp_lcd_touch: "./components/components_dependencies/esp_lcd_touch"
+  espressif/esp_lvgl_port: "./components/components_dependencies/esp_lvgl_port"
+  lvgl/lvgl: "./components_dependencies/lvgl/"
+
+build_args_local: "--rules-container=rules-mk"

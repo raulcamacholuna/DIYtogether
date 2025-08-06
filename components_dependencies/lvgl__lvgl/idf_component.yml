@@ -1,5 +1,0 @@
-## Este fichero le dice al sistema de compilación de ESP-IDF la versión de este componente.
-## Es crucial para que otros componentes (como esp_lvgl_port) sepan con qué API interactuar.
-version: "8.4.0"
-description: "LVGL graphics library (local copy)"
-url: "https://github.com/lvgl/lvgl"

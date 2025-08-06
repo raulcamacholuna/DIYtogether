@@ -1,20 +1,27 @@
-idf_component_register(SRCS "hardware_manager.c" "main.c"
-                       # Añade aquí otros ficheros .c o .cpp que tengas en el directorio 'main'
+# CMakeLists.txt para el componente principal de la aplicación
 
-                       # Esto añade el directorio 'main' a la ruta de inclusión para este componente.
-                       INCLUDE_DIRS "."
+idf_component_register(
+    SRCS 
+        "main.c"
+        "hardware_manager.c"
+        # ...añade aquí otros ficheros .c que tengas en 'main'...
+    INCLUDE_DIRS "."
+    
+    # [LA SOLUCIÓN FINAL]
+    # Declaramos TODAS las dependencias que nuestra aplicación y sus
+    # componentes (como el BSP) necesitan para comunicarse entre sí.
+    REQUIRES
+        # Tus componentes de alto nivel
+        diymon_bsp
+        diymon_core
+        diymon_ui
 
-                       # Lista de otros componentes de los que 'main' depende.
-                       REQUIRES
-                           # --- Componentes del sistema ESP-IDF ---
-                           nvs_flash
-
-                           # --- Componentes de la Interfaz Gráfica ---
-                           esp_lvgl_port
-                           lvgl
-
-                           # --- Componentes de Hardware y propios ---
-                           diymon_bsp
-                           diymon_ui
-                           diymon_core
+        # Los drivers de bajo nivel que el BSP expone en su API
+        esp_lcd
+        esp_lcd_touch
+        driver
+        esp_driver_i2c
+        esp_driver_spi
+        sdmmc
+        fatfs
 )

@@ -1,31 +1,31 @@
 # CMakeLists.txt para el componente 'diymon_ui'.
-# Versión automatizada para gestionar fácilmente los archivos generados por EEZ Studio.
+# Versión corregida y optimizada.
 
-# 1. Buscar automáticamente todos los archivos fuente (.c) en este directorio.
-#    La función file(GLOB ...) crea una lista de todos los archivos que terminan en .c
-#    y la guarda en la variable 'component_sources'.
-set(component_sources
-    "actions.c"
-    "screens.c"
-    "styles.c"
-    "ui.c"
+# 1. Buscar automáticamente todos los archivos fuente (.c).
+#    Esto es más robusto que una lista manual. Si añades un nuevo archivo,
+#    lo encontrará solo.
+file(GLOB component_sources 
+    "*.c"
+    "actions/*.c"   # Asumiendo que pudieras tener archivos .c aquí
+    "screens/*.c"
+    "styles/*.c"
 )
 
-# 2. Registrar el componente con la lista de archivos que hemos encontrado.
+# 2. Registrar el componente con toda su información.
 idf_component_register(
-    # SRCS: Usa la variable que hemos creado con todos los archivos .c
     SRCS ${component_sources}
-
-    # INCLUDE_DIRS: Permite que otros componentes puedan hacer #include "fichero.h" de este.
     INCLUDE_DIRS "."
-
-    # PRIV_INCLUDE_DIRS: Directorios de inclusión privados para este componente.
     PRIV_INCLUDE_DIRS "."
     
-    # REQUIRES: Lista de otros componentes de los que 'diymon_ui' depende.
-    # - lvgl: Necesario porque toda la UI está basada en él.
-    # - NOTA: En ESP-IDF v5.x, 'esp_log' se incluye automáticamente y NO debe listarse aquí.
+    # --- [LA CORRECCIÓN CLAVE ESTÁ AQUÍ] ---
     REQUIRES 
-        "lvgl__lvgl"
-        "diymon_core"
+        # CORRECCIÓN 1: El nombre estándar del componente es "lvgl"
+        lvgl
+
+        # CORRECCIÓN 2: AÑADIMOS LA DEPENDENCIA QUE FALTABA
+        # La UI necesita "hablar" con el BSP para poder usar la pantalla.
+        diymon_bsp
+
+        # La dependencia a diymon_core (si la necesitas)
+        diymon_core
 )

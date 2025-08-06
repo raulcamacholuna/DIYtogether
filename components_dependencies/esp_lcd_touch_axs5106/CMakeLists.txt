@@ -5,7 +5,7 @@ idf_component_register(
     # [CORRECCIÓN] Le recordamos quién es su padre y qué otras herramientas necesita
     REQUIRES 
         "esp_lcd"
-        "espressif/esp_lcd_touch" # ¡El nombre correcto de su padre!
+        "esp_lcd_touch" # ¡El nombre correcto de su padre!
         "driver"
         "log"
 )
