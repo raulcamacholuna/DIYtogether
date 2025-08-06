@@ -1,0 +1,16 @@
+ dependencies:
+      espressif/esp_lvgl_port:
+        version: "~2.6.0"
+        override_path: "components_dependencies/esp_lvgl_port"
+      espressif/esp_lcd_touch:
+        version: "~1.1.2"
+        override_path: "components_dependencies/esp_lcd_touch"
+      lvgl/lvgl:
+        version: "~8.4.0"
+        override_path: "components_dependencies/lvgl"
+      espressif/esp_lcd_jd9853:
+        version: "*"
+        override_path: "components_dependencies/esp_lcd_jd9853"
+      espressif/esp_lcd_touch_axs5106:
+        version: "*"
+        override_path: "components_dependencies/esp_lcd_touch_axs5106"

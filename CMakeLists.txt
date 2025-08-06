@@ -4,3 +4,5 @@ cmake_minimum_required(VERSION 3.5)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(DIYTOGUETHER)
+# Le decimos al sistema que, además de 'components', también busque herramientas en nuestro almacén local.
+set(EXTRA_COMPONENT_DIRS components_dependencies)
