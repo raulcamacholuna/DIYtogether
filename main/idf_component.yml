@@ -1,13 +1,21 @@
-## IDF Component Manager Manifest File
+## idf_component.yml for main component
+
 dependencies:
-  # Required IDF version
-  idf: ">=5.0"
+  # El cerebro de la lógica
+  diymon_core:
+    path: ../components/diymon_core
+  
+  # La cara y los músculos
+  diymon_ui:
+    path: ../components/diymon_ui
+  
+  # El sistema nervioso y los huesos
+  diymon_bsp:
+    path: ../components/diymon_bsp
 
-  # LVGL graphics library
-  lvgl/lvgl: "^8.4.0"
-
-  # Porting layer for LVGL on ESP chips
-  espressif/esp_lvgl_port: "*"
-
-  # General touch driver
-  espressif/esp_lcd_touch: "*"
+  # --- [LA CORRECCIÓN] ---
+  # El puente que nos da lvgl_helpers.h y conecta LVGL con el hardware
+  espressif/esp_lvgl_port: "~2.6.0"
+  
+  # La librería de gráficos
+  lvgl/lvgl: "~8.4.0"
