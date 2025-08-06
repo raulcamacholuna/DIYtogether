@@ -1,0 +1,30 @@
+# CMakeLists.txt para los drivers de la placa original de DIYMON
+# Basado en la configuración original para asegurar la compatibilidad total.
+
+# Busca automáticamente todos los ficheros .c en este directorio
+file(GLOB_RECURSE SRC_FILES "*.c")
+
+idf_component_register(
+    SRCS ${SRC_FILES}
+    INCLUDE_DIRS "."
+    
+    # [CORRECCIÓN] Lista completa y correcta de dependencias de bajo nivel
+    # que necesitan estos drivers para funcionar.
+    REQUIRES 
+        "log"           # Para los mensajes ESP_LOGI
+        "lvgl"          # Necesario si alguna función BSP interactúa con tipos de LVGL
+        "esp_lvgl_port" # Necesario por el mismo motivo
+
+        # --- Dependencias de Hardware de bajo nivel (las que me faltaban) ---
+        "esp_lcd"       # El controlador genérico de pantallas de ESP-IDF
+        "driver"        # Drivers de periféricos (gpio, i2c, spi)
+        "esp_adc"       # Para leer valores analógicos (batería)
+        "fatfs"         # Sistema de ficheros para la SD
+        "nvs_flash"     # Memoria no volátil
+        "lwip"          # Pila TCP/IP para el WiFi
+        "esp_wifi"      # El driver de WiFi
+
+        # --- Componentes específicos que usabas antes ---
+        "esp_lcd_jd9853"      # El driver específico de tu pantalla
+        "esp_lcd_touch_axs5106" # El driver específico de tu panel táctil
+)

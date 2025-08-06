@@ -14,7 +14,7 @@ idf_component_register(SRCS "hardware_manager.c" "main.c"
                            lvgl
 
                            # --- Componentes de Hardware y propios ---
-                           esp_bsp
+                           diymon_bsp
                            diymon_ui
                            diymon_core
 )

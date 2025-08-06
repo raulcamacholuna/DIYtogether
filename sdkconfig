@@ -634,6 +634,13 @@ CONFIG_ESP_WIFI_PASSWORD="mypassword"
 # end of Example Configuration
 
 #
+# DIYMON Board Support Package
+#
+CONFIG_DIYMON_BOARD_ORIGINAL=y
+# CONFIG_DIYMON_BOARD_WAVESHARE_C6 is not set
+# end of DIYMON Board Support Package
+
+#
 # Compiler options
 #
 CONFIG_COMPILER_OPTIMIZATION_DEBUG=y
