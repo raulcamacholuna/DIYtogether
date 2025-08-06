@@ -2,8 +2,7 @@
  * =====================================================================================
  *       Filename:  ui.c
  *    Description:  Orquestador principal de la UI de DIYMON.
- *                  Gestiona las animaciones desde la SD.
- *        Version:  5.1 (Limpio y corregido para LVGL 8)
+ *        Version:  5.2 (CORREGIDO para LVGL 8.4.0)
  * =====================================================================================
  */
 
@@ -13,10 +12,9 @@
 #include "ui_priv.h"
 #include "diymon_evolution.h"
 
-// [IMPORTANTE] Cabeceras necesarias para los widgets que usamos
+// [CORRECCIÓN] En LVGL 8, solo necesitamos la cabecera principal.
+// Las funciones de los widgets se incluyen automáticamente si están activadas en lv_conf.h
 #include "lvgl.h"
-#include "src/widgets/lv_gif.h"
-#include "src/widgets/lv_animimg.h" // Para controlar los GIFs
 
 #include "esp_log.h"
 #include <stdio.h>
@@ -31,16 +29,11 @@ static lv_obj_t *getLvglObjectFromIndex(int32_t index) {
     return ((lv_obj_t **)&objects)[index];
 }
 
-
 // ----- Funciones de gestión de animaciones -----
 
-/**
- * @brief Actualiza el sprite principal del DIYMON basándose en su código evolutivo actual.
- *        Esta animación (idle) se repite infinitamente.
- */
 void ui_update_diymon_sprite(void) {
     if (!g_diymon_gif_obj) {
-        ESP_LOGE(TAG, "El objeto GIF del DIYMON (g_diymon_gif_obj) no ha sido creado en screens.c!");
+        ESP_LOGE(TAG, "El objeto GIF (g_diymon_gif_obj) no ha sido creado en screens.c!");
         return;
     }
 
@@ -55,12 +48,9 @@ void ui_update_diymon_sprite(void) {
     lv_animimg_start(g_diymon_gif_obj);
 }
 
-/**
- * @brief Lanza una animación de acción que se reproduce una sola vez.
- */
 void ui_play_action_animation(const char* action_name) {
     if (!g_diymon_gif_obj) {
-        ESP_LOGE(TAG, "El objeto GIF del DIYMON (g_diymon_gif_obj) no ha sido creado!");
+        ESP_LOGE(TAG, "El objeto GIF (g_diymon_gif_obj) no ha sido creado!");
         return;
     }
 
@@ -71,27 +61,17 @@ void ui_play_action_animation(const char* action_name) {
     ESP_LOGI(TAG, "Lanzando animación de acción desde: %s", gif_path);
     
     lv_gif_set_src(g_diymon_gif_obj, gif_path);
-    
-    // Le decimos que se reproduzca una sola vez
     lv_animimg_set_repeat_count(g_diymon_gif_obj, 1);
-    
-    // Y la reiniciamos
     lv_animimg_start(g_diymon_gif_obj);
-
-    // NOTA: Para que vuelva a la animación 'idle' automáticamente,
-    // necesitaremos un temporizador o un evento 'LV_EVENT_READY' en el futuro.
 }
-
 
 // ----- Funciones de inicialización y control de la UI -----
 
 static void ui_connect_dynamic_actions() {
     ESP_LOGI(TAG, "Conectando acciones al sistema dinámico...");
     if (objects.comer) {
-        // La función 'action_comer' ya no es necesaria, conectamos directamente al orquestador.
         lv_obj_add_event_cb(objects.comer, execute_diymon_action, LV_EVENT_CLICKED, (void *)ACTION_ID_COMER);
     }
-    // ... aquí conectarías otros botones como 'pesas' o 'atacar' de la misma forma ...
 }
 
 void loadScreen(enum ScreensEnum screenId) {
@@ -105,10 +85,7 @@ void loadScreen(enum ScreensEnum screenId) {
 void ui_init() {
     create_screens();
     ui_connect_dynamic_actions();
-    
-    // Al iniciar la UI, cargamos el sprite correspondiente al estado guardado en memoria.
     ui_update_diymon_sprite();
-
     loadScreen(SCREEN_ID_MAIN);
     ESP_LOGI(TAG, "UI de DIYMON inicializada y lista.");
 }

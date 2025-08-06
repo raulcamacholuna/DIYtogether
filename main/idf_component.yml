@@ -4,7 +4,7 @@ dependencies:
   idf: ">=5.0"
 
   # LVGL graphics library
-  lvgl/lvgl: "^8.3.0"
+  lvgl/lvgl: "^8.4.0"
 
   # Porting layer for LVGL on ESP chips
   espressif/esp_lvgl_port: "*"
