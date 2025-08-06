@@ -20,36 +20,28 @@ dependencies:
       type: service
     version: 1.1.2
   espressif/esp_lvgl_port:
-    component_hash: e720c95cf0667554a204591bb5fade4655fb2990465557041200fa44b5bc7556
-    dependencies:
-    - name: idf
-      require: private
-      version: '>=4.4'
-    - name: lvgl/lvgl
-      registry_url: https://components.espressif.com
-      require: public
-      version: '>=8,<10'
+    dependencies: []
     source:
-      registry_url: https://components.espressif.com/
-      type: service
+      path: Z:\DIYMON\VSCODE\DIYToguether\components\espressif__esp_lvgl_port
+      type: local
     version: 2.6.0
   idf:
     source:
       type: idf
     version: 5.5.0
   lvgl/lvgl:
-    component_hash: d7c1ac037ae6e85d94897f807d6e7ba0946a83e720074fc95a4f6241da9f9f53
+    component_hash: b702d642e03e95928046d5c6726558e6444e112420c77efa5fdb6650b0a13c5d
     dependencies: []
     source:
       registry_url: https://components.espressif.com/
       type: service
-    version: 8.4.0
+    version: 9.3.0
 direct_dependencies:
 - espressif/cmake_utilities
 - espressif/esp_lcd_touch
 - espressif/esp_lvgl_port
 - idf
 - lvgl/lvgl
-manifest_hash: 8d815e09ce679ad6e2a7b22498a341bffad1c6bacd5afe3f62f67e9a865dc2cb
+manifest_hash: 0db112430786cd5071c0c58e6492e152f5b571b6141b3fd1332033c87cd2ba41
 target: esp32c6
 version: 2.0.0

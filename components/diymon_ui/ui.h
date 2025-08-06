@@ -1,33 +1,34 @@
-#ifndef EEZ_LVGL_UI_GUI_H
-#define EEZ_LVGL_UI_GUI_H
+#ifndef UI_H_
+#define UI_H_
 
-#include <lvgl.h>
-
-
-
-#if defined(EEZ_FOR_LVGL)
-#include <eez/flow/lvgl_api.h>
-#endif
-
-#if !defined(EEZ_FOR_LVGL)
+#include "lvgl.h"
 #include "screens.h"
-#endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-
-
 void ui_init();
 void ui_tick();
-
-#if !defined(EEZ_FOR_LVGL)
 void loadScreen(enum ScreensEnum screenId);
-#endif
+
+// ----- [NUEVO] DECLARACIÓN DE NUESTRAS FUNCIONES PÚBLICAS -----
+// Ahora main.c y actions.c sabrán que estas funciones existen.
+
+/**
+ * @brief Actualiza el sprite del DIYMON basándose en su estado actual.
+ */
+void ui_update_diymon_sprite(void);
+
+/**
+ * @brief Reproduce una animación de acción (ej: "comer") desde la SD.
+ * @param action_name El nombre del fichero GIF (sin la extensión).
+ */
+void ui_play_action_animation(const char* action_name);
+
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // EEZ_LVGL_UI_GUI_H
+#endif /*UI_H_*/

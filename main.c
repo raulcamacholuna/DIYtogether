@@ -128,9 +128,6 @@ static esp_err_t app_lvgl_init(void)
         },
         .flags = {
             .buff_dma = true,
-#if LVGL_VERSION_MAJOR >= 9
-            .swap_bytes = true,
-#endif
         }};
 #if EXAMPLE_DISPLAY_ROTATION == 90
     disp_cfg.rotation.swap_xy = true;

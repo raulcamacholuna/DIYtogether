@@ -44,6 +44,7 @@ static void evolution_timer_callback(void* arg) {
     if (next_evolution != NULL) {
         ESP_LOGI(TAG, "¡EVOLUCIÓN! Nuevo código: %s", next_evolution);
         diymon_set_current_code(next_evolution);
+        ui_update_diymon_sprite();
     } else {
         ESP_LOGI(TAG, "El DIYMON ha alcanzado su forma final. Deteniendo temporizador de evolución.");
         // Ahora, al llamar a stop, el handle es válido porque es estático.

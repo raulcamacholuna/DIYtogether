@@ -1,5 +1,9 @@
 dependencies:
-  lvgl/lvgl: "^8.4.0"
-  espressif/esp_lvgl_port: "*"
+  # esp_lvgl_port y lvgl son ahora componentes locales en la carpeta 'components'
   espressif/esp_lcd_touch: "*"
   idf: ">=5.0"
+
+# Esta sección le indica al gestor de componentes que, si algún componente
+# pide 'lvgl/lvgl', debe usar nuestra versión local en su lugar.
+override_path:
+  lvgl/lvgl: "./components/lvgl__lvgl/"

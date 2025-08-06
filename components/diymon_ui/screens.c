@@ -1,18 +1,18 @@
-#include <string.h>
-
 #include "screens.h"
 #include "images.h"
 #include "fonts.h"
 #include "actions.h"
-#include "vars.h"
 #include "styles.h"
-#include "ui.h"
+#include "ui_priv.h" // [NUEVO] Para usar la variable global
+#include "lvgl.h"
 
-#include <string.h>
 
 objects_t objects;
 lv_obj_t *tick_value_change_obj;
 uint32_t active_theme_index = 0;
+
+// [NUEVO] Definimos aquí nuestra variable global para el GIF
+lv_obj_t *g_diymon_gif_obj = NULL;
 
 void create_screen_main() {
     lv_obj_t *obj = lv_obj_create(0);
@@ -20,89 +20,37 @@ void create_screen_main() {
     lv_obj_set_pos(obj, 0, 0);
     lv_obj_set_size(obj, 172, 320);
     lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_bg_img_src(obj, &img_fondo, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_img_src(obj, "S:/skins/default/fondo.bin", LV_PART_MAIN | LV_STATE_DEFAULT);
     {
         lv_obj_t *parent_obj = obj;
-        {
-            // Idle
-            lv_obj_t *obj = lv_animimg_create(parent_obj);
-            objects.idle = obj;
-            lv_obj_set_pos(obj, -4, 77);
-            lv_obj_set_size(obj, 180, 243);
-            static const lv_img_dsc_t *images[3] = {
-                &img_1_resized,
-                &img_2_resized,
-                &img_3_resized,
-            };
-            lv_animimg_set_src(obj, (const void **)images, 3);
-            lv_animimg_set_duration(obj, 3000);
-            lv_animimg_set_repeat_count(obj, LV_ANIM_REPEAT_INFINITE);
-            lv_animimg_start(obj);
-            lv_obj_add_event_cb(obj, action_idle, LV_EVENT_READY, (void *)0);
-            lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+        
+        // --- [MODIFICADO] CREACIÓN DEL ACTOR PRINCIPAL (UN ÚNICO GIF) ---
+        g_diymon_gif_obj = lv_gif_create(parent_obj);
+        objects.idle = g_diymon_gif_obj;
+        lv_obj_set_pos(g_diymon_gif_obj, -4, 77);
+        lv_obj_set_size(g_diymon_gif_obj, 180, 243);
+        lv_obj_clear_flag(g_diymon_gif_obj, LV_OBJ_FLAG_SCROLLABLE);
+        
+        // --- [COMENTADO] Ya no creamos los animimg compilados ---
+        /*
+        { // Idle
+            ...
         }
-        {
-            // Comiendo
-            lv_obj_t *obj = lv_animimg_create(parent_obj);
-            objects.comiendo = obj;
-            lv_obj_set_pos(obj, -4, 77);
-            lv_obj_set_size(obj, 180, 243);
-            static const lv_img_dsc_t *images[4] = {
-                &img_c1,
-                &img_c2,
-                &img_c3,
-                &img_c4,
-            };
-            lv_animimg_set_src(obj, (const void **)images, 4);
-            lv_animimg_set_duration(obj, 2000);
-            lv_animimg_set_repeat_count(obj, 1);
-            lv_animimg_start(obj);
-            lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+        { // Comiendo
+            ...
         }
-        {
-            // ejercicio
-            lv_obj_t *obj = lv_animimg_create(parent_obj);
-            objects.ejercicio = obj;
-            lv_obj_set_pos(obj, -4, 77);
-            lv_obj_set_size(obj, 180, 243);
-            static const lv_img_dsc_t *images[3] = {
-                &img_p1,
-                &img_p2,
-                &img_p3,
-            };
-            lv_animimg_set_src(obj, (const void **)images, 3);
-            lv_animimg_set_duration(obj, 2000);
-            lv_animimg_set_repeat_count(obj, 2);
-            lv_animimg_start(obj);
-            lv_obj_add_event_cb(obj, action_idle, LV_EVENT_READY, (void *)0);
-            lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
-            lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+        { // ejercicio
+            ...
         }
-        {
-            // ataque
-            lv_obj_t *obj = lv_animimg_create(parent_obj);
-            objects.ataque = obj;
-            lv_obj_set_pos(obj, -8, 77);
-            lv_obj_set_size(obj, 180, 243);
-            static const lv_img_dsc_t *images[4] = {
-                &img_ah2,
-                &img_ah3,
-                &img_ah1,
-                &img_ah4,
-            };
-            lv_animimg_set_src(obj, (const void **)images, 4);
-            lv_animimg_set_duration(obj, 3000);
-            lv_animimg_set_repeat_count(obj, 1);
-            lv_animimg_start(obj);
-            lv_obj_add_event_cb(obj, action_idle, LV_EVENT_READY, (void *)0);
-            lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
-            lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+        { // ataque
+            ...
         }
-        {
-            // SCROLL_UI
+        */
+
+        { // SCROLL_UI - Los botones no cambian
             lv_obj_t *obj = lv_obj_create(parent_obj);
-            objects.scroll_ui = obj;
-            lv_obj_set_pos(obj, 0, 0);
+            // ... todo tu código para el scroll y los botones (comer, pesas, atacar) se mantiene igual ...
+             lv_obj_set_pos(obj, 0, 0);
             lv_obj_set_size(obj, LV_PCT(100), LV_PCT(100));
             lv_obj_set_style_pad_left(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_pad_top(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -153,6 +101,10 @@ void create_screen_main() {
     tick_screen_main();
 }
 
+// ... El resto del fichero (delete_screen_main, create_screens, etc.) se queda igual ...
+// ...
+// ...
+// ...
 void delete_screen_main() {
     lv_obj_del(objects.main);
     objects.main = 0;

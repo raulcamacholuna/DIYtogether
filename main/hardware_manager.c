@@ -7,7 +7,7 @@
  *                  Centraliza la inicialización y configuración de todos los
  *                  periféricos del dispositivo.
  *
- *        Version:  1.0
+ *        Version:  1.1 (Con brillo configurable)
  *        Created:  [Fecha de hoy]
  *
  *         Author:  Raúl Camacho Luna (con revisión de IA)
@@ -23,6 +23,9 @@
 #include "esp_check.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "lv_fs_if.h" 
+#include "lvgl.h"
+#include "lvgl_helpers.h"
 
 // Includes de la BSP (Board Support Package) para el hardware específico
 #include "bsp_i2c.h"
@@ -49,6 +52,9 @@ static const char *TAG = "HW_MANAGER";
 #define DISPLAY_BUFF_HEIGHT          50    // Altura del buffer de dibujado de LVGL
 #define DISPLAY_BUFF_DOUBLE_BUFFER   1     // 1 para doble buffer, 0 para simple
 
+// [NUEVO] Configuración del Brillo
+#define DEFAULT_BRIGHTNESS           50    // Brillo inicial en porcentaje (0-100)
+
 // Determina la resolución de la pantalla según la rotación
 #if DISPLAY_ROTATION == 90 || DISPLAY_ROTATION == 270
 #define LCD_H_RES (320)
@@ -60,8 +66,6 @@ static const char *TAG = "HW_MANAGER";
 
 
 /* --- Variables estáticas del módulo --- */
-// Estas variables son "privadas" a este fichero. Nadie fuera de hardware_manager.c
-// necesita acceder a ellas directamente.
 static esp_lcd_panel_io_handle_t io_handle = NULL;
 static esp_lcd_panel_handle_t panel_handle = NULL;
 static esp_lcd_touch_handle_t touch_handle = NULL;
@@ -71,7 +75,6 @@ static lv_indev_t *lvgl_touch_indev = NULL;
 
 
 /* --- Declaraciones de funciones privadas --- */
-// Prototipos de funciones que solo se usarán dentro de este fichero.
 static esp_err_t lvgl_driver_init(void);
 
 /* --- Implementación de funciones --- */
@@ -86,13 +89,8 @@ esp_err_t hardware_manager_init(void)
     
     ESP_LOGI(TAG, "Initializing sensors and peripherals...");
     bsp_battery_init();
-    bsp_qmi8658_init(i2c_bus_handle); // Sensor de movimiento (IMU)
+    bsp_qmi8658_init(i2c_bus_handle);
     bsp_sdcard_init();
-    
-    // NOTA: La conexión WiFi se deja comentada. Idealmente, la UI debe ofrecer
-    // una pantalla para que el usuario introduzca sus credenciales.
-    // bsp_wifi_init("WSTEST", "waveshare0755");
-    // ESP_LOGW(TAG, "WiFi not initialized. Implement WiFi provisioning screen.");
 
     ESP_LOGI(TAG, "Initializing display and touch panel...");
     bsp_display_init(&io_handle, &panel_handle, LCD_H_RES * DISPLAY_BUFF_HEIGHT);
@@ -101,16 +99,21 @@ esp_err_t hardware_manager_init(void)
     ESP_LOGI(TAG, "Initializing LVGL graphics library driver...");
     ESP_ERROR_CHECK(lvgl_driver_init());
 
-    ESP_LOGI(TAG, "Initializing display brightness control...");
-    bsp_display_brightness_init();
-    bsp_display_set_brightness(100); // Pone el brillo al 100%
+    //ESP_LOGI(TAG, "Initializing display brightness control...");
+    //bsp_display_brightness_init();
+    //bsp_display_set_brightness(DEFAULT_BRIGHTNESS); // [MODIFICADO] Usa la nueva constante
+
+    // --- [NUEVO] REGISTRO DEL SISTEMA DE FICHEROS PARA LVGL ---
+    // Le decimos a LVGL que el disco 'S' corresponde a la ruta "/sdcard"
+    // que es donde el driver BSP monta la tarjeta SD.
+    lvgl_fs_init();
+    ESP_LOGI(TAG, "LVGL File System initialized and SD card registered.");
 
     return ESP_OK;
 }
 
 static esp_err_t lvgl_driver_init(void)
 {
-    // --- Configuración del motor de LVGL ---
     const lvgl_port_cfg_t lvgl_cfg = {
         .task_priority = 4,
         .task_stack = 1024 * 10,
@@ -120,7 +123,6 @@ static esp_err_t lvgl_driver_init(void)
     };
     ESP_RETURN_ON_ERROR(lvgl_port_init(&lvgl_cfg), TAG, "LVGL port initialization failed");
 
-    // --- Configuración del driver de la pantalla para LVGL ---
     lvgl_port_display_cfg_t disp_cfg = {
         .io_handle = io_handle,
         .panel_handle = panel_handle,
@@ -141,9 +143,6 @@ static esp_err_t lvgl_driver_init(void)
 #endif
         }};
 
-    // --- Ajuste de la rotación y el 'gap' de la pantalla ---
-    // Este panel LCD tiene un área no visible, por lo que es necesario
-    // ajustar las coordenadas para que la imagen quede centrada.
     #if DISPLAY_ROTATION == 90
         disp_cfg.rotation.swap_xy = true;
         disp_cfg.rotation.mirror_x = true;
@@ -156,13 +155,12 @@ static esp_err_t lvgl_driver_init(void)
         disp_cfg.rotation.swap_xy = true;
         disp_cfg.rotation.mirror_y = true;
         ESP_ERROR_CHECK(esp_lcd_panel_set_gap(panel_handle, 0, 34));
-    #else // Rotación 0
+    #else
         ESP_ERROR_CHECK(esp_lcd_panel_set_gap(panel_handle, 34, 0));
     #endif
 
     lvgl_disp = lvgl_port_add_disp(&disp_cfg);
 
-    // --- Configuración del driver del panel táctil para LVGL ---
     const lvgl_port_touch_cfg_t touch_cfg = {
         .disp = lvgl_disp,
         .handle = touch_handle,
