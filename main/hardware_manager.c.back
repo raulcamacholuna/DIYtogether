@@ -1,6 +1,6 @@
 /*
  * Archivo: hardware_manager.c
- * Versión: 9.0 (FINAL Y CORRECTA)
+ * Versión: 7.0 (FINAL - Limpio, sin pruebas)
  */
 
 #include "hardware_manager.h"
@@ -13,16 +13,13 @@ static const char *TAG = "HW_MANAGER";
 
 esp_err_t hardware_manager_init(void)
 {
-    // 1. INICIALIZAR TODO EL HARDWARE DE BAJO NIVEL (SD, I2C, SPI Display)
     ESP_LOGI(TAG, "Initializing Board Support Package hardware...");
     ESP_ERROR_CHECK(bsp_init());
 
-    // 2. INICIALIZAR EL MOTOR DE LVGL
     ESP_LOGI(TAG, "Initializing LVGL core...");
     const lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
     ESP_ERROR_CHECK(lvgl_port_init(&lvgl_cfg));
 
-    // 3. REGISTRAR EL DISPLAY EN LVGL (¡AHORA HABILITADO!)
     ESP_LOGI(TAG, "Registering display with LVGL...");
     lvgl_port_display_cfg_t disp_cfg = {
         .io_handle = bsp_get_panel_io_handle(),
@@ -37,7 +34,6 @@ esp_err_t hardware_manager_init(void)
     };
     lv_display_t *disp = lvgl_port_add_disp(&disp_cfg);
     
-    // 4. REGISTRAR EL PANEL TÁCTIL EN LVGL (¡AHORA HABILITADO!)
     ESP_LOGI(TAG, "Registering touch input with LVGL...");
     lvgl_port_touch_cfg_t touch_cfg = {
         .disp = disp,
@@ -48,7 +44,6 @@ esp_err_t hardware_manager_init(void)
         return ESP_FAIL;
     }
     
-    // 5. CONFIGURAR BRILLO
     ESP_LOGI(TAG, "Setting display brightness...");
     bsp_display_set_brightness(DEFAULT_BRIGHTNESS);
 
