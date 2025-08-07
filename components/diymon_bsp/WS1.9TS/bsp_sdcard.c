@@ -43,28 +43,7 @@ esp_err_t bsp_sdcard_init(void)
         .allocation_unit_size = 16 * 1024
     };
 
-    // 2. Configurar el bus SPI específicamente para la SD Card
-    spi_bus_config_t bus_cfg = {
-        .mosi_io_num = PIN_NUM_MOSI,
-        .miso_io_num = PIN_NUM_MISO,
-        .sclk_io_num = PIN_NUM_CLK,
-        .quadwp_io_num = -1,
-        .quadhd_io_num = -1,
-        .max_transfer_sz = 4096,
-    };
-    
-    // Inicializamos el bus SPI2. El DMA se asigna automáticamente (SPI_DMA_CH_AUTO)
-    // Es importante que si la pantalla ya inicializó este bus, no lo hagamos de nuevo.
-    // Una mejora futura sería asegurar que el bus se inicializa una sola vez.
-    ret = spi_bus_initialize(SPI2_HOST, &bus_cfg, SPI_DMA_CH_AUTO);
-    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
-        ESP_LOGE(TAG, "Failed to initialize SPI bus (%s).", esp_err_to_name(ret));
-        return ret;
-    }
-    // ESP_ERR_INVALID_STATE significa que el bus ya estaba inicializado, lo cual está bien.
-    if (ret == ESP_ERR_INVALID_STATE) {
-        ESP_LOGW(TAG, "SPI bus (SPI2_HOST) was already initialized.");
-    }
+
 
     // 3. Configurar el HOST (el controlador del bus SPI para la SD)
     // La estructura g_host ya se inicializó con SDSPI_HOST_DEFAULT()

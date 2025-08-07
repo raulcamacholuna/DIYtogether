@@ -16,7 +16,7 @@ esp_err_t hardware_manager_init(void)
     // 1. INICIALIZAR TODO EL HARDWARE DE BAJO NIVEL
     ESP_LOGI(TAG, "Initializing Board Support Package hardware...");
     ESP_ERROR_CHECK(bsp_init());
-    
+   
     // 2. INICIALIZAR EL MOTOR DE LVGL
     ESP_LOGI(TAG, "Initializing LVGL core...");
     const lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
@@ -25,10 +25,12 @@ esp_err_t hardware_manager_init(void)
     // 3. REGISTRAR EL DISPLAY EN LVGL
     ESP_LOGI(TAG, "Registering display with LVGL...");
     lvgl_port_display_cfg_t disp_cfg = {
+        .io_handle = bsp_get_panel_io_handle(),  // <-- Pasamos el handle de I/O
         .panel_handle = bsp_get_display_handle(),
         .hres = bsp_get_display_hres(),
         .vres = bsp_get_display_vres(),
         .double_buffer = 1,
+        .buffer_size = bsp_get_display_buffer_size(), // <-- Usamos tu nueva función
         .flags = {
             .buff_dma = true,
         }
@@ -54,7 +56,7 @@ esp_err_t hardware_manager_init(void)
     
     ESP_LOGI(TAG, "Setting display brightness...");
     bsp_display_set_brightness(DEFAULT_BRIGHTNESS);
-    
+
     ESP_LOGI(TAG, "Hardware Manager initialized successfully! Project is ready.");
     return ESP_OK;
 }
