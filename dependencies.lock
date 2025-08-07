@@ -57,6 +57,6 @@ direct_dependencies:
 - espressif/zlib
 - idf
 - lvgl/lvgl
-manifest_hash: f2b59ad87a0abe8068c979f5a10d43a1737d786bbeb1cc52167c153ee0fffd5c
+manifest_hash: 9dbfd9503591a886071dd65e43a16e0ccd62a461a0b180d405ec17276208046d
 target: esp32c6
 version: 2.0.0

@@ -78,11 +78,12 @@ void app_main(void)
 
     /* --- 4. Inicialización de la Interfaz de Usuario (UI) --- */
     ESP_LOGI(TAG, "Initializing DIYMON User Interface...");
-    if (lvgl_port_lock(0)) {
+    ui_init();
+   /* if (lvgl_port_lock(0)) {
         ui_init();
         lvgl_port_unlock();
     }
-    
+    */
 
     /* --- 5. Creación e Inicio del Temporizador de Evolución --- */
     const esp_timer_create_args_t evolution_timer_args = {

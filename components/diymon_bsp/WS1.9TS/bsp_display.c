@@ -88,7 +88,7 @@ esp_err_t bsp_display_init(void) {
     esp_lcd_panel_reset(g_panel_handle);
     esp_lcd_panel_init(g_panel_handle);
     esp_lcd_panel_swap_xy(g_panel_handle, true); 
-    esp_lcd_panel_set_gap(g_panel_handle, 0, 35); 
+    esp_lcd_panel_set_gap(g_panel_handle, 0, 0); 
     esp_lcd_panel_mirror(g_panel_handle, false, true);
     esp_lcd_panel_invert_color(g_panel_handle, false); 
     esp_lcd_panel_disp_on_off(g_panel_handle, true);
