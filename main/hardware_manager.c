@@ -1,93 +1,60 @@
 /*
- * =====================================================================================
- *       Filename:  hardware_manager.c
- *    Description:  Implementación del gestor de hardware para DIYMON.
- *        Version:  2.1 (ARQUITECTURA CON LVGL PORT CORRECTO)
- * =====================================================================================
+ * Archivo: hardware_manager.c
+ * Versión: 3.2 (FINALÍSIMA - Sincronizado con la API exacta de esp_lvgl_port)
  */
 
 #include "hardware_manager.h"
-
-// Includes generales del sistema y drivers
 #include "esp_log.h"
-#include "esp_check.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-
-// Includes de la BSP (Board Support Package)
 #include "bsp_api.h" 
-
-// Includes de LVGL
 #include "esp_lvgl_port.h"
 
-// TAG para los logs de este fichero
 static const char *TAG = "HW_MANAGER";
-
-#define DEFAULT_BRIGHTNESS           50
-
-/* --- Declaraciones de funciones privadas --- */
-// [EXPLICACIÓN] Ya no necesitamos esta función, su lógica se integra en el init.
-// static esp_err_t lvgl_driver_init(void);
-
-/* --- Implementación de funciones --- */
+#define DEFAULT_BRIGHTNESS 80
 
 esp_err_t hardware_manager_init(void)
 {
+    // 1. INICIALIZAR TODO EL HARDWARE DE BAJO NIVEL
     ESP_LOGI(TAG, "Initializing Board Support Package hardware...");
-    bsp_i2c_init();
-    bsp_spi_init();
-    bsp_display_init(); // Esto prepara el hardware del display
-    bsp_touch_init();   // Esto prepara el hardware del táctil
-    bsp_sdcard_init();  // Esto prepara el hardware de la SD
+    ESP_ERROR_CHECK(bsp_init());
     
-    // --- PASO 1: Inicializar el motor de LVGL ---
-    // Esto crea la tarea que gestionará LVGL, su temporizador, etc.
+    // 2. INICIALIZAR EL MOTOR DE LVGL
     ESP_LOGI(TAG, "Initializing LVGL core...");
     const lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
     ESP_ERROR_CHECK(lvgl_port_init(&lvgl_cfg));
 
-    // --- PASO 2: Registrar el DISPLAY en LVGL ---
-    // Ahora le decimos a LVGL: "¡Usa esta pantalla para dibujar!"
+    // 3. REGISTRAR EL DISPLAY EN LVGL
     ESP_LOGI(TAG, "Registering display with LVGL...");
-    // Creamos una configuración de display para el port
     lvgl_port_display_cfg_t disp_cfg = {
-        .io_handle = bsp_get_panel_io_handle(),     // Obtenemos el IO handle desde la BSP
-        .panel_handle = bsp_get_display_handle(),   // Obtenemos el panel handle desde la BSP
-        .buffer_size = bsp_get_display_buffer_size(), // Dejamos que la BSP decida el tamaño
-        .double_buffer = 1,                         // Usamos doble buffer
-        .hres = bsp_get_display_hres(),             // La resolución horizontal desde la BSP
-        .vres = bsp_get_display_vres(),             // La resolución vertical desde la BSP
-        .monochrome = false,
-        .rotation = {
-            .swap_xy = false,
-            .mirror_x = false,
-            .mirror_y = false,
-        },
+        .panel_handle = bsp_get_display_handle(),
+        .hres = bsp_get_display_hres(),
+        .vres = bsp_get_display_vres(),
+        .double_buffer = 1,
         .flags = {
-            .buff_dma = true, // Usar DMA para el buffer es más rápido
+            .buff_dma = true,
         }
     };
-    // Añadimos la pantalla a LVGL
-    ESP_ERROR_CHECK(lvgl_port_add_disp(&disp_cfg));
+    lv_display_t *disp = lvgl_port_add_disp(&disp_cfg);
     
-    // --- PASO 3: Registrar el panel TÁCTIL en LVGL ---
-    // Ahora le decimos a LVGL: "¡Usa este panel táctil para la entrada!"
+    // 4. REGISTRAR EL PANEL TÁCTIL EN LVGL
     ESP_LOGI(TAG, "Registering touch input with LVGL...");
-    lvgl_port_indev_cfg_t indev_cfg = {
-        .disp = lvgl_port_get_disp_default(), // Lo asociamos a la pantalla por defecto
-        .indev_type = LV_INDEV_TYPE_POINTER,
-        .handle = bsp_get_touch_handle()      // Obtenemos el handle del táctil desde la BSP
-    };
-    ESP_ERROR_CHECK(lvgl_port_add_indev(&indev_cfg));
     
-    ESP_LOGI(TAG, "Initializing display brightness control...");
+    // [CORRECCIÓN FINAL] La estructura SÍ necesita el handle del táctil,
+    // y la función 'lvgl_port_add_touch' SÓLO toma un argumento.
+    lvgl_port_touch_cfg_t touch_cfg = {
+        .disp = disp,                           // El miembro se llama 'disp'
+        .handle = bsp_get_touch_handle(),       // El miembro se llama 'handle'
+    };
+    
+    // [CORRECCIÓN FINAL] La función ahora solo tiene un argumento.
+    // No usamos ESP_ERROR_CHECK, pero verificamos que el puntero devuelto no sea NULL.
+    if (lvgl_port_add_touch(&touch_cfg) == NULL) {
+        ESP_LOGE(TAG, "Failed to register touch input device");
+        return ESP_FAIL; // Devolvemos un error si falla
+    }
+    
+    ESP_LOGI(TAG, "Setting display brightness...");
     bsp_display_set_brightness(DEFAULT_BRIGHTNESS);
     
-    // [EXPLICACIÓN] La función lvgl_fs_init() no es parte de esta librería.
-    // La gestión del sistema de ficheros se hace montando la SD en el VFS de ESP-IDF
-    // y luego registrando un driver en LVGL. Es un paso más avanzado que podemos
-    // ver después. Por ahora lo quitamos para que el núcleo funcione.
-    ESP_LOGI(TAG, "Hardware Manager initialized successfully!");
-
+    ESP_LOGI(TAG, "Hardware Manager initialized successfully! Project is ready.");
     return ESP_OK;
 }

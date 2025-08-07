@@ -1,31 +1,44 @@
-# CMakeLists.txt para el componente 'diymon_ui'.
-# Versión corregida y optimizada.
+# =====================================================================================
+#  CMakeLists.txt para el componente 'diymon_ui'
+#  Versión Definitiva: Automatizada, robusta y fácil de mantener.
+# =====================================================================================
 
-# 1. Buscar automáticamente todos los archivos fuente (.c).
-#    Esto es más robusto que una lista manual. Si añades un nuevo archivo,
-#    lo encontrará solo.
-file(GLOB component_sources 
+# 1. BÚSQUEDA AUTOMÁTICA DE ARCHIVOS FUENTE
+# -------------------------------------------------------------------------------------
+# La función file(GLOB ...) busca todos los archivos que coincidan con los patrones
+# y los guarda en la variable 'component_sources'.
+# Esto es la clave para que no tengas que editar este archivo nunca más.
+#
+# - "*.c":           Encuentra todos los .c en la raíz de 'diymon_ui' (ui.c, screens.c,
+#                    y tus nuevos archivos de imagen como attack.c, eat.c, etc.).
+# - "screens/*.c":   Encuentra los .c que puedas tener en la subcarpeta 'screens'.
+# - "actions/*.c":   Encuentra los .c que puedas tener en la subcarpeta 'actions'.
+# - "styles/*.c":    Encuentra los .c que puedas tener en la subcarpeta 'styles'.
+
+file(GLOB component_sources
     "*.c"
-    "actions/*.c"   # Asumiendo que pudieras tener archivos .c aquí
     "screens/*.c"
+    "actions/*.c"
     "styles/*.c"
 )
 
-# 2. Registrar el componente con toda su información.
+# 2. REGISTRO DEL COMPONENTE
+# -------------------------------------------------------------------------------------
+# Aquí le decimos a ESP-IDF todo lo que necesita saber sobre nuestro componente.
+
 idf_component_register(
+    # SRCS: Usa la lista de archivos que acabamos de encontrar automáticamente.
     SRCS ${component_sources}
+
+    # INCLUDE_DIRS: Permite que otros componentes (como 'main') puedan hacer #include "ui.h".
     INCLUDE_DIRS "."
+
+    # PRIV_INCLUDE_DIRS: Directorios de cabeceras solo para este componente.
     PRIV_INCLUDE_DIRS "."
     
-    # --- [LA CORRECCIÓN CLAVE ESTÁ AQUÍ] ---
+    # REQUIRES: La lista de otros componentes que 'diymon_ui' necesita para funcionar.
     REQUIRES 
-        # CORRECCIÓN 1: El nombre estándar del componente es "lvgl"
-        lvgl
-
-        # CORRECCIÓN 2: AÑADIMOS LA DEPENDENCIA QUE FALTABA
-        # La UI necesita "hablar" con el BSP para poder usar la pantalla.
-        diymon_bsp
-
-        # La dependencia a diymon_core (si la necesitas)
-        diymon_core
+        lvgl          # Necesario para todas las funciones de la librería gráfica.
+        diymon_bsp    # Necesario para interactuar con el hardware (pantalla, táctil).
+        diymon_core   # Necesario para la lógica del juego y la evolución.
 )

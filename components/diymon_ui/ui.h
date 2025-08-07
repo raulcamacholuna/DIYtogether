@@ -1,34 +1,34 @@
-#ifndef UI_H_
-#define UI_H_
-
-#include "lvgl.h"
-#include "screens.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-void ui_init();
-void ui_tick();
-void loadScreen(enum ScreensEnum screenId);
-
-// ----- [NUEVO] DECLARACIÓN DE NUESTRAS FUNCIONES PÚBLICAS -----
-// Ahora main.c y actions.c sabrán que estas funciones existen.
-
-/**
- * @brief Actualiza el sprite del DIYMON basándose en su estado actual.
+/*
+ * Archivo: ui.h
+ * Descripción: Interfaz PÚBLICA del componente de la UI.
+ *              Esta es la ÚNICA fuente de verdad para los tipos y enums compartidos.
+ * Versión: 8.0
  */
+#ifndef UI_H
+#define UI_H
+
+#include "lvgl.h" // Incluimos la cabecera principal de LVGL
+
+// --- DEFINICIONES COMPARTIDAS ---
+
+// [DEFINICIÓN ÚNICA] Enum para identificar las pantallas.
+enum ScreensEnum {
+    SCREEN_ID_MAIN = 1,
+};
+
+// [DEFINICIÓN ÚNICA] Enum para identificar las acciones de los botones.
+typedef enum {
+    ACTION_ID_COMER,
+    ACTION_ID_EJERCICIO,
+    ACTION_ID_ATACAR,
+} diymon_action_id_t;
+
+
+// --- FUNCIONES PÚBLICAS DE LA UI ---
+
+void ui_init(void);
 void ui_update_diymon_sprite(void);
-
-/**
- * @brief Reproduce una animación de acción (ej: "comer") desde la SD.
- * @param action_name El nombre del fichero GIF (sin la extensión).
- */
+void ui_update_diymon_background(void);
 void ui_play_action_animation(const char* action_name);
 
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /*UI_H_*/
+#endif // UI_H

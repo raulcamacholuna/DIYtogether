@@ -1,44 +1,23 @@
-#ifndef EEZ_LVGL_UI_SCREENS_H
-#define EEZ_LVGL_UI_SCREENS_H
+/*
+ * Archivo: screens.h
+ * Descripción: Declaraciones privadas para el módulo de pantallas.
+ * Versión: 8.0
+ */
+#ifndef SCREENS_H
+#define SCREENS_H
 
-#include <lvgl.h>
+#include "ui.h" // [AÑADIDO] Incluimos la API pública para obtener los enums correctos.
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+// [ELIMINADO] El enum ScreensEnum se ha movido a ui.h para ser la única fuente de verdad.
 
-typedef struct _objects_t {
-    lv_obj_t *main;
-    lv_obj_t *idle;
-    lv_obj_t *comiendo;
-    lv_obj_t *ejercicio;
-    lv_obj_t *ataque;
-    lv_obj_t *scroll_ui;
-    lv_obj_t *comer;
-    lv_obj_t *pesas;
-    lv_obj_t *atacar;
-} objects_t;
+// --- DECLARACIONES DE OBJETOS GLOBALES ---
+// Usamos 'extern' para decirle a otros archivos .c (como ui.c)
+// que estas variables existen y serán definidas en screens.c.
+extern lv_obj_t *g_diymon_gif_obj;
+extern lv_obj_t *g_background_obj;
 
-extern objects_t objects;
+// --- DECLARACIONES DE FUNCIONES ---
+// Estas son las funciones definidas en screens.c que ui.c necesita llamar.
+void create_screens(void);
 
-enum ScreensEnum {
-    SCREEN_ID_MAIN = 1,
-};
-
-void create_screen_main();
-void delete_screen_main();
-void tick_screen_main();
-
-void create_screen_by_id(enum ScreensEnum screenId);
-void delete_screen_by_id(enum ScreensEnum screenId);
-void tick_screen_by_id(enum ScreensEnum screenId);
-void tick_screen(int screen_index);
-
-void create_screens();
-
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /*EEZ_LVGL_UI_SCREENS_H*/
+#endif // SCREENS_H

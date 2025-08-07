@@ -7,6 +7,7 @@ endif()
 set(ADD_SRCS "")
 set(ADD_LIBS "")
 set(PRIV_REQ "")
+
 idf_build_get_property(target IDF_TARGET)
 if(${target} STREQUAL "esp32p4")
     list(APPEND ADD_SRCS "src/common/ppa/lcd_ppa.c")
@@ -21,7 +22,7 @@ idf_component_register(
         INCLUDE_DIRS "include"
         PRIV_INCLUDE_DIRS "priv_include"
         REQUIRES "esp_lcd"
-        PRIV_REQUIRES "${PRIV_REQ}")
+        PRIV_REQUIRES "${PRIV_REQ}" )
 
 # Get LVGL version
 idf_build_get_property(build_components BUILD_COMPONENTS)

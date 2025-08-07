@@ -1,165 +1,111 @@
+/*
+ * Archivo: screens.c
+ * Versión: 10.0 (FINAL - Carga 100% dinámica de imágenes desde la SD)
+ */
 #include "screens.h"
-#include "images.h"
-#include "fonts.h"
 #include "actions.h"
 #include "styles.h"
-#include "ui_priv.h" // [NUEVO] Para usar la variable global
 #include "lvgl.h"
+#include "ui_priv.h"
+#include "diymon_evolution.h"
+#include "esp_log.h"
+#include <stdio.h>
+#include <string.h>
 
+// [CAMBIO CLAVE] ¡Ya no necesitamos declarar imágenes desde archivos .c!
+// LV_IMAGE_DECLARE(eat);     // <-- ELIMINADO
+// LV_IMAGE_DECLARE(train);   // <-- ELIMINADO
+// LV_IMAGE_DECLARE(attack);  // <-- ELIMINADO
 
-objects_t objects;
-lv_obj_t *tick_value_change_obj;
-uint32_t active_theme_index = 0;
-
-// [NUEVO] Definimos aquí nuestra variable global para el GIF
+// Definición de las variables globales para los objetos de la UI
+objects_t objects; 
 lv_obj_t *g_diymon_gif_obj = NULL;
+lv_obj_t *g_background_obj = NULL;
+
+static const char *TAG = "DIYMON_SCREENS";
+
+// Función para actualizar el fondo dinámicamente desde la SD
+void ui_update_diymon_background(void) {
+    if (!g_background_obj) {
+        ESP_LOGE(TAG, "El objeto de fondo (g_background_obj) no existe!");
+        return;
+    }
+    const char* evo_code = diymon_get_current_code();
+    static char bg_path[128];
+
+    // [CAMBIO CLAVE] Ahora cargamos un archivo .png directamente, gracias al decodificador.
+    snprintf(bg_path, sizeof(bg_path), "S:/sdcard/diymon/%s/background.png", evo_code);
+    ESP_LOGI(TAG, "Cargando fondo: %s", bg_path);
+    lv_image_set_src(g_background_obj, bg_path);
+}
 
 void create_screen_main() {
-    lv_obj_t *obj = lv_obj_create(0);
-    objects.main = obj;
-    lv_obj_set_pos(obj, 0, 0);
-    lv_obj_set_size(obj, 172, 320);
-    lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_bg_img_src(obj, "S:/skins/default/fondo.bin", LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_t *screen = lv_obj_create(NULL);
+    objects.main = screen;
+    lv_obj_set_size(screen, 170, 320);
+    lv_obj_center(screen);
+    lv_obj_remove_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Creamos el objeto de fondo (la ruta se establecerá dinámicamente)
+    g_background_obj = lv_image_create(screen);
+    lv_obj_align(g_background_obj, LV_ALIGN_CENTER, 0, 0);
+
+    // Creamos el objeto GIF (la ruta se establecerá dinámicamente)
+    g_diymon_gif_obj = lv_gif_create(screen);
+    objects.idle = g_diymon_gif_obj;
+    lv_obj_align(g_diymon_gif_obj, LV_ALIGN_CENTER, 0, 30);
+
+    // Creamos el contenedor de botones
+    lv_obj_t *btn_container = lv_obj_create(screen);
+    lv_obj_set_size(btn_container, lv_pct(100), 80);
+    lv_obj_align(btn_container, LV_ALIGN_TOP_MID, 0, 10);
+    lv_obj_set_flex_flow(btn_container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(btn_container, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_bg_opa(btn_container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(btn_container, 0, 0);
+
     {
-        lv_obj_t *parent_obj = obj;
-        
-        // --- [MODIFICADO] CREACIÓN DEL ACTOR PRINCIPAL (UN ÚNICO GIF) ---
-        g_diymon_gif_obj = lv_gif_create(parent_obj);
-        objects.idle = g_diymon_gif_obj;
-        lv_obj_set_pos(g_diymon_gif_obj, -4, 77);
-        lv_obj_set_size(g_diymon_gif_obj, 180, 243);
-        lv_obj_clear_flag(g_diymon_gif_obj, LV_OBJ_FLAG_SCROLLABLE);
-        
-        // --- [COMENTADO] Ya no creamos los animimg compilados ---
-        /*
-        { // Idle
-            ...
-        }
-        { // Comiendo
-            ...
-        }
-        { // ejercicio
-            ...
-        }
-        { // ataque
-            ...
-        }
-        */
+        // Botón Comer
+        lv_obj_t *btn_comer = lv_button_create(btn_container);
+        objects.comer = btn_comer;
+        lv_obj_set_size(btn_comer, 60, 60);
+        lv_obj_set_style_bg_opa(btn_comer, LV_OPA_TRANSP, 0);
+        lv_obj_t *img_comer = lv_image_create(btn_comer);
+        // [CAMBIO CLAVE] Cargamos la imagen del botón directamente desde un archivo .png en la SD
+        lv_image_set_src(img_comer, "S:/sdcard/buttons/actions/eat.png");
+        lv_obj_center(img_comer);
 
-        { // SCROLL_UI - Los botones no cambian
-            lv_obj_t *obj = lv_obj_create(parent_obj);
-            // ... todo tu código para el scroll y los botones (comer, pesas, atacar) se mantiene igual ...
-             lv_obj_set_pos(obj, 0, 0);
-            lv_obj_set_size(obj, LV_PCT(100), LV_PCT(100));
-            lv_obj_set_style_pad_left(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_pad_top(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_pad_right(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_pad_bottom(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_bg_opa(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_border_width(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_radius(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-            {
-                lv_obj_t *parent_obj = obj;
-                {
-                    // Comer
-                    lv_obj_t *obj = lv_btn_create(parent_obj);
-                    objects.comer = obj;
-                    lv_obj_set_pos(obj, 188, 18);
-                    lv_obj_set_size(obj, 65, 59);
-                    lv_obj_add_event_cb(obj, action_comer, LV_EVENT_CLICKED, (void *)0);
-                    lv_obj_add_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
-                    lv_obj_set_style_bg_img_src(obj, &img_apple, LV_PART_MAIN | LV_STATE_DEFAULT);
-                    lv_obj_set_style_bg_opa(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-                }
-                {
-                    // Pesas
-                    lv_obj_t *obj = lv_btn_create(parent_obj);
-                    objects.pesas = obj;
-                    lv_obj_set_pos(obj, 271, 18);
-                    lv_obj_set_size(obj, 65, 59);
-                    lv_obj_add_event_cb(obj, action_ejercicio, LV_EVENT_CLICKED, (void *)0);
-                    lv_obj_add_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
-                    lv_obj_set_style_bg_img_src(obj, &img_pesas, LV_PART_MAIN | LV_STATE_DEFAULT);
-                    lv_obj_set_style_bg_opa(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-                }
-                {
-                    // Atacar
-                    lv_obj_t *obj = lv_btn_create(parent_obj);
-                    objects.atacar = obj;
-                    lv_obj_set_pos(obj, 355, 18);
-                    lv_obj_set_size(obj, 60, 60);
-                    lv_obj_add_event_cb(obj, action_atacar, LV_EVENT_CLICKED, (void *)0);
-                    lv_obj_add_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
-                    lv_obj_set_style_bg_img_src(obj, &img_ataque, LV_PART_MAIN | LV_STATE_DEFAULT);
-                    lv_obj_set_style_bg_opa(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-                }
-            }
-        }
+        // Botón Entrenar
+        lv_obj_t *btn_pesas = lv_button_create(btn_container);
+        objects.pesas = btn_pesas;
+        lv_obj_set_size(btn_pesas, 60, 60);
+        lv_obj_set_style_bg_opa(btn_pesas, LV_OPA_TRANSP, 0);
+        lv_obj_t *img_pesas = lv_image_create(btn_pesas);
+        // [CAMBIO CLAVE] Cargamos la imagen del botón directamente desde un archivo .png en la SD
+        lv_image_set_src(img_pesas, "S:/sdcard/buttons/actions/train.png");
+        lv_obj_center(img_pesas);
+        
+        // Botón Atacar
+        lv_obj_t *btn_atacar = lv_button_create(btn_container);
+        objects.atacar = btn_atacar;
+        lv_obj_set_size(btn_atacar, 60, 60);
+        lv_obj_set_style_bg_opa(btn_atacar, LV_OPA_TRANSP, 0);
+        lv_obj_t *img_atacar = lv_image_create(btn_atacar);
+        // [CAMBIO CLAVE] Cargamos la imagen del botón directamente desde un archivo .png en la SD
+        lv_image_set_src(img_atacar, "S:/sdcard/buttons/actions/attack.png");
+        lv_obj_center(img_atacar);
     }
-    
-    tick_screen_main();
 }
 
-// ... El resto del fichero (delete_screen_main, create_screens, etc.) se queda igual ...
-// ...
-// ...
-// ...
 void delete_screen_main() {
-    lv_obj_del(objects.main);
-    objects.main = 0;
-    objects.idle = 0;
-    objects.comiendo = 0;
-    objects.ejercicio = 0;
-    objects.ataque = 0;
-    objects.scroll_ui = 0;
-    objects.comer = 0;
-    objects.pesas = 0;
-    objects.atacar = 0;
-}
-
-void tick_screen_main() {
-}
-
-
-
-typedef void (*create_screen_func_t)();
-create_screen_func_t create_screen_funcs[] = {
-    create_screen_main,
-};
-void create_screen(int screen_index) {
-    create_screen_funcs[screen_index]();
-}
-void create_screen_by_id(enum ScreensEnum screenId) {
-    create_screen_funcs[screenId - 1]();
-}
-
-typedef void (*delete_screen_func_t)();
-delete_screen_func_t delete_screen_funcs[] = {
-    delete_screen_main,
-};
-void delete_screen(int screen_index) {
-    delete_screen_funcs[screen_index]();
-}
-void delete_screen_by_id(enum ScreensEnum screenId) {
-    delete_screen_funcs[screenId - 1]();
-}
-
-typedef void (*tick_screen_func_t)();
-tick_screen_func_t tick_screen_funcs[] = {
-    tick_screen_main,
-};
-void tick_screen(int screen_index) {
-    tick_screen_funcs[screen_index]();
-}
-void tick_screen_by_id(enum ScreensEnum screenId) {
-    tick_screen_funcs[screenId - 1]();
+    if(objects.main) {
+        lv_obj_del(objects.main);
+    }
+    memset(&objects, 0, sizeof(objects_t));
+    g_diymon_gif_obj = NULL;
+    g_background_obj = NULL;
 }
 
 void create_screens() {
-    lv_disp_t *dispp = lv_disp_get_default();
-    lv_theme_t *theme = lv_theme_default_init(dispp, lv_palette_main(LV_PALETTE_BLUE), lv_palette_main(LV_PALETTE_RED), true, LV_FONT_DEFAULT);
-    lv_disp_set_theme(dispp, theme);
-    
     create_screen_main();
 }

@@ -1,38 +1,17 @@
 /*
- * =====================================================================================
- *       Filename:  actions.h
- *    Description:  Cabecera para el sistema de acciones dinámicas y basadas en datos de DIYMON.
- *        Version:  4.2 (Final y Correcto)
- * =====================================================================================
+ * Archivo: actions.h
+ * Descripción: Declaraciones privadas para el módulo de acciones.
+ * Versión: 8.0
  */
-#ifndef EEZ_LVGL_UI_ACTIONS_H
-#define EEZ_LVGL_UI_ACTIONS_H
+#ifndef ACTIONS_H
+#define ACTIONS_H
 
-#include <lvgl.h>
+#include "ui.h" // [AÑADIDO] Incluimos la API pública para obtener diymon_action_id_t.
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+// [ELIMINADO] El enum diymon_action_id_t se ha movido a ui.h.
 
-// --- El Modelo de Datos para las Acciones ---
-typedef enum {
-    ACTION_ID_COMER,
-    ACTION_ID_EJERCICIO,
-    ACTION_ID_ATACAR,
-    ACTION_ID_COUNT
-} diymon_action_id_t;
-
-// --- El Orquestador de Acciones ---
+// --- DECLARACIONES DE FUNCIONES ---
+// Esta es la función de callback que se define en actions.c.
 void execute_diymon_action(lv_event_t *e);
 
-// --- Funciones de Compatibilidad con EEZ Studio ---
-extern void action_comer(lv_event_t * e);
-extern void action_ejercicio(lv_event_t * e);
-extern void action_atacar(lv_event_t * e);
-extern void action_idle(lv_event_t * e);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /*EEZ_LVGL_UI_ACTIONS_H*/
+#endif // ACTIONS_H
