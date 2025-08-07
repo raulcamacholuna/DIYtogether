@@ -50,9 +50,13 @@ set(BSP_DEPS
 # Finalmente, registramos el componente. La directiva "REQUIRES" consume
 # nuestra lista de dependencias y las enlaza correctamente.
 idf_component_register(
-    SRCS ${BSP_SOURCES}
-    INCLUDE_DIRS 
+    SRC_DIRS "." ${BOARD_SUBDIR}
+
+    # Los directorios de inclusión están bien.
+    INCLUDE_DIRS
         "include"
-        ${BSP_PATH}
-    REQUIRES ${BSP_DEPS}  # Aquí se usan todas las dependencias definidas arriba
+        ${BOARD_SUBDIR}
+        
+    # La lista de dependencias se consume aquí.
+    REQUIRES ${BSP_DEPS}
 )

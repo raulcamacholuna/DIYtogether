@@ -89,3 +89,11 @@ void bsp_display_set_brightness(int percentage) {
 esp_lcd_panel_handle_t bsp_get_display_handle(void) {
     return g_panel_handle;
 }
+
+int bsp_get_display_hres(void) {
+    return BSP_LCD_H_RES;
+}
+
+int bsp_get_display_vres(void) {
+    return BSP_LCD_V_RES;
+}

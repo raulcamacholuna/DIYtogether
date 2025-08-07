@@ -15,6 +15,7 @@ idf_component_register(
         diymon_bsp
         diymon_core
         diymon_ui
+        lvgl
 
         # Los drivers de bajo nivel que el BSP expone en su API
         esp_lcd

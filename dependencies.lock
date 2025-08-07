@@ -31,16 +31,6 @@ dependencies:
       path: Z:\DIYMON\VSCODE\DIYToguether\components_dependencies\espressif__cmake_utilities
       type: local
     version: 1.1.1
-  espressif/zlib:
-    component_hash: d901723af51f13fc8e5824f39f32239c847956e8fd951a05266588dc5cfbb9ae
-    dependencies:
-    - name: idf
-      require: private
-      version: '>=4.4'
-    source:
-      registry_url: https://components.espressif.com/
-      type: service
-    version: 1.3.1
   idf:
     source:
       type: idf
@@ -52,6 +42,12 @@ dependencies:
       registry_url: https://components.espressif.com/
       type: service
     version: 8.4.0
+  zlib:
+    dependencies: []
+    source:
+      path: Z:\DIYMON\VSCODE\DIYToguether\components_dependencies\zlib
+      type: local
+    version: 1.3.1
 direct_dependencies:
 - diymon_bsp
 - diymon_core
@@ -61,6 +57,6 @@ direct_dependencies:
 - espressif/zlib
 - idf
 - lvgl/lvgl
-manifest_hash: 6bd4dbe639a0ecbb0fdc96a8046a6474f678bf20c09f8f7c30c23bf26c1f1164
+manifest_hash: f2b59ad87a0abe8068c979f5a10d43a1737d786bbeb1cc52167c153ee0fffd5c
 target: esp32c6
 version: 2.0.0
