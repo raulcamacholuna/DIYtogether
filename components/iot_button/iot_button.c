@@ -28,6 +28,10 @@ static portMUX_TYPE s_button_lock = portMUX_INITIALIZER_UNLOCKED;
         return (ret_val);                                         \
     }
 
+#define IOT_BUTTON_VER_MAJOR 1
+#define IOT_BUTTON_VER_MINOR 0
+#define IOT_BUTTON_VER_PATCH 0
+
 static const char *button_event_str[] = {
     "BUTTON_PRESS_DOWN",
     "BUTTON_PRESS_UP",
@@ -633,7 +637,8 @@ esp_err_t iot_button_register_power_save_cb(const button_power_save_config_t *co
 esp_err_t iot_button_create(const button_config_t *config, const button_driver_t *driver, button_handle_t *ret_button)
 {
     if (!g_head_handle) {
-        ESP_LOGI(TAG, "IoT Button Version: %d.%d.%d", IOT_BUTTON_VER_MAJOR, IOT_BUTTON_VER_MINOR, IOT_BUTTON_VER_PATCH);    }
+        ESP_LOGI(TAG, "IoT Button Version: %d.%d.%d", IOT_BUTTON_VER_MAJOR, IOT_BUTTON_VER_MINOR, IOT_BUTTON_VER_PATCH);
+    }
     ESP_RETURN_ON_FALSE(driver && config && ret_button, ESP_ERR_INVALID_ARG, TAG, "Invalid argument");
     button_dev_t *btn = (button_dev_t *) calloc(1, sizeof(button_dev_t));
     ESP_RETURN_ON_FALSE(btn, ESP_ERR_NO_MEM, TAG, "Button memory alloc failed");
@@ -646,7 +651,7 @@ esp_err_t iot_button_create(const button_config_t *config, const button_driver_t
 
     btn->next = g_head_handle;
     g_head_handle = btn;
-
+    
     if (!g_button_timer_handle) {
         esp_timer_create_args_t button_timer = {0};
         button_timer.arg = NULL;

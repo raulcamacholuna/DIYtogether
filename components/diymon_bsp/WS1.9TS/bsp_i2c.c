@@ -1,45 +1,38 @@
 /*
- * Archivo: components/diymon_bsp/WS1.9TS/bsp_i2c.c
- * Versión Corregida: Implementación del driver I2C.
+ * Archivo: bsp_i2c.c
+ * Versión: Corregida con la API I2C Legacy para compatibilidad
  */
-#include "bsp_api.h" // ¡Incluir siempre la API pública primero!
+#include "bsp_api.h"
 #include "esp_log.h"
-// No es necesario incluir bsp_i2c.h si no tiene contenido útil.
+// [CORRECCIÓN] Usamos la cabecera del driver I2C legacy
+#include "driver/i2c.h"
 
-// --- CONFIGURACIÓN PRIVADA PARA ESTE MÓDULO ---
 static const char *TAG = "bsp_i2c";
 
-// Pines I2C correctos para la placa Waveshare
-#define PIN_I2C_SCL      (GPIO_NUM_8)
-#define PIN_I2C_SDA      (GPIO_NUM_18)
-#define I2C_PORT_NUM     (I2C_NUM_0)
-
-// Handle del bus I2C. Es estático (privado) para este archivo.
-// Nadie más necesita acceder a él directamente.
-static i2c_master_bus_handle_t g_bus_handle = NULL;
-
-// --- IMPLEMENTACIÓN DE LAS FUNCIONES PÚBLICAS ---
+#define I2C_PORT_NUM     I2C_NUM_0
+#define PIN_I2C_SCL      8
+#define PIN_I2C_SDA      18
 
 // Esta es la implementación de la función prometida en bsp_api.h
 esp_err_t bsp_i2c_init(void)
 {
-    ESP_LOGI(TAG, "Initializing I2C master bus on SCL:%d, SDA:%d", PIN_I2C_SCL, PIN_I2C_SDA);
+    ESP_LOGI(TAG, "Initializing I2C master bus (LEGACY API)...");
 
-    i2c_master_bus_config_t i2c_mst_config = {
-        .clk_source = I2C_CLK_SRC_DEFAULT,
-        .i2c_port = I2C_PORT_NUM,
-        .scl_io_num = PIN_I2C_SCL,
+    // Usamos la estructura y funciones de la API antigua
+    i2c_config_t conf = {
+        .mode = I2C_MODE_MASTER,
         .sda_io_num = PIN_I2C_SDA,
-        .glitch_ignore_cnt = 7,
-        .flags.enable_internal_pullup = true,
+        .scl_io_num = PIN_I2C_SCL,
+        .sda_pullup_en = GPIO_PULLUP_ENABLE,
+        .scl_pullup_en = GPIO_PULLUP_ENABLE,
+        .master.clk_speed = 400000, // 400KHz
     };
-
-    // La función que crea el bus ahora guarda el handle en nuestra variable estática g_bus_handle
-    return i2c_new_master_bus(&i2c_mst_config, &g_bus_handle);
+    
+    ESP_ERROR_CHECK(i2c_param_config(I2C_PORT_NUM, &conf));
+    ESP_ERROR_CHECK(i2c_driver_install(I2C_PORT_NUM, conf.mode, 0, 0, 0));
+    
+    ESP_LOGI(TAG, "I2C bus initialized successfully.");
+    return ESP_OK;
 }
 
-// Esta función simplemente devuelve el handle que ya hemos inicializado y guardado.
-i2c_master_bus_handle_t bsp_get_i2c_bus_handle(void)
-{
-    return g_bus_handle;
-}
+// Ya no necesitamos la función bsp_get_i2c_bus_handle()

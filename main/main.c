@@ -5,12 +5,12 @@
  *
  *    Description:  Punto de entrada principal para el firmware de DIYMON.
  *                  Inicializa los servicios básicos, el gestor de hardware y la
- *                  interfaz de usuario. Ahora también gestiona el temporizador de evolución.
+ *                  interfaz de usuario.
  *
- *        Version:  1.2 (Con corrección del temporizador)
+ *        Version:  FINAL
  *        Created:  [Fecha de hoy]
  *       Revision:  none
- *       Compiler:  xtensa-esp32-elf-gcc
+ *       Compiler:  xtensa-esp-elf-gcc
  *
  *         Author:  Raúl Camacho Luna (con revisión de IA)
  *   Organization:  DIYMON Project
@@ -32,7 +32,6 @@
 
 static const char *TAG = "DIYMON_MAIN";
 
-// [CORRECCIÓN] Se declara el handle como 'static' para que no se destruya al salir de app_main
 static esp_timer_handle_t evolution_timer_handle;
 
 static void evolution_timer_callback(void* arg) {
@@ -47,7 +46,6 @@ static void evolution_timer_callback(void* arg) {
         ui_update_diymon_sprite();
     } else {
         ESP_LOGI(TAG, "El DIYMON ha alcanzado su forma final. Deteniendo temporizador de evolución.");
-        // Ahora, al llamar a stop, el handle es válido porque es estático.
         esp_timer_stop(evolution_timer_handle);
     }
 }
@@ -78,17 +76,16 @@ void app_main(void)
 
     /* --- 4. Inicialización de la Interfaz de Usuario (UI) --- */
     ESP_LOGI(TAG, "Initializing DIYMON User Interface...");
+    
+    // [AJUSTE] El lock/unlock no es necesario aquí. La inicialización de la UI
+    // se hace de forma segura antes de que otras tareas puedan interferir.
     ui_init();
-   /* if (lvgl_port_lock(0)) {
-        ui_init();
-        lvgl_port_unlock();
-    }
-    */
+    
 
     /* --- 5. Creación e Inicio del Temporizador de Evolución --- */
     const esp_timer_create_args_t evolution_timer_args = {
             .callback = &evolution_timer_callback,
-            .arg = NULL, // No necesitamos pasar el handle como argumento si es estático/global
+            .arg = NULL,
             .name = "evolution-timer"
     };
     ESP_ERROR_CHECK(esp_timer_create(&evolution_timer_args, &evolution_timer_handle));

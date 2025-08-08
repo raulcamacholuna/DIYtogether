@@ -13,9 +13,15 @@ dependencies:
   diymon_bsp:
     path: ../components/diymon_bsp
 
-  # --- [LA CORRECCIÓN] ---
-  # El puente que nos da lvgl_helpers.h y conecta LVGL con el hardware
-  espressif/esp_lvgl_port: "~2.6.0"
-  
-  # La librería de gráficos
-  lvgl/lvgl: "~8.4.0"
+  # Versión mínima requerida del ESP-IDF
+  idf: ">=5.1"
+
+  # Librería principal para la interfaz de usuario (UI)
+  lvgl/lvgl: "^9.3.0"
+
+  # Componente "puente" oficial de Espressif que conecta LVGL con los drivers de ESP-IDF
+  espressif/esp_lvgl_port: "^2.6.0"
+
+  # Driver específico para el controlador táctil CST816S, identificado en la documentación
+  espressif/esp_lcd_touch_cst816s:
+    path: ../components/diymon_bsp/ws1.9ts/esp_lcd_touch_cst816s
