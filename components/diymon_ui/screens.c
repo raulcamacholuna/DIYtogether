@@ -78,6 +78,20 @@ void ui_update_diymon_background(void) {
     fread(g_img_data_buffer, 1, file_size, f);
     fclose(f);
     
+
+    uint8_t* pixel_data = g_img_data_buffer + LVGL_BIN_HEADER_SIZE;
+    size_t pixel_data_size = file_size - LVGL_BIN_HEADER_SIZE;
+
+    // Recorremos el búfer de píxeles de 2 en 2 bytes
+    for (size_t i = 0; i < pixel_data_size; i += 2) {
+        uint8_t temp = pixel_data[i];
+        pixel_data[i] = pixel_data[i+1];
+        pixel_data[i+1] = temp;
+    }
+    ESP_LOGI(TAG, "Se han intercambiado los bytes de %d píxeles.", pixel_data_size / 2);
+
+
+
     ESP_LOGI(TAG, "Leídos %d bytes. Configurando imagen cruda...", file_size);
 
     // [LA SOLUCIÓN] Configuramos el descriptor de LVGL para que apunte
