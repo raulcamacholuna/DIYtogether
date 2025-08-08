@@ -18,6 +18,8 @@ extern lv_obj_t *g_background_obj;
 
 // --- DECLARACIONES DE FUNCIONES ---
 // Estas son las funciones definidas en screens.c que ui.c necesita llamar.
+void create_screen_main(void);
+void delete_screen_main(void);
 void create_screens(void);
 
 #endif // SCREENS_H

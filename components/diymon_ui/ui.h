@@ -1,34 +1,37 @@
 /*
- * Archivo: ui.h
+ * Fichero: components/diymon_ui/ui.h
  * Descripción: Interfaz PÚBLICA del componente de la UI.
- *              Esta es la ÚNICA fuente de verdad para los tipos y enums compartidos.
- * Versión: 8.0
+ *              Define las funciones de alto nivel para controlar la UI desde el exterior.
  */
 #ifndef UI_H
 #define UI_H
 
-#include "lvgl.h" // Incluimos la cabecera principal de LVGL
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // --- DEFINICIONES COMPARTIDAS ---
 
-// [DEFINICIÓN ÚNICA] Enum para identificar las pantallas.
+// Enum para identificar las pantallas. Se mantiene aquí porque es parte de la
+// interfaz pública para, potencialmente, cambiar de pantalla.
 enum ScreensEnum {
     SCREEN_ID_MAIN = 1,
 };
 
-// [DEFINICIÓN ÚNICA] Enum para identificar las acciones de los botones.
-typedef enum {
-    ACTION_ID_COMER,
-    ACTION_ID_EJERCICIO,
-    ACTION_ID_ATACAR,
-} diymon_action_id_t;
-
 
 // --- FUNCIONES PÚBLICAS DE LA UI ---
 
+/**
+ * @brief Inicializa y configura toda la interfaz de usuario.
+ *
+ * Esta es la función principal que se debe llamar desde fuera del componente
+ * (por ejemplo, desde main.c) para poner en marcha toda la UI.
+ */
 void ui_init(void);
-void ui_update_diymon_sprite(void);
-void ui_update_diymon_background(void);
-void ui_play_action_animation(const char* action_name);
+
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // UI_H
