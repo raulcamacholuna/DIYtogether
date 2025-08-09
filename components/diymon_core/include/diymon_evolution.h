@@ -1,7 +1,9 @@
-// =============================================================================
-//  diymon_evolution.h (Sin cambios necesarios)
-// =============================================================================
-
+/*
+ * Fichero: ./components/diymon_core/include/diymon_evolution.h
+ * Fecha: 12/08/2025 - 10:32
+ * Último cambio: Añadida la declaración de 'diymon_get_previous_evolution_in_sequence'.
+ * Descripción: Cabecera del motor de evolución. Expone las funciones para gestionar el estado y la secuencia de evolución del DIYMON, incluyendo la involución.
+ */
 #ifndef DIYMON_EVOLUTION_H
 #define DIYMON_EVOLUTION_H
 
@@ -46,5 +48,12 @@ const char* diymon_get_current_code(void);
  */
 const char* diymon_get_next_evolution_in_sequence(const char* current_code);
 
+/**
+ * @brief Obtiene el código anterior en la secuencia de evolución predefinida.
+ * @param current_code El código actual.
+ * @return El código anterior en la secuencia, o NULL si es la forma inicial.
+ */
+const char* diymon_get_previous_evolution_in_sequence(const char* current_code);
 
-#endif // DIYMON_EVOLUTION_H
+
+#endif // DIYMON_EVOLUTION_H```

@@ -1,10 +1,8 @@
 /*
  * Fichero: ./components/diymon_core/diymon_evolution.c
- * Fecha: 09/08/2025 - 10:25
- * Último cambio: Implementada la función 'diymon_core_get_evolution_id'.
- * Descripción: Añadida la función que convierte el código de evolución de formato
- *              string (ej: "1.1.1") a un entero (ej: 111) para que la UI pueda
- *              construir rutas de ficheros dinámicamente.
+ * Fecha: 12/08/2025 - 10:40
+ * Último cambio: Implementada la función 'diymon_get_previous_evolution_in_sequence'.
+ * Descripción: Añadida la lógica para obtener la evolución anterior en la secuencia, permitiendo la funcionalidad de "bajar nivel".
  */
 
 #include "diymon_evolution.h"
@@ -101,6 +99,13 @@ const char* diymon_get_next_evolution_in_sequence(const char* current_code) {
     if (strcmp(current_code, "0") == 0) return "1";
     if (strcmp(current_code, "1") == 0) return "1.1";
     if (strcmp(current_code, "1.1") == 0) return "1.1.1";
+    return NULL;
+}
+
+const char* diymon_get_previous_evolution_in_sequence(const char* current_code) {
+    if (strcmp(current_code, "1.1.1") == 0) return "1.1";
+    if (strcmp(current_code, "1.1") == 0) return "1";
+    if (strcmp(current_code, "1") == 0) return "0";
     return NULL;
 }
 

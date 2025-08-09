@@ -1,11 +1,8 @@
 /*
   Fichero: ./components/diymon_ui/ui_asset_loader.c
-  Fecha: 10/08/2025 - 00:30
-  Último cambio: Creación del fichero.
-  Descripción: Implementación del gestor de assets. Carga los ficheros binarios
-               de los iconos en búferes de memoria al inicio, realizando la
-               corrección de bytes necesaria para el formato RGB565 y
-               construyendo descriptores de imagen válidos para LVGL.
+  Fecha: 12/08/2025 - 11:40
+  Último cambio: Corregidos los nombres de los ficheros de iconos para cumplir el formato 8.3.
+  Descripción: Implementación del gestor de assets. Se han corregido los nombres de los ficheros de iconos del panel de administración para que coincidan con los nombres válidos en el sistema de ficheros FAT (8.3).
 */
 #include "ui_asset_loader.h"
 #include "diymon_ui_helpers.h"
@@ -64,7 +61,7 @@ static bool load_asset(ui_asset_id_t id, const char* filename) {
     fread(g_asset_buffers[id], 1, data_size, f);
     fclose(f);
     
-    // [LA SOLUCIÓN] Corregir los bytes de los datos leídos.
+    // Corregir los bytes de los datos leídos.
     swap_bytes_for_rgb565(g_asset_buffers[id], data_size);
     
     // Apuntar el descriptor al búfer en memoria.
@@ -76,9 +73,15 @@ static bool load_asset(ui_asset_id_t id, const char* filename) {
 
 void ui_assets_init(void) {
     ESP_LOGI(TAG, "Precargando todos los assets de la UI...");
+    // Panel de jugador
     load_asset(ASSET_ICON_EAT, "ICON_EAT.bin");
     load_asset(ASSET_ICON_GYM, "ICON_GYM.bin");
     load_asset(ASSET_ICON_ATK, "ICON_ATK.bin");
+    
+    // Panel de admin (con nombres 8.3 corregidos)
+    load_asset(ASSET_ICON_LVL_DOWN, "ICON_LD.bin");
+    load_asset(ASSET_ICON_SCREEN_OFF, "ICON_OFF.bin");
+    load_asset(ASSET_ICON_LVL_UP, "ICON_LU.bin");
 }
 
 void ui_assets_deinit(void) {

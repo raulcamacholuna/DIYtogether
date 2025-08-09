@@ -1,10 +1,8 @@
 /*
   Fichero: ./components/diymon_ui/ui_asset_loader.h
-  Fecha: 10/08/2025 - 00:30
-  Último cambio: Creación del fichero.
-  Descripción: Interfaz pública para el gestor de assets de la UI. Define las
-               funciones para inicializar, liberar y obtener los recursos gráficos
-               (iconos) que se precargan en memoria al inicio.
+  Fecha: 12/08/2025 - 10:31
+  Último cambio: Añadidos IDs para los iconos del panel de administración.
+  Descripción: Interfaz pública para el gestor de assets. Define los identificadores únicos para todos los recursos gráficos (iconos) que se precargan en memoria.
 */
 #ifndef UI_ASSET_LOADER_H
 #define UI_ASSET_LOADER_H
@@ -13,9 +11,16 @@
 
 // Identificadores únicos para cada asset precargado.
 typedef enum {
+    // Iconos del panel de jugador
     ASSET_ICON_EAT,
     ASSET_ICON_GYM,
     ASSET_ICON_ATK,
+
+    // Iconos del panel de administración
+    ASSET_ICON_LVL_DOWN,
+    ASSET_ICON_SCREEN_OFF,
+    ASSET_ICON_LVL_UP,
+
     ASSET_COUNT // Utilidad para contar el número de assets
 } ui_asset_id_t;
 
