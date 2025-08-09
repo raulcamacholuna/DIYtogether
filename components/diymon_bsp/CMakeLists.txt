@@ -1,4 +1,8 @@
-# CMakeLists.txt para el componente diymon_bsp (Versión Final y Completa)
+# Fichero: ./components/diymon_bsp/CMakeLists.txt
+# Fecha: 08/08/2025 - 21:50
+# Último cambio: Restaurado a la lista de dependencias correcta.
+# Descripción: Registro del componente BSP. Se mantiene la lista de dependencias
+#              alineada con el hardware real del proyecto.
 
 # 1. Definimos la subcarpeta de nuestra placa
 set(BOARD_SUBDIR "WS1.9TS")
@@ -10,9 +14,6 @@ file(GLOB component_sources "${BOARD_SUBDIR}/*.c")
 idf_component_register(
     SRCS ${component_sources}
     
-    # [SOLUCIÓN AL ERROR de bsp_api.h]
-    # Hacemos que los headers de la carpeta "include" sean públicos
-    # y los de la carpeta de la placa sean privados para el componente.
     INCLUDE_DIRS "include"
     PRIV_INCLUDE_DIRS "${BOARD_SUBDIR}"
     
