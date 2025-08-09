@@ -1,20 +1,11 @@
-# =====================================================================================
-#  CMakeLists.txt para el componente 'diymon_ui'
-#  Versión Definitiva: Automatizada, robusta y fácil de mantener.
-# =====================================================================================
+# Fichero: ./components/diymon_ui/CMakeLists.txt
+# Fecha: 09/08/2025 - 09:25
+# Último cambio: Corregida la sintaxis de los comentarios a '#'.
+# Descripción: Se ha añadido 'diymon_core' a la lista de requerimientos (REQUIRES)
+#              para permitir que la UI pueda consultar el estado de evolución
+#              del personaje y cargar las animaciones correspondientes.
 
 # 1. BÚSQUEDA AUTOMÁTICA DE ARCHIVOS FUENTE
-# -------------------------------------------------------------------------------------
-# La función file(GLOB ...) busca todos los archivos que coincidan con los patrones
-# y los guarda en la variable 'component_sources'.
-# Esto es la clave para que no tengas que editar este archivo nunca más.
-#
-# - "*.c":           Encuentra todos los .c en la raíz de 'diymon_ui' (ui.c, screens.c,
-#                    y tus nuevos archivos de imagen como attack.c, eat.c, etc.).
-# - "screens/*.c":   Encuentra los .c que puedas tener en la subcarpeta 'screens'.
-# - "actions/*.c":   Encuentra los .c que puedas tener en la subcarpeta 'actions'.
-# - "styles/*.c":    Encuentra los .c que puedas tener en la subcarpeta 'styles'.
-
 file(GLOB component_sources
     "*.c"
     "screens/*.c"
@@ -23,9 +14,6 @@ file(GLOB component_sources
 )
 
 # 2. REGISTRO DEL COMPONENTE
-# -------------------------------------------------------------------------------------
-# Aquí le decimos a ESP-IDF todo lo que necesita saber sobre nuestro componente.
-
 idf_component_register(
     # SRCS: Usa la lista de archivos que acabamos de encontrar automáticamente.
     SRCS ${component_sources}

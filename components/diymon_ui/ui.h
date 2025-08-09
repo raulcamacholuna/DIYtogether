@@ -1,5 +1,7 @@
 /*
- * Fichero: components/diymon_ui/ui.h
+ * Fichero: ./components/diymon_ui/ui.h
+ * Fecha: 09/08/2025 - 06:55
+ * Último cambio: Sin cambios en la interfaz pública.
  * Descripción: Interfaz PÚBLICA del componente de la UI.
  *              Define las funciones de alto nivel para controlar la UI desde el exterior.
  */

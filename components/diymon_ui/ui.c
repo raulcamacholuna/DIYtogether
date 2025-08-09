@@ -1,87 +1,64 @@
 /*
  * Fichero: ./components/diymon_ui/ui.c
- * Fecha: 08/08/2025 - 16:45
- * Último cambio: Restaurado el logger de eventos táctiles detallado para depuración.
- * Descripción: Se reintroduce el callback de depuración táctil en la pantalla principal para registrar la secuencia completa de interacciones (Pressed, Dragging, Released, Gesture), facilitando el diagnóstico de problemas de gestos.
+ * Fecha: 10/08/2025 - 03:15
+ * Último cambio: Adaptado para conectar los botones del panel con las acciones.
+ * Descripción: El fichero principal de la UI ahora se encarga de conectar los eventos de los botones (obtenidos del módulo del panel) con el despachador de acciones, añadiendo el logging de pulsación de botón.
  */
-
 #include "ui.h"
-#include "ui_priv.h"
 #include "screens.h"
 #include "actions.h"
-#include "diymon_ui_helpers.h"
+#include "ui_actions_panel.h" // Se necesita para obtener los botones
 #include "esp_log.h"
 
-static const char *TAG = "DIYMON_UI";
+extern lv_obj_t *g_main_screen_obj; // Definido en screens.c
+extern lv_obj_t *g_idle_animation_obj; // Definido en screens.c
 
-/**
- * @brief Conecta los objetos de la UI (botones) con sus correspondientes acciones.
- */
-static void ui_connect_actions() {
-    ESP_LOGI(TAG, "Conectando eventos de botones al sistema de acciones...");
-    
-    if (objects.comer) {
-        lv_obj_add_event_cb(objects.comer, execute_diymon_action, LV_EVENT_CLICKED, (void*)(intptr_t)ACTION_ID_COMER);
-    }
-    if (objects.pesas) {
-        lv_obj_add_event_cb(objects.pesas, execute_diymon_action, LV_EVENT_CLICKED, (void*)(intptr_t)ACTION_ID_EJERCICIO);
-    }
-    if (objects.atacar) {
-        lv_obj_add_event_cb(objects.atacar, execute_diymon_action, LV_EVENT_CLICKED, (void*)(intptr_t)ACTION_ID_ATACAR);
-    }
-}
+static const char *TAG = "DIYMON_UI_MAIN";
 
-/**
- * @brief Callback de diagnóstico para registrar todos los eventos de entrada táctil.
- * 
- * Captura y muestra en el log la secuencia completa de una interacción táctil:
- * PRESSED, DRAGGING, RELEASED y GESTURE, para facilitar la depuración.
- * 
- * @param e Puntero al evento de LVGL que contiene el estado de la entrada.
- */
-static void touch_logger_event_cb(lv_event_t *e) {
+// --- Nuevo callback de evento para los botones que añade logging ---
+static void button_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    lv_indev_t *indev = lv_indev_get_act();
-    if (!indev) return;
+    diymon_action_id_t action_id = (diymon_action_id_t)(intptr_t)lv_event_get_user_data(e);
 
-    lv_point_t point;
-    lv_indev_get_point(indev, &point);
-
-    switch (code) {
-        case LV_EVENT_PRESSED:
-            ESP_LOGI(TAG, "Touch Logger -> PRESSED at X: %d, Y: %d", point.x, point.y);
-            break;
-        case LV_EVENT_PRESSING:
-            ESP_LOGI(TAG, "Touch Logger -> DRAGGING to X: %d, Y: %d", point.x, point.y);
-            break;
-        case LV_EVENT_RELEASED:
-            ESP_LOGI(TAG, "Touch Logger -> RELEASED at X: %d, Y: %d", point.x, point.y);
-            break;
-        case LV_EVENT_GESTURE: {
-            lv_dir_t dir = lv_indev_get_gesture_dir(indev);
-            const char* dir_str = (dir == LV_DIR_TOP) ? "UP" : (dir == LV_DIR_BOTTOM) ? "DOWN" : (dir == LV_DIR_LEFT) ? "LEFT" : "RIGHT";
-            ESP_LOGW(TAG, "Touch Logger -> GESTURE DETECTED! Direction: %s", dir_str);
-            break;
+    if (code == LV_EVENT_CLICKED) {
+        switch(action_id) {
+            case ACTION_ID_COMER:     ESP_LOGW(TAG, "BOTÓN PULSADO: Comer");     break;
+            case ACTION_ID_EJERCICIO: ESP_LOGW(TAG, "BOTÓN PULSADO: Ejercicio"); break;
+            case ACTION_ID_ATACAR:    ESP_LOGW(TAG, "BOTÓN PULSADO: Atacar");    break;
+            default: break;
         }
-        default:
-            break;
+        
+        // Pasamos el puntero al objeto de idle como parámetro del evento
+        lv_event_send((lv_obj_t*)e->current_target, LV_EVENT_REFRESH, g_idle_animation_obj);
+
+        // Llamamos al ejecutor de acciones original
+        execute_diymon_action(e);
     }
 }
 
-/**
- * @brief Inicializa y configura toda la interfaz de usuario.
- */
-void ui_init() {
-    create_screens();
-    ui_connect_actions();
-    
-    if (objects.main) {
-        ui_helpers_load_background(objects.main);
-        // Se añade el logger de diagnóstico a la pantalla principal para capturar todos los eventos.
-        lv_obj_add_event_cb(objects.main, touch_logger_event_cb, LV_EVENT_ALL, NULL);
-        ESP_LOGI(TAG, "Logger de eventos táctiles detallado VINCULADO a la pantalla principal.");
-    }
 
-    lv_screen_load(objects.main);
-    ESP_LOGI(TAG, "UI dinámica inicializada y lista.");
+// --- Función para conectar los botones a sus acciones ---
+static void ui_connect_actions(void) {
+    lv_obj_t *eat_btn = ui_actions_panel_get_eat_btn();
+    lv_obj_t *gym_btn = ui_actions_panel_get_gym_btn();
+    lv_obj_t *atk_btn = ui_actions_panel_get_atk_btn();
+
+    if (eat_btn) lv_obj_add_event_cb(eat_btn, button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_COMER);
+    if (gym_btn) lv_obj_add_event_cb(gym_btn, button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EJERCICIO);
+    if (atk_btn) lv_obj_add_event_cb(atk_btn, button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_ATACAR);
+    
+    ESP_LOGI(TAG, "Eventos de botones de acción conectados.");
+}
+
+
+void ui_init(void) {
+    create_screens();
+    
+    if (g_main_screen_obj) {
+        ui_connect_actions();
+        lv_obj_add_event_cb(g_main_screen_obj, (lv_event_cb_t)delete_screen_main, LV_EVENT_DELETE, NULL);
+    }
+    
+    lv_screen_load(g_main_screen_obj);
+    ESP_LOGI(TAG, "UI modularizada y lista.");
 }

@@ -38,4 +38,22 @@ void ui_helpers_load_background(lv_obj_t* parent);
  */
 void ui_helpers_free_background_buffer();
 
+/**
+ * @brief Crea y muestra el GIF animado del DIYMON en el centro de la pantalla.
+ * 
+ * Carga el fichero diymon.gif correspondiente a la evolución actual en un búfer
+ * de memoria y lo muestra centrado en su objeto padre.
+ * 
+ * @param parent Puntero al objeto sobre el que se creará el GIF (la pantalla principal).
+ */
+void ui_helpers_create_diymon_gif(lv_obj_t* parent);
+
+/**
+ * @brief Libera la memoria utilizada por el búfer del GIF del DIYMON.
+ * 
+ * Debe llamarse cuando la pantalla se destruye para evitar fugas de memoria.
+ */
+void ui_helpers_free_gif_buffer();
+
+
 #endif // DIYMON_UI_HELPERS_H
