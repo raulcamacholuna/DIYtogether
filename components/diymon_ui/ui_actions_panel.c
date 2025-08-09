@@ -99,7 +99,7 @@ static void animate_buttons_in(void) {
 }
 
 /**
- * @brief [LA SOLUCIÓN] Callback para ocultar el objeto al final de la animación.
+ * @brief Callback para ocultar el objeto al final de la animación.
  */
 static void anim_ready_hide_cb(lv_anim_t *a) {
     lv_obj_add_flag((lv_obj_t *)a->var, LV_OBJ_FLAG_HIDDEN);
@@ -124,7 +124,7 @@ static void animate_buttons_out(void) {
             lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_y);
             lv_anim_set_path_cb(&a, lv_anim_path_ease_in);
             lv_anim_set_delay(&a, i * 50);
-            lv_anim_set_ready_cb(&a, anim_ready_hide_cb); // <-- Se usa el callback correcto.
+            lv_anim_set_ready_cb(&a, anim_ready_hide_cb);
             lv_anim_start(&a);
         }
     }
@@ -137,7 +137,8 @@ void ui_actions_panel_handle_gesture(lv_dir_t dir, lv_coord_t start_y) {
              animate_buttons_out();
         }
     } else {
-        if (dir == LV_DIR_BOTTOM && start_y >= 0 && start_y < 40) {
+        // Ahora, cualquier gesto hacia abajo activa el panel, sin importar dónde empiece.
+        if (dir == LV_DIR_BOTTOM) {
             ESP_LOGI(TAG, "Gesto (Abajo) -> Mostrar botones");
             animate_buttons_in();
         }
