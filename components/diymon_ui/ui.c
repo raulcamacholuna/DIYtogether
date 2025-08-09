@@ -1,21 +1,21 @@
 /*
  * Fichero: ./components/diymon_ui/ui.c
- * Fecha: 10/08/2025 - 03:15
- * Último cambio: Adaptado para conectar los botones del panel con las acciones.
- * Descripción: El fichero principal de la UI ahora se encarga de conectar los eventos de los botones (obtenidos del módulo del panel) con el despachador de acciones, añadiendo el logging de pulsación de botón.
+ * Fecha: 10/08/2025 - 03:40
+ * Último cambio: Corregida la llamada a `execute_diymon_action`.
+ * Descripción: Se elimina la llamada incorrecta a `lv_event_send` y se llama a `execute_diymon_action` con los parámetros correctos, resolviendo los errores de compilación.
  */
 #include "ui.h"
 #include "screens.h"
 #include "actions.h"
-#include "ui_actions_panel.h" // Se necesita para obtener los botones
+#include "ui_actions_panel.h" 
 #include "esp_log.h"
 
-extern lv_obj_t *g_main_screen_obj; // Definido en screens.c
-extern lv_obj_t *g_idle_animation_obj; // Definido en screens.c
+extern lv_obj_t *g_main_screen_obj; 
+extern lv_obj_t *g_idle_animation_obj; 
 
 static const char *TAG = "DIYMON_UI_MAIN";
 
-// --- Nuevo callback de evento para los botones que añade logging ---
+// --- Callback de evento para los botones que añade logging ---
 static void button_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     diymon_action_id_t action_id = (diymon_action_id_t)(intptr_t)lv_event_get_user_data(e);
@@ -28,11 +28,10 @@ static void button_event_cb(lv_event_t *e) {
             default: break;
         }
         
-        // Pasamos el puntero al objeto de idle como parámetro del evento
-        lv_event_send((lv_obj_t*)e->current_target, LV_EVENT_REFRESH, g_idle_animation_obj);
-
-        // Llamamos al ejecutor de acciones original
-        execute_diymon_action(e);
+        // --- LA SOLUCIÓN ---
+        // Se elimina la llamada incorrecta a lv_event_send y se llama directamente
+        // a la función de acción con los parámetros correctos.
+        execute_diymon_action(action_id, g_idle_animation_obj);
     }
 }
 
@@ -56,6 +55,7 @@ void ui_init(void) {
     
     if (g_main_screen_obj) {
         ui_connect_actions();
+        // El callback de borrado ahora no necesita castearse
         lv_obj_add_event_cb(g_main_screen_obj, (lv_event_cb_t)delete_screen_main, LV_EVENT_DELETE, NULL);
     }
     

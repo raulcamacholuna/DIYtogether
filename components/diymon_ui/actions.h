@@ -1,7 +1,8 @@
 /*
- * Fichero: components/diymon_ui/actions.h
- * Descripción: Cabecera para el sistema de acciones dinámicas de DIYMON.
- *              == ESTE FICHERO ES LA ÚNICA FUENTE DE LA VERDAD PARA LOS IDs DE ACCIÓN ==
+ * Fichero: ./components/diymon_ui/actions.h
+ * Fecha: 10/08/2025 - 03:40
+ * Último cambio: Modificada la firma de `execute_diymon_action`.
+ * Descripción: Se cambia la firma de la función para que acepte los datos necesarios directamente como parámetros, en lugar de depender de un objeto de evento.
  */
 #ifndef ACTIONS_H
 #define ACTIONS_H
@@ -13,14 +14,10 @@ extern "C" {
 #endif
 
 // --- El Modelo de Datos para las Acciones ---
-// Este enum define un identificador único para cada posible acción del usuario.
 typedef enum {
     ACTION_ID_COMER,
     ACTION_ID_EJERCICIO,
     ACTION_ID_ATACAR,
-    
-    // ESTA LÍNEA ES CRUCIAL. Es un truco estándar en C para obtener automáticamente
-    // el número total de acciones. Siempre debe ser el último elemento.
     ACTION_ID_COUNT 
 } diymon_action_id_t;
 
@@ -28,9 +25,10 @@ typedef enum {
 // --- El Orquestador de Acciones ---
 /**
  * @brief Orquestador principal de acciones, llamado por los eventos de los botones.
- * @param e Puntero al evento de LVGL que contiene los datos de la acción.
+ * @param action_id El identificador de la acción a ejecutar.
+ * @param idle_obj Un puntero al objeto de animación de idle para poder pausarlo.
  */
-void execute_diymon_action(lv_event_t *e);
+void execute_diymon_action(diymon_action_id_t action_id, lv_obj_t* idle_obj);
 
 
 #ifdef __cplusplus
