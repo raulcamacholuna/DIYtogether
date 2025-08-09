@@ -1,8 +1,10 @@
 /*
  * Fichero: ./components/diymon_ui/animation_loader.c
- * Fecha: 10/08/2025 - 02:35
- * Último cambio: Adaptado el formato del nombre de fichero a `[prefijo][numero]f.bin`.
- * Descripción: La función `animation_loader_load_frame` se ha modificado para construir correctamente el nombre de los ficheros de animación (`idle1f.bin`, `idle2f.bin`, etc.), añadiendo la letra 'f' antes de la extensión.
+ * Fecha: 10/08/2025 - 22:00
+ * Último cambio: Añadida la comprobación de puntero nulo para la ruta.
+ * Descripción: Se ha hecho más robusta la función `animation_loader_init` para
+ *              que no cause un fallo si se le pasa una ruta (`path`) nula,
+ *              evitando el pánico del sistema por `strdup(NULL)`.
  */
 #include "animation_loader.h"
 #include "esp_log.h"
@@ -24,17 +26,22 @@ static void swap_bytes_for_rgb565(uint8_t *data, size_t size) {
 
 animation_t animation_loader_init(const char *path, uint16_t width, uint16_t height, uint16_t num_frames) {
     animation_t anim = { 0 };
-    anim.base_path = strdup(path);
+    // --- SOLUCIÓN: Comprobar si la ruta es nula antes de duplicarla ---
+    anim.base_path = path ? strdup(path) : NULL;
     anim.frame_count = num_frames;
     anim.width = width;
     anim.height = height;
     
-    uint32_t line_bytes = width * 2; // 2 bytes por píxel para RGB565
+    uint32_t line_bytes = width * 2;
     uint32_t stride = (line_bytes + 3) & ~3;
     size_t buffer_size = stride * height;
 
     anim.img_dsc.data = (uint8_t *)malloc(buffer_size);
-    if (!anim.img_dsc.data) { ESP_LOGE(TAG, "Fallo al reservar buffer!"); animation_loader_free(&anim); return anim; }
+    if (!anim.img_dsc.data) { 
+        ESP_LOGE(TAG, "Fallo al reservar buffer de animación!");
+        animation_loader_free(&anim); 
+        return anim; 
+    }
     
     anim.img_dsc.header.w = width;
     anim.img_dsc.header.h = height;
@@ -47,13 +54,12 @@ animation_t animation_loader_init(const char *path, uint16_t width, uint16_t hei
 }
 
 bool animation_loader_load_frame(animation_t *anim, uint16_t frame_index, const char *prefix) {
-    if (!anim) return false;
+    if (!anim || !anim->base_path) return false;
     char full_path[128];
-    // --- CAMBIO: Se añade la 'f' al formato para que coincida con "idle1f.bin", "idle2f.bin", etc. ---
-    snprintf(full_path, sizeof(full_path), "%s/%s%df.bin", anim->base_path, prefix, frame_index + 1);
+    snprintf(full_path, sizeof(full_path), "%s/%s%d.bin", anim->base_path, prefix, frame_index + 1);
 
     FILE *f = fopen(full_path, "rb");
-    if (!f) { ESP_LOGE(TAG, "No se pudo abrir: %s", full_path); return false; }
+    if (!f) { ESP_LOGW(TAG, "No se pudo abrir: %s", full_path); return false; }
     
     fseek(f, LVGL_BIN_HEADER_SIZE, SEEK_SET);
     fread((void *)anim->img_dsc.data, 1, anim->img_dsc.data_size, f);
@@ -65,7 +71,13 @@ bool animation_loader_load_frame(animation_t *anim, uint16_t frame_index, const 
 
 void animation_loader_free(animation_t *anim) {
     if (!anim) return;
-    if(anim->base_path) free(anim->base_path);
-    if (anim->img_dsc.data) free((void*)anim->img_dsc.data);
+    if(anim->base_path) {
+        free(anim->base_path);
+        anim->base_path = NULL;
+    }
+    if (anim->img_dsc.data) {
+        free((void*)anim->img_dsc.data);
+        anim->img_dsc.data = NULL;
+    }
     anim->frame_count = 0;
 }
