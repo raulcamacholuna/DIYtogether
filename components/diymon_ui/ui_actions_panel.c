@@ -1,8 +1,8 @@
 /*
  * Fichero: ./components/diymon_ui/ui_actions_panel.c
- * Fecha: 10/08/2025 - 03:15
- * Último cambio: Creación del fichero con logging de eventos específico.
- * Descripción: Implementa la creación, animación y manejo de eventos del panel de acciones. Incluye un callback de eventos propio para registrar los toques y gestos que ocurren sobre él.
+ * Fecha: 10/08/2025 - 04:45
+ * Último cambio: Añadido log para clics y arrastres sobre el panel de acciones.
+ * Descripción: El callback de eventos del panel ahora informa de más interacciones (clics, arrastres) para diferenciar claramente cuándo el usuario interactúa con la barra superior en lugar del fondo.
  */
 #include "ui_actions_panel.h"
 #include "diymon_ui_helpers.h"
@@ -11,23 +11,19 @@
 
 static const char *TAG = "UI_PANEL";
 
-// Variables estáticas para los objetos gestionados por este módulo
 static lv_obj_t *s_panel_obj;
 static lv_obj_t *s_eat_btn, *s_gym_btn, *s_atk_btn;
 static lv_timer_t *s_panel_hide_timer = NULL;
 
-// Declaraciones de funciones estáticas internas
 static void animate_panel_in(void);
 static void animate_panel_out(void);
 static void timer_auto_hide_callback(lv_timer_t *timer);
 static void panel_anim_out_finished_cb(lv_anim_t *a);
 static void panel_event_cb(lv_event_t *e);
 
-// --- Funciones de creación ---
-
 void ui_actions_panel_create(lv_obj_t *parent) {
     char path_buffer[128];
-    ui_helpers_build_asset_path(path_buffer, sizeof(path_buffer), ""); // Base path
+    ui_helpers_build_asset_path(path_buffer, sizeof(path_buffer), "");
 
     s_panel_obj = lv_obj_create(parent);
     lv_obj_set_scrollbar_mode(s_panel_obj, LV_SCROLLBAR_MODE_OFF);
@@ -41,10 +37,8 @@ void ui_actions_panel_create(lv_obj_t *parent) {
     lv_obj_set_style_pad_column(s_panel_obj, 7, 0);
     lv_obj_add_flag(s_panel_obj, LV_OBJ_FLAG_HIDDEN);
     
-    // Añadido callback de eventos para el logging específico del panel
     lv_obj_add_event_cb(s_panel_obj, panel_event_cb, LV_EVENT_ALL, NULL);
     
-    // Creación de botones
     s_eat_btn = lv_btn_create(s_panel_obj);
     lv_obj_set_size(s_eat_btn, 50, 50);
     lv_obj_t *img_eat = lv_img_create(s_eat_btn);
@@ -70,14 +64,9 @@ void ui_actions_panel_create(lv_obj_t *parent) {
     ESP_LOGI(TAG, "Panel de acciones creado.");
 }
 
-// --- Getters para los botones ---
-
 lv_obj_t* ui_actions_panel_get_eat_btn(void) { return s_eat_btn; }
 lv_obj_t* ui_actions_panel_get_gym_btn(void) { return s_gym_btn; }
 lv_obj_t* ui_actions_panel_get_atk_btn(void) { return s_atk_btn; }
-
-
-// --- Lógica de animación y gestos ---
 
 static void timer_auto_hide_callback(lv_timer_t *timer) {
     animate_panel_out();
@@ -127,26 +116,38 @@ static void animate_panel_out(void) {
 
 void ui_actions_panel_handle_gesture(lv_dir_t dir, lv_coord_t start_y) {
     if (dir == LV_DIR_BOTTOM && start_y >= 0 && start_y < 40) {
-        ESP_LOGI(TAG, "Gesto (pantalla principal) -> Mostrar panel");
+        ESP_LOGI(TAG, "Gesto (Fondo) -> Mostrar panel");
         animate_panel_in();
     }
 }
 
-// --- Callback de eventos del panel para logging ---
-
 static void panel_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     lv_indev_t *indev = lv_indev_get_act();
-    
-    if (code == LV_EVENT_PRESSED) {
-        lv_point_t p;
-        lv_indev_get_point(indev, &p);
-        ESP_LOGW(TAG, "PANEL EVENT: Pulsado sobre el panel en -> X: %d, Y: %d", p.x, p.y);
-    } else if (code == LV_EVENT_GESTURE) {
-        lv_dir_t dir = lv_indev_get_gesture_dir(indev);
-        if (dir == LV_DIR_TOP) {
-            ESP_LOGW(TAG, "PANEL EVENT: Gesto ARRIBA sobre el panel -> Ocultar panel");
-            animate_panel_out();
+    lv_point_t p;
+
+    switch (code) {
+        case LV_EVENT_PRESSED:
+            lv_indev_get_point(indev, &p);
+            ESP_LOGW(TAG, "EVENTO (Panel Acciones): Pulsado en -> X: %d, Y: %d", p.x, p.y);
+            break;
+        case LV_EVENT_CLICKED:
+            lv_indev_get_point(indev, &p);
+            ESP_LOGW(TAG, "EVENTO (Panel Acciones): Click en -> X: %d, Y: %d", p.x, p.y);
+            break;
+        case LV_EVENT_PRESSING:
+            lv_indev_get_point(indev, &p);
+            ESP_LOGI(TAG, "EVENTO (Panel Acciones): Arrastrando en -> X: %d, Y: %d", p.x, p.y);
+            break;
+        case LV_EVENT_GESTURE: {
+            lv_dir_t dir = lv_indev_get_gesture_dir(indev);
+            if (dir == LV_DIR_TOP) {
+                ESP_LOGW(TAG, "GESTO (Panel Acciones): Arrastre ARRIBA -> Ocultar panel");
+                animate_panel_out();
+            }
+            break;
         }
+        default:
+            break;
     }
 }
