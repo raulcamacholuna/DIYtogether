@@ -1,10 +1,10 @@
 /*
  * Fichero: ./components/diymon_ui/animation_loader.c
- * Fecha: 10/08/2025 - 22:00
- * Último cambio: Añadida la comprobación de puntero nulo para la ruta.
- * Descripción: Se ha hecho más robusta la función `animation_loader_init` para
- *              que no cause un fallo si se le pasa una ruta (`path`) nula,
- *              evitando el pánico del sistema por `strdup(NULL)`.
+ * Fecha: 11/08/2025 - 12:00
+ * Último cambio: Añadida la implementación de `animation_loader_count_frames`.
+ * Descripción: Se añade el cuerpo de la función que cuenta dinámicamente los
+ *              ficheros de animación en un directorio, solucionando el error
+ *              de "undefined reference" durante el enlazado.
  */
 #include "animation_loader.h"
 #include "esp_log.h"
@@ -26,7 +26,6 @@ static void swap_bytes_for_rgb565(uint8_t *data, size_t size) {
 
 animation_t animation_loader_init(const char *path, uint16_t width, uint16_t height, uint16_t num_frames) {
     animation_t anim = { 0 };
-    // --- SOLUCIÓN: Comprobar si la ruta es nula antes de duplicarla ---
     anim.base_path = path ? strdup(path) : NULL;
     anim.frame_count = num_frames;
     anim.width = width;
@@ -59,7 +58,7 @@ bool animation_loader_load_frame(animation_t *anim, uint16_t frame_index, const 
     snprintf(full_path, sizeof(full_path), "%s/%s%d.bin", anim->base_path, prefix, frame_index + 1);
 
     FILE *f = fopen(full_path, "rb");
-    if (!f) { ESP_LOGW(TAG, "No se pudo abrir: %s", full_path); return false; }
+    if (!f) { return false; } // No logueamos aquí para no spamear durante el conteo.
     
     fseek(f, LVGL_BIN_HEADER_SIZE, SEEK_SET);
     fread((void *)anim->img_dsc.data, 1, anim->img_dsc.data_size, f);
@@ -80,4 +79,32 @@ void animation_loader_free(animation_t *anim) {
         anim->img_dsc.data = NULL;
     }
     anim->frame_count = 0;
+}
+
+/**
+ * @brief [IMPLEMENTACIÓN AÑADIDA] Cuenta los ficheros de una animación en un directorio.
+ */
+uint16_t animation_loader_count_frames(const char *path, const char *prefix) {
+    if (!path || !prefix) {
+        return 0;
+    }
+
+    uint16_t count = 0;
+    DIR *dir = opendir(path);
+    if (!dir) {
+        ESP_LOGE(TAG, "No se pudo abrir el directorio: %s", path);
+        return 0;
+    }
+
+    struct dirent *ent;
+    size_t prefix_len = strlen(prefix);
+
+    while ((ent = readdir(dir)) != NULL) {
+        if (strncmp(ent->d_name, prefix, prefix_len) == 0) {
+            count++;
+        }
+    }
+
+    closedir(dir);
+    return count;
 }

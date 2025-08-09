@@ -1,11 +1,10 @@
 /*
  * Fichero: ./components/diymon_ui/ui_idle_animation.c
- * Fecha: 10/08/2025 - 21:00
- * Último cambio: Adaptado para usar el búfer de animación compartido.
- * Descripción: Este módulo ya no reserva su propio búfer de memoria. En su lugar,
- *              obtiene una referencia al búfer compartido del módulo
- *              `ui_action_animations`, resolviendo así el conflicto de memoria
- *              y el fallo de sistema `Load access fault`.
+ * Fecha: 11/08/2025 - 10:15
+ * Último cambio: Implementadas las funciones para pausar y reanudar.
+ * Descripción: Implementación de la animación de reposo. Se añaden las funciones
+ *              para pausar y reanudar su temporizador, evitando conflictos de
+ *              renderizado con otras animaciones que usen el mismo búfer.
  */
 #include "ui_idle_animation.h"
 #include "ui_action_animations.h" // Necesario para obtener el reproductor compartido
@@ -38,17 +37,14 @@ static void idle_animation_timer_cb(lv_timer_t *timer) {
 }
 
 lv_obj_t* ui_idle_animation_start(lv_obj_t *parent) {
-    // --- SOLUCIÓN: Obtener el reproductor de animación compartido ---
     animation_t* shared_player = ui_action_animations_get_player();
     if (shared_player == NULL || shared_player->img_dsc.data == NULL) {
         ESP_LOGE(TAG, "No se puede iniciar la animación idle: el búfer compartido no es válido.");
         return NULL;
     }
 
-    // Copiar la configuración del descriptor de imagen (que contiene el puntero al búfer)
     g_idle_animation_player.img_dsc = shared_player->img_dsc;
 
-    // Configurar los parámetros específicos de la animación de reposo
     char anim_path[128];
     ui_helpers_build_asset_path(anim_path, sizeof(anim_path), "");
     size_t len = strlen(anim_path);
@@ -57,13 +53,11 @@ lv_obj_t* ui_idle_animation_start(lv_obj_t *parent) {
     g_idle_animation_player.base_path = strdup(anim_path);
     g_idle_animation_player.frame_count = IDLE_ANIM_FRAME_COUNT;
 
-    // Crear el objeto de imagen y asignarle el descriptor con el búfer compartido
     g_anim_img_obj = lv_img_create(parent);
     lv_img_set_src(g_anim_img_obj, &g_idle_animation_player.img_dsc);
     lv_obj_align(g_anim_img_obj, LV_ALIGN_TOP_LEFT, 0, 0);
     lv_obj_move_background(g_anim_img_obj);
 
-    // Iniciar el temporizador para ciclar los fotogramas
     g_anim_timer = lv_timer_create(idle_animation_timer_cb, IDLE_FRAME_INTERVAL, NULL);
     lv_timer_ready(g_anim_timer);
     
@@ -77,11 +71,23 @@ void ui_idle_animation_stop(void) {
         lv_timer_del(g_anim_timer);
         g_anim_timer = NULL;
     }
-    // Liberar solo la ruta de la animación de idle. El búfer principal
-    // será liberado por el módulo de animaciones de acción.
     if (g_idle_animation_player.base_path) {
         free(g_idle_animation_player.base_path);
         g_idle_animation_player.base_path = NULL;
     }
     g_current_frame_index = -1;
+}
+
+void ui_idle_animation_pause(void) {
+    if (g_anim_timer) {
+        lv_timer_pause(g_anim_timer);
+        ESP_LOGI(TAG, "Animación de Idle PAUSADA.");
+    }
+}
+
+void ui_idle_animation_resume(void) {
+    if (g_anim_timer) {
+        lv_timer_resume(g_anim_timer);
+        ESP_LOGI(TAG, "Animación de Idle REANUDADA.");
+    }
 }

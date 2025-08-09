@@ -1,13 +1,16 @@
 /*
- * Fichero: ./components/diymon_ui/ui.c
- * Fecha: 10/08/2025 - 04:55
- * Último cambio: Corregido el evento de doble clic inexistente y añadido log para pulsación larga.
- * Descripción: Se elimina el uso del evento `LV_EVENT_DOUBLE_CLICKED` que causaba un error de compilación. En su lugar, se añade el manejo del evento `LV_EVENT_LONG_PRESSED` para registrar las pulsaciones largas en la terminal con un color distintivo.
- */
+  Fichero: ./components/diymon_ui/ui.c
+  Fecha: 10/08/2025 - 00:30
+  Último cambio: Integrado el nuevo gestor de assets.
+  Descripción: Se invoca al gestor de assets para precargar todos los iconos
+               al iniciar la UI, asegurando que los recursos estén disponibles
+               antes de que se cree cualquier pantalla que los necesite.
+*/
 #include "ui.h"
 #include "screens.h"
 #include "actions.h"
 #include "ui_actions_panel.h" 
+#include "ui_asset_loader.h" // <-- Incluir el nuevo gestor
 #include "esp_log.h"
 
 extern lv_obj_t *g_main_screen_obj; 
@@ -32,8 +35,6 @@ static void button_event_cb(lv_event_t *e) {
         execute_diymon_action(action_id, g_idle_animation_obj);
     } else if (code == LV_EVENT_LONG_PRESSED) {
         ESP_LOGW(TAG, "BOTÓN PULSADO (Pulsación Larga): %s", action_name);
-        // Aquí podrías definir una acción diferente para la pulsación larga si quisieras.
-        // Por ahora, ejecuta la misma acción que un click simple.
         execute_diymon_action(action_id, g_idle_animation_obj);
     }
 }
@@ -60,6 +61,10 @@ static void ui_connect_actions(void) {
 }
 
 void ui_init(void) {
+    // 1. Precargar todos los assets necesarios para la UI.
+    ui_assets_init();
+
+    // 2. Crear las pantallas, que ahora pueden usar los assets ya cargados.
     create_screens();
     
     if (g_main_screen_obj) {
