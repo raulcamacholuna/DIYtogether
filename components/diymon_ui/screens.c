@@ -1,18 +1,22 @@
 /*
  * Fichero: ./components/diymon_ui/screens.c
- * Fecha: 10/08/2025 - 22:00
- * Último cambio: Corregido el orden de inicialización de los módulos de animación.
- * Descripción: Se ha cambiado el orden en `create_screen_main` para que el
- *              búfer de animación compartido se cree *antes* de que la animación
- *              de reposo intente usarlo, solucionando el pánico del sistema.
+ * Fecha: 12/08/2025 - 12:10
+ * Último cambio: Implementada la detección manual de doble toque.
+ * Descripción: Se ha reemplazado el uso del evento `LV_EVENT_DOUBLE_CLICKED` por una lógica manual basada en `LV_EVENT_CLICKED` y un temporizador. Esto soluciona el error de compilación y asegura la compatibilidad independientemente de la configuración de LVGL.
  */
 #include "screens.h"
 #include "ui_idle_animation.h"
 #include "ui_actions_panel.h"
 #include "ui_action_animations.h"
 #include "esp_log.h"
+#include "screen_state.h" 
+#include "bsp_api.h"      
 
 static const char *TAG = "SCREENS";
+
+// --- Variables para la detección manual de doble toque ---
+static uint8_t g_click_count = 0;
+static lv_timer_t *g_double_click_timer = NULL;
 
 lv_obj_t *g_idle_animation_obj = NULL;
 lv_obj_t *g_main_screen_obj = NULL;
@@ -21,6 +25,14 @@ static lv_coord_t touch_start_y = -1;
 
 static void main_screen_event_cb(lv_event_t *e);
 
+/**
+ * @brief Callback del temporizador que se activa si no hay un segundo toque.
+ */
+static void double_click_timer_cb(lv_timer_t *timer) {
+    g_click_count = 0;
+    g_double_click_timer = NULL;
+}
+
 void create_screen_main(void) {
     g_main_screen_obj = lv_obj_create(NULL);
     lv_obj_clear_flag(g_main_screen_obj, LV_OBJ_FLAG_SCROLLABLE);
@@ -28,15 +40,11 @@ void create_screen_main(void) {
     lv_obj_add_flag(g_main_screen_obj, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(g_main_screen_obj, main_screen_event_cb, LV_EVENT_ALL, NULL);
 
-    // --- SOLUCIÓN: Corregido el orden de inicialización ---
-    // 1. Crear el gestor de animaciones de acción, que reserva el búfer compartido.
     ui_action_animations_create(g_main_screen_obj);
-    // 2. Iniciar la animación de idle, que AHORA puede usar el búfer ya creado.
     g_idle_animation_obj = ui_idle_animation_start(g_main_screen_obj);
-    // 3. Crear el panel de acciones.
     ui_actions_panel_create(g_main_screen_obj);
 
-    ESP_LOGI(TAG, "Pantalla principal creada delegando en módulos (orden corregido).");
+    ESP_LOGI(TAG, "Pantalla principal creada delegando en módulos.");
 }
 
 static void main_screen_event_cb(lv_event_t *e) {
@@ -54,8 +62,31 @@ static void main_screen_event_cb(lv_event_t *e) {
             touch_start_y = -1;
             break;
         case LV_EVENT_GESTURE: {
-            lv_dir_t dir = lv_indev_get_gesture_dir(indev);
-            ui_actions_panel_handle_gesture(dir, touch_start_y);
+            if (!g_screen_is_off) { 
+                lv_dir_t dir = lv_indev_get_gesture_dir(indev);
+                ui_actions_panel_handle_gesture(dir, touch_start_y);
+            }
+            break;
+        }
+        case LV_EVENT_CLICKED: { // Se usa CLICKED en lugar de DOUBLE_CLICKED
+            if (g_screen_is_off) {
+                g_click_count++;
+                if (g_click_count == 1) {
+                    // Primer clic, iniciar temporizador de 300ms
+                    g_double_click_timer = lv_timer_create(double_click_timer_cb, 300, NULL);
+                    lv_timer_set_repeat_count(g_double_click_timer, 1);
+                } else if (g_click_count == 2) {
+                    // Segundo clic dentro de la ventana del temporizador
+                    if (g_double_click_timer) {
+                        lv_timer_del(g_double_click_timer);
+                        g_double_click_timer = NULL;
+                    }
+                    ESP_LOGI(TAG, "Doble toque (manual) detectado. ¡Encendiendo pantalla!");
+                    bsp_display_turn_on();
+                    g_screen_is_off = false;
+                    g_click_count = 0; // Reiniciar contador
+                }
+            }
             break;
         }
         default:
