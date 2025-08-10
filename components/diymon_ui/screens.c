@@ -1,8 +1,8 @@
 /*
  * Fichero: ./components/diymon_ui/screens.c
- * Fecha: 12/08/2025 - 12:10
- * Último cambio: Implementada la detección manual de doble toque.
- * Descripción: Se ha reemplazado el uso del evento `LV_EVENT_DOUBLE_CLICKED` por una lógica manual basada en `LV_EVENT_CLICKED` y un temporizador. Esto soluciona el error de compilación y asegura la compatibilidad independientemente de la configuración de LVGL.
+ * Fecha: 13/08/2025 - 09:10
+ * Último cambio: Añadida la captura de la coordenada X del toque.
+ * Descripción: Se modifica el manejador de eventos de la pantalla para capturar no solo la coordenada 'y' del inicio del toque, sino también la 'x'. Esto es necesario para que el gestor de paneles pueda detectar gestos de borde (edge swipes).
  */
 #include "screens.h"
 #include "ui_idle_animation.h"
@@ -21,6 +21,7 @@ static lv_timer_t *g_double_click_timer = NULL;
 lv_obj_t *g_idle_animation_obj = NULL;
 lv_obj_t *g_main_screen_obj = NULL;
 
+static lv_coord_t touch_start_x = -1;
 static lv_coord_t touch_start_y = -1;
 
 static void main_screen_event_cb(lv_event_t *e);
@@ -55,16 +56,18 @@ static void main_screen_event_cb(lv_event_t *e) {
         case LV_EVENT_PRESSED: {
             lv_point_t p;
             lv_indev_get_point(indev, &p);
+            touch_start_x = p.x;
             touch_start_y = p.y;
             break;
         }
         case LV_EVENT_RELEASED:
+            touch_start_x = -1;
             touch_start_y = -1;
             break;
         case LV_EVENT_GESTURE: {
             if (!g_screen_is_off) { 
                 lv_dir_t dir = lv_indev_get_gesture_dir(indev);
-                ui_actions_panel_handle_gesture(dir, touch_start_y);
+                ui_actions_panel_handle_gesture(dir, touch_start_x, touch_start_y);
             }
             break;
         }

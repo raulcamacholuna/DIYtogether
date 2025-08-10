@@ -1,7 +1,7 @@
 /*
   Fichero: ./components/diymon_ui/ui.c
-  Fecha: 12/08/2025 - 11:30
-  Último cambio: Re-aplicado el include de ui_actions_panel.h.
+  Fecha: 13/08/2025 - 09:10
+  Último cambio: Conectados los eventos de los botones del panel lateral.
   Descripción: Se corrige el error de compilación por 'declaración implícita' añadiendo la cabecera del panel de acciones. Esto permite que el fichero conozca las funciones ui_actions_panel_get_..._btn y sus tipos de retorno correctos.
 */
 #include "ui.h"
@@ -37,6 +37,13 @@ static void ui_connect_actions(void) {
     lv_obj_add_event_cb(ui_actions_panel_get_screen_off_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_SCREEN_OFF);
     lv_obj_add_event_cb(ui_actions_panel_get_lvl_up_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_LVL_UP);
     
+    // Conectar acciones del panel lateral de evolución
+    lv_obj_add_event_cb(ui_actions_panel_get_evo_fire_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EVO_FIRE);
+    lv_obj_add_event_cb(ui_actions_panel_get_evo_water_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EVO_WATER);
+    lv_obj_add_event_cb(ui_actions_panel_get_evo_earth_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EVO_EARTH);
+    lv_obj_add_event_cb(ui_actions_panel_get_evo_wind_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EVO_WIND);
+    lv_obj_add_event_cb(ui_actions_panel_get_evo_back_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EVO_BACK);
+
     ESP_LOGI(TAG, "Eventos de todos los botones de acción conectados.");
 }
 

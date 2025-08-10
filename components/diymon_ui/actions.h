@@ -1,7 +1,7 @@
 /*
  * Fichero: ./components/diymon_ui/actions.h
- * Fecha: 12/08/2025 - 10:30
- * Último cambio: Añadidos IDs para las acciones del panel de administración.
+ * Fecha: 13/08/2025 - 09:10
+ * Último cambio: Añadidos identificadores para las acciones del panel lateral de evolución.
  * Descripción: Define los identificadores para todas las acciones de usuario posibles, incluyendo las del panel de acciones principal y el nuevo panel de administración.
  */
 #ifndef ACTIONS_H
@@ -15,15 +15,22 @@ extern "C" {
 
 // --- El Modelo de Datos para las Acciones ---
 typedef enum {
-    // Acciones del panel de jugador
+    // Acciones del panel de jugador (superior)
     ACTION_ID_COMER,
     ACTION_ID_EJERCICIO,
     ACTION_ID_ATACAR,
 
-    // Acciones del panel de administración
+    // Acciones del panel de administración (superior)
     ACTION_ID_LVL_DOWN,
     ACTION_ID_SCREEN_OFF,
     ACTION_ID_LVL_UP,
+
+    // Acciones del panel de evolución (lateral)
+    ACTION_ID_EVO_FIRE,
+    ACTION_ID_EVO_WATER,
+    ACTION_ID_EVO_EARTH,
+    ACTION_ID_EVO_WIND,
+    ACTION_ID_EVO_BACK,
     
     ACTION_ID_COUNT 
 } diymon_action_id_t;

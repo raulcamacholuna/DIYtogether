@@ -1,7 +1,7 @@
 /*
   Fichero: ./components/diymon_ui/ui_asset_loader.h
-  Fecha: 12/08/2025 - 10:31
-  Último cambio: Añadidos IDs para los iconos del panel de administración.
+  Fecha: 13/08/2025 - 09:10
+  Último cambio: Añadidos IDs para los iconos del panel lateral.
   Descripción: Interfaz pública para el gestor de assets. Define los identificadores únicos para todos los recursos gráficos (iconos) que se precargan en memoria.
 */
 #ifndef UI_ASSET_LOADER_H
@@ -20,6 +20,13 @@ typedef enum {
     ASSET_ICON_LVL_DOWN,
     ASSET_ICON_SCREEN_OFF,
     ASSET_ICON_LVL_UP,
+
+    // Iconos del panel de evolución (lateral)
+    ASSET_ICON_EVO_FIRE,
+    ASSET_ICON_EVO_WATER,
+    ASSET_ICON_EVO_EARTH,
+    ASSET_ICON_EVO_WIND,
+    ASSET_ICON_EVO_BACK,
 
     ASSET_COUNT // Utilidad para contar el número de assets
 } ui_asset_id_t;

@@ -1,7 +1,7 @@
 /*
   Fichero: ./components/diymon_ui/ui_asset_loader.c
-  Fecha: 12/08/2025 - 11:40
-  Último cambio: Corregidos los nombres de los ficheros de iconos para cumplir el formato 8.3.
+  Fecha: 13/08/2025 - 09:35
+  Último cambio: Corregidos los nombres de fichero de los iconos del panel lateral.
   Descripción: Implementación del gestor de assets. Se han corregido los nombres de los ficheros de iconos del panel de administración para que coincidan con los nombres válidos en el sistema de ficheros FAT (8.3).
 */
 #include "ui_asset_loader.h"
@@ -82,6 +82,13 @@ void ui_assets_init(void) {
     load_asset(ASSET_ICON_LVL_DOWN, "ICON_LD.bin");
     load_asset(ASSET_ICON_SCREEN_OFF, "ICON_OFF.bin");
     load_asset(ASSET_ICON_LVL_UP, "ICON_LU.bin");
+
+    // [CORREGIDO] Panel lateral de evolución, usando los nombres de la imagen.
+    load_asset(ASSET_ICON_EVO_FIRE,  "LVL_FIRE.BIN");
+    load_asset(ASSET_ICON_EVO_WATER, "LVL_WATE.BIN");
+    load_asset(ASSET_ICON_EVO_EARTH, "LVL_EART.BIN");
+    load_asset(ASSET_ICON_EVO_WIND,  "LVL_WIND.BIN");
+    load_asset(ASSET_ICON_EVO_BACK,  "LVL_DOWN.BIN");
 }
 
 void ui_assets_deinit(void) {

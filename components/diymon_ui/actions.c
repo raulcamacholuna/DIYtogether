@@ -1,7 +1,7 @@
 /*
  * Fichero: ./components/diymon_ui/actions.c
- * Fecha: 12/08/2025 - 12:20
- * Último cambio: Añadido el ajuste de brillo a los botones de nivel.
+ * Fecha: 13/08/2025 - 09:10
+ * Último cambio: Implementada la lógica (placeholder) para las nuevas acciones de evolución.
  * Descripción: Se ha modificado la lógica de los botones de subir/bajar nivel para que, además de cambiar la evolución, ajusten el brillo de la pantalla en pasos del 10%.
  */
 #include "actions.h"
@@ -81,6 +81,23 @@ void execute_diymon_action(diymon_action_id_t action_id, lv_obj_t* idle_obj) {
             ESP_LOGI(TAG, "Acción: Apagar pantalla.");
             bsp_display_turn_off();
             g_screen_is_off = true;
+            break;
+
+        // --- Nuevas acciones del panel lateral ---
+        case ACTION_ID_EVO_FIRE:
+            ESP_LOGI(TAG, "Acción: Evolucionar a Fuego (lógica pendiente).");
+            break;
+        case ACTION_ID_EVO_WATER:
+            ESP_LOGI(TAG, "Acción: Evolucionar a Agua (lógica pendiente).");
+            break;
+        case ACTION_ID_EVO_EARTH:
+            ESP_LOGI(TAG, "Acción: Evolucionar a Tierra (lógica pendiente).");
+            break;
+        case ACTION_ID_EVO_WIND:
+            ESP_LOGI(TAG, "Acción: Evolucionar a Aire (lógica pendiente).");
+            break;
+        case ACTION_ID_EVO_BACK:
+            ESP_LOGI(TAG, "Acción: Volver de evolución (lógica pendiente).");
             break;
 
         default:
