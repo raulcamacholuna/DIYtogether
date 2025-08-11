@@ -1,10 +1,10 @@
 /*
   Fichero: ./components/diymon_ui/ui.c
-  Fecha: 11/08/2025 - 14:30
-  Último cambio: Actualizadas las conexiones de eventos para los botones de administración.
-  Descripción: Se actualizan los eventos de los botones del panel de administración para
-               reflejar sus nuevas funcionalidades de brillo, encendido/apagado de pantalla
-               y borrado de configuración WiFi.
+  Fecha: 11/08/2025 - 22:00
+  Último cambio: Corregida la conexión de eventos para el botón de FTP.
+  Descripción: Se actualiza el callback del botón del panel de administración
+               para usar el getter y el ID de acción correctos para la
+               funcionalidad de habilitar el modo FTP.
 */
 #include "ui.h"
 #include "screens.h"
@@ -34,10 +34,10 @@ static void ui_connect_actions(void) {
     lv_obj_add_event_cb(ui_actions_panel_get_gym_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EJERCICIO);
     lv_obj_add_event_cb(ui_actions_panel_get_atk_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_ATACAR);
 
-    // --- ANOTACIÓN: Conectar acciones del panel de admin (NUEVAS FUNCIONES) ---
+    // Conectar acciones del panel de admin
     lv_obj_add_event_cb(ui_actions_panel_get_brightness_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_BRIGHTNESS_CYCLE);
     lv_obj_add_event_cb(ui_actions_panel_get_toggle_screen_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_TOGGLE_SCREEN);
-    lv_obj_add_event_cb(ui_actions_panel_get_erase_wifi_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_ERASE_WIFI);
+    lv_obj_add_event_cb(ui_actions_panel_get_enable_ftp_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_ENABLE_FTP);
     
     // Conectar acciones del panel lateral de evolución
     lv_obj_add_event_cb(ui_actions_panel_get_evo_fire_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EVO_FIRE);

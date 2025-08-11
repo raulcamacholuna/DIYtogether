@@ -1,11 +1,10 @@
 /*
- * Fichero: ./components/diymon_ui/actions.h
- * Fecha: 11/08/2025 - 14:30
- * Último cambio: Renombrados los IDs de acción para el panel de administración.
- * Descripción: Define los identificadores para todas las acciones de usuario posibles,
- *              incluyendo las del panel de acciones principal y el panel de administración
- *              con sus nuevas funcionalidades.
- */
+  Fichero: ./components/diymon_ui/actions.h
+  Fecha: 11/08/2025 - 22:30
+  Último cambio: Corregido el ID de acción para habilitar FTP.
+  Descripción: Define los identificadores para todas las acciones de usuario posibles.
+               Se reemplaza la acción de borrado de WiFi por la de activación de FTP.
+*/
 #ifndef ACTIONS_H
 #define ACTIONS_H
 
@@ -22,12 +21,12 @@ typedef enum {
     ACTION_ID_EJERCICIO,
     ACTION_ID_ATACAR,
 
-    // --- ANOTACIÓN: Acciones del panel de administración (nuevas funciones) ---
-    ACTION_ID_BRIGHTNESS_CYCLE, // Antes ACTION_ID_LVL_DOWN
-    ACTION_ID_TOGGLE_SCREEN,    // Antes ACTION_ID_SCREEN_OFF
-    ACTION_ID_ERASE_WIFI,       // Antes ACTION_ID_LVL_UP
+    // Acciones del panel de administración
+    ACTION_ID_BRIGHTNESS_CYCLE,
+    ACTION_ID_TOGGLE_SCREEN,
+    ACTION_ID_ENABLE_FTP,       // Reemplaza a ACTION_ID_ERASE_WIFI
 
-    // Acciones del panel de evolución (lateral) - Se mantienen
+    // Acciones del panel de evolución (lateral)
     ACTION_ID_EVO_FIRE,
     ACTION_ID_EVO_WATER,
     ACTION_ID_EVO_EARTH,

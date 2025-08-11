@@ -1,13 +1,18 @@
+/*
+  Fichero: ./components/screen_manager/screen_manager.c
+  Fecha: 12/08/2025 - 09:00
+  Último cambio: Sin cambios funcionales, se mantiene para consistencia.
+  Descripción: Gestor de estado de la pantalla. Se encarga de la lógica de
+               encendido, apagado y control de brillo, delegando en el BSP.
+*/
 #include "screen_manager.h"
-#include "bsp_api.h" // <-- ANOTACIÓN: ¡El gestor habla con el BSP!
+#include "bsp_api.h"
 #include "esp_log.h"
 
 static const char *TAG = "SCREEN_MANAGER";
 static bool g_is_screen_off = false;
 
 esp_err_t screen_manager_init(void) {
-    // En este caso, el BSP ya inicializa el display.
-    // Esta función podría usarse en el futuro si se necesitara una configuración adicional.
     ESP_LOGI(TAG, "Gestor de pantalla inicializado.");
     return ESP_OK;
 }

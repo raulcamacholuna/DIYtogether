@@ -1,9 +1,10 @@
 /*
- * Fichero: ./diymon_bsp/WS1.9TS/bsp_touch.c
- * Fecha: 08/08/2025 - 04:15
- * Último cambio: Añadida la frecuencia del reloj I2C (`scl_speed_hz`) a la configuración.
- * Descripción: Driver del panel táctil CST816S. Se corrige el error `ESP_ERR_INVALID_ARG` especificando la velocidad de comunicación en la configuración del panel I/O, completando la inicialización con la API moderna.
- */
+  Fichero: ./components/diymon_bsp/WS1.9TS/bsp_touch.c
+  Fecha: 12/08/2025 - 09:00
+  Último cambio: Corregido para usar el bus I2C global en lugar de pasarlo.
+  Descripción: Driver del panel táctil CST816S. Ahora utiliza la función pública
+               `bsp_get_i2c_bus_handle` para obtener el manejador del bus I2C.
+*/
 #include "bsp_api.h"
 #include "esp_log.h"
 #include "esp_lcd_touch_cst816s.h"
@@ -27,7 +28,7 @@ esp_err_t bsp_touch_init(void)
         .control_phase_bytes = 1,
         .lcd_cmd_bits = 8,
         .lcd_param_bits = 8,
-        .scl_speed_hz = 400000, // <--- LA LÍNEA QUE FALTABA
+        .scl_speed_hz = 400000,
         .flags = {
             .dc_low_on_data = 0,
             .disable_control_phase = 1,

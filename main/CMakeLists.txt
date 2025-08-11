@@ -1,4 +1,7 @@
-# CMakeLists.txt para el componente principal de la aplicación
+# Fichero: ./main/CMakeLists.txt
+# Fecha: 12/08/2025 - 07:15
+# Último cambio: Añadida la dependencia del nuevo componente service_screen.
+# Descripción: CMakeLists para el componente principal.
 
 idf_component_register(
     SRCS 
@@ -7,14 +10,14 @@ idf_component_register(
     INCLUDE_DIRS "."
     
     REQUIRES
-        # Tus componentes de alto nivel
         diymon_bsp
         diymon_core
         diymon_ui
         wifi_portal
-        screen_manager # <-- ANOTACIÓN: Añadimos el nuevo componente.
+        ftp_server
+        screen_manager
+        service_screen
 
-        # Dependencias de bajo nivel que usan tus componentes
         lvgl
         esp_lcd
         esp_lcd_touch

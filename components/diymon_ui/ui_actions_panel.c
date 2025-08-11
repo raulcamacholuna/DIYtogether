@@ -1,9 +1,10 @@
 /*
   Fichero: ./components/diymon_ui/ui_actions_panel.c
-  Fecha: 11/08/2025 - 14:45
-  Último cambio: Actualizados los nombres de assets y getters para los botones de administración.
-  Descripción: Se ha refactorizado por completo para manejar un panel de jugador y un panel de administración.
-               Incluye una máquina de estados para controlar la visibilidad y funciones de animación parametrizadas.
+  Fecha: 11/08/2025 - 21:15
+  Último cambio: Actualizado el panel de administración para el botón FTP.
+  Descripción: Se refactoriza para crear el botón de FTP con su nuevo asset y
+               se actualiza el nombre de la función getter correspondiente para
+               mantener la consistencia en todo el proyecto.
 */
 #include "ui_actions_panel.h"
 #include "ui_asset_loader.h"
@@ -80,10 +81,10 @@ void ui_actions_panel_create(lv_obj_t *parent) {
     s_player_btns[1] = create_top_action_button(parent, ASSET_ICON_GYM, 1);
     s_player_btns[2] = create_top_action_button(parent, ASSET_ICON_ATK, 2);
 
-    // --- ANOTACIÓN: Panel de Admin (Usando los nuevos IDs de Asset) ---
+    // --- Panel de Admin ---
     s_admin_btns[0] = create_top_action_button(parent, ASSET_ICON_BRIGHTNESS, 0);
     s_admin_btns[1] = create_top_action_button(parent, ASSET_ICON_SCREEN_OFF, 1);
-    s_admin_btns[2] = create_top_action_button(parent, ASSET_ICON_ERASE_WIFI, 2);
+    s_admin_btns[2] = create_top_action_button(parent, ASSET_ICON_FTP, 2); // [CORRECCIÓN]
 
     // --- Panel Lateral ---
     s_side_btns[0] = create_side_action_button(parent, ASSET_ICON_EVO_FIRE, 0);
@@ -95,13 +96,17 @@ void ui_actions_panel_create(lv_obj_t *parent) {
     ESP_LOGI(TAG, "Todos los paneles de acción (superior y lateral) creados.");
 }
 
-// --- ANOTACIÓN: Getters para botones (Con los nombres actualizados) ---
+// Getters para botones de jugador
 lv_obj_t* ui_actions_panel_get_eat_btn(void) { return s_player_btns[0]; }
 lv_obj_t* ui_actions_panel_get_gym_btn(void) { return s_player_btns[1]; }
 lv_obj_t* ui_actions_panel_get_atk_btn(void) { return s_player_btns[2]; }
+
+// Getters para botones de admin
 lv_obj_t* ui_actions_panel_get_brightness_btn(void) { return s_admin_btns[0]; }
 lv_obj_t* ui_actions_panel_get_toggle_screen_btn(void) { return s_admin_btns[1]; }
-lv_obj_t* ui_actions_panel_get_erase_wifi_btn(void) { return s_admin_btns[2]; }
+lv_obj_t* ui_actions_panel_get_enable_ftp_btn(void) { return s_admin_btns[2]; } // [CORRECCIÓN]
+
+// Getters para botones de evolución
 lv_obj_t* ui_actions_panel_get_evo_fire_btn(void) { return s_side_btns[0]; }
 lv_obj_t* ui_actions_panel_get_evo_water_btn(void) { return s_side_btns[1]; }
 lv_obj_t* ui_actions_panel_get_evo_earth_btn(void) { return s_side_btns[2]; }
@@ -123,9 +128,6 @@ static void timer_auto_hide_callback(lv_timer_t *timer) {
 static void anim_ready_hide_cb(lv_anim_t *a) {
     lv_obj_add_flag((lv_obj_t *)a->var, LV_OBJ_FLAG_HIDDEN);
 }
-
-// --- El resto del fichero no necesita cambios ---
-// ... (funciones de animación y handle_gesture se mantienen igual) ...
 
 static void animate_panel_in_top(lv_obj_t **buttons) {
     if (s_hide_timer) lv_timer_del(s_hide_timer);

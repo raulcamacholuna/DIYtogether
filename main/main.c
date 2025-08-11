@@ -1,41 +1,43 @@
+/*
+  Fichero: ./main/main.c
+  Fecha: 12/08/2025 - 09:30
+  Último cambio: Sin cambios. Se mantiene la arquitectura de modos de operación.
+  Descripción: Orquestador principal. Decide el modo de operación (FTP, Portal, App)
+               y ejecuta únicamente los componentes necesarios para cada modo.
+*/
 #include <stdio.h>
+#include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
+#include "esp_wifi.h"
+#include "esp_system.h"
+#include "nvs.h"
 #include "esp_lvgl_port.h"
 #include "esp_timer.h"
-#include "esp_system.h" 
 
+#include "bsp_api.h"
 #include "hardware_manager.h"
 #include "diymon_evolution.h"
 #include "ui.h"
 #include "screens.h"
 #include "wifi_portal.h"
+#include "ftp_server.h"
 #include "screen_manager.h"
+#include "service_screen.h"
 
 static const char *TAG = "DIYMON_MAIN";
 
+// --- Declaraciones de funciones ---
+static void run_ftp_mode(void);
+static void run_wifi_portal_mode(void);
+static void run_main_application_mode(void);
+static bool check_ftp_flag(void);
+static void erase_ftp_flag(void);
+static void evolution_timer_callback(void* arg);
+
 static esp_timer_handle_t evolution_timer_handle;
-
-static void evolution_timer_callback(void* arg) {
-    const char* current_code = diymon_get_current_code();
-    const char* next_evolution = diymon_get_next_evolution_in_sequence(current_code);
-
-    if (next_evolution != NULL) {
-        ESP_LOGI(TAG, "¡EVOLUCIÓN! Nuevo código: %s", next_evolution);
-        diymon_set_current_code(next_evolution);
-        
-        if (lvgl_port_lock(0)) {
-            delete_screen_main();
-            ui_init();
-            lvgl_port_unlock();
-        }
-    } else {
-        ESP_LOGI(TAG, "El DIYMON ha alcanzado su forma final. Deteniendo temporizador.");
-        esp_timer_stop(evolution_timer_handle);
-    }
-}
 
 void app_main(void)
 {
@@ -47,25 +49,51 @@ void app_main(void)
     ESP_ERROR_CHECK(ret);
     ESP_LOGI(TAG, "Sistema NVS inicializado.");
 
-    if (!wifi_portal_credentials_saved()) {
-        // --- ANOTACIÓN: Flujo de PRIMER ARRANQUE ---
-        // Si no hay WiFi, inicializamos el hardware y lanzamos el portal.
-        // Esta función NUNCA retornará, ya que siempre termina en un reinicio.
-        hardware_manager_init();
-        screen_manager_init();
-        ESP_LOGI(TAG, "No hay credenciales WiFi. Lanzando portal de configuracion...");
-        wifi_portal_start();
+    if (check_ftp_flag()) {
+        erase_ftp_flag();
+        run_ftp_mode();
+    } else if (!wifi_portal_credentials_saved()) {
+        run_wifi_portal_mode();
+    } else {
+        run_main_application_mode();
     }
+}
 
-    // --- ANOTACIÓN: Flujo NORMAL de la aplicación ---
-    // Este código solo se ejecuta si las credenciales ya estaban guardadas.
+static void run_ftp_mode(void) {
+    ESP_LOGI(TAG, "Arrancando en modo FTP...");
+    service_screen_show("/sdcard/config/FTP.bin");
+    
+    bsp_wifi_init_sta_from_nvs();
+    bool ip_ok = bsp_wifi_wait_for_ip(15000);
+
+    if (ip_ok) {
+        char ip_addr_buffer[16] = "0.0.0.0";
+        bsp_wifi_get_ip(ip_addr_buffer);
+        ESP_LOGI(TAG, "Dispositivo conectado. IP: %s. Iniciando servidor FTP.", ip_addr_buffer);
+        ftp_server_start(); // Bloqueante
+    } else {
+        ESP_LOGE(TAG, "No se pudo obtener IP. Reiniciando en 10 segundos...");
+        vTaskDelay(pdMS_TO_TICKS(10000));
+        esp_restart();
+    }
+}
+
+static void run_wifi_portal_mode(void) {
+    ESP_LOGI(TAG, "No hay credenciales. Arrancando en modo Portal WiFi...");
+    service_screen_show("/sdcard/config/WIFI.bin");
+    wifi_portal_start(); // Bloqueante, reinicia al finalizar
+}
+
+static void run_main_application_mode(void) {
+    ESP_LOGI(TAG, "Cargando aplicación principal...");
     hardware_manager_init();
     screen_manager_init();
     
-    ESP_LOGI(TAG, "Cargando aplicacion principal...");
-
+    ESP_LOGI(TAG, "Desactivando WiFi para liberar memoria RAM...");
+    esp_wifi_stop();
+    esp_wifi_deinit();
+    
     diymon_evolution_init();
-    ESP_LOGI(TAG, "Logica del DIYMON Core inicializada.");
 
     if (lvgl_port_lock(0)) {
         ui_init();
@@ -74,10 +102,49 @@ void app_main(void)
     ESP_LOGI(TAG, "Interfaz de Usuario principal inicializada.");
 
     const esp_timer_create_args_t evolution_timer_args = {
-            .callback = &evolution_timer_callback, .name = "evolution-timer"
+        .callback = &evolution_timer_callback, .name = "evolution-timer"
     };
     ESP_ERROR_CHECK(esp_timer_create(&evolution_timer_args, &evolution_timer_handle));
     ESP_ERROR_CHECK(esp_timer_start_periodic(evolution_timer_handle, 5 * 1000000));
     
-    ESP_LOGI(TAG, "¡Firmware DIYMON en marcha! ¡Bienvenido, creador!");
+    ESP_LOGI(TAG, "¡Firmware DIYMON en marcha!");
+}
+
+static bool check_ftp_flag(void) {
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open("storage", NVS_READONLY, &nvs_handle);
+    if (err != ESP_OK) return false;
+    char ftp_flag[2] = {0};
+    size_t len = sizeof(ftp_flag);
+    err = nvs_get_str(nvs_handle, "enable_ftp", ftp_flag, &len);
+    nvs_close(nvs_handle);
+    return (err == ESP_OK && strcmp(ftp_flag, "1") == 0);
+}
+
+static void erase_ftp_flag(void) {
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
+    if (err == ESP_OK) {
+        nvs_erase_key(nvs_handle, "enable_ftp");
+        nvs_commit(nvs_handle);
+        nvs_close(nvs_handle);
+        ESP_LOGI(TAG, "Marca FTP borrada de NVS.");
+    }
+}
+
+static void evolution_timer_callback(void* arg) {
+    const char* current_code = diymon_get_current_code();
+    const char* next_evolution = diymon_get_next_evolution_in_sequence(current_code);
+    if (next_evolution != NULL) {
+        ESP_LOGI(TAG, "¡EVOLUCIÓN! Nuevo código: %s", next_evolution);
+        diymon_set_current_code(next_evolution);
+        if (lvgl_port_lock(0)) {
+            delete_screen_main();
+            ui_init();
+            lvgl_port_unlock();
+        }
+    } else {
+        ESP_LOGI(TAG, "El DIYMON ha alcanzado su forma final.");
+        esp_timer_stop(evolution_timer_handle);
+    }
 }

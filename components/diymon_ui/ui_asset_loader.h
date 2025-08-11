@@ -1,8 +1,9 @@
 /*
   Fichero: ./components/diymon_ui/ui_asset_loader.h
-  Fecha: 11/08/2025 - 14:30
-  Último cambio: Renombrados los IDs de assets para el panel de administración.
-  Descripción: Interfaz pública para el gestor de assets. Define los identificadores únicos para todos los recursos gráficos (iconos) que se precargan en memoria.
+  Fecha: 11/08/2025 - 21:15
+  Último cambio: Renombrado el ID del asset para el botón FTP.
+  Descripción: Interfaz pública para el gestor de assets. Se actualiza el 
+               identificador del icono de 'ERASE_WIFI' a 'FTP' para que sea más descriptivo.
 */
 #ifndef UI_ASSET_LOADER_H
 #define UI_ASSET_LOADER_H
@@ -16,12 +17,12 @@ typedef enum {
     ASSET_ICON_GYM,
     ASSET_ICON_ATK,
 
-    // --- ANOTACIÓN: Iconos del panel de administración (nuevas funciones) ---
-    ASSET_ICON_BRIGHTNESS,  // Antes ASSET_ICON_LVL_DOWN
-    ASSET_ICON_SCREEN_OFF,  // Mantiene el nombre, ahora es un toggle.
-    ASSET_ICON_ERASE_WIFI,  // Antes ASSET_ICON_LVL_UP
+    // Iconos del panel de administración
+    ASSET_ICON_BRIGHTNESS,
+    ASSET_ICON_SCREEN_OFF,
+    ASSET_ICON_FTP,         // [CORRECCIÓN] Renombrado desde ASSET_ICON_ERASE_WIFI
 
-    // Iconos del panel de evolución (lateral) - Se mantienen
+    // Iconos del panel de evolución (lateral)
     ASSET_ICON_EVO_FIRE,
     ASSET_ICON_EVO_WATER,
     ASSET_ICON_EVO_EARTH,

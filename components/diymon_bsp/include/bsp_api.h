@@ -1,9 +1,11 @@
 /*
- * Fichero: ./diymon_bsp/include/bsp_api.h
- * Fecha: 12/08/2025 - 11:55
- * Último cambio: Añadida la declaración de bsp_spi_init.
- * Descripción: Interfaz pública del BSP. Se añade la declaración de la función de inicialización del bus SPI para que pueda ser orquestada por otros módulos del BSP.
- */
+  Fichero: ./components/diymon_bsp/include/bsp_api.h
+  Fecha: 12/08/2025 - 09:00
+  Último cambio: Restauradas todas las declaraciones de funciones públicas necesarias.
+  Descripción: Interfaz pública del BSP. Se restauran las declaraciones de funciones
+               esenciales (`bsp_get_i2c_bus_handle`, `bsp_display_turn_on/off`)
+               para asegurar que todos los componentes que dependen del BSP compilen.
+*/
 #ifndef BSP_API_H
 #define BSP_API_H
 
@@ -11,21 +13,32 @@
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_touch.h"
 #include "driver/i2c_master.h"
+#include "esp_wifi.h"
 
-// --- INICIALIZADORES ---
+// --- INICIALIZADORES DE HARDWARE ---
 esp_err_t bsp_init(void);
+esp_err_t bsp_init_service_mode(void);
+esp_err_t bsp_init_minimal_headless(void);
+
+// --- INICIALIZADORES DE PERIFÉRICOS INDIVIDUALES ---
 esp_err_t bsp_i2c_init(void);
-esp_err_t bsp_spi_init(void); // <-- Declaración añadida
+esp_err_t bsp_spi_init(void);
 esp_err_t bsp_display_init(void);
 esp_err_t bsp_touch_init(void);
 esp_err_t bsp_sdcard_init(void);
 esp_err_t bsp_imu_init(void);
 
+// --- FUNCIONES DE WIFI ---
+void bsp_wifi_init_stack(void);
+void bsp_wifi_start_ap(void);
+void bsp_wifi_init_sta_from_nvs(void);
+bool bsp_wifi_wait_for_ip(uint32_t timeout_ms);
+void bsp_wifi_get_ip(char *ip);
+
 // --- FUNCIONES DE CONTROL ---
 void bsp_display_set_brightness(int percentage);
 void bsp_display_turn_on(void);
 void bsp_display_turn_off(void);
-void bsp_imu_read(float acc[3], float gyro[3]);
 
 // --- GETTERS DE HANDLES Y CONFIGURACIÓN ---
 i2c_master_bus_handle_t bsp_get_i2c_bus_handle(void);

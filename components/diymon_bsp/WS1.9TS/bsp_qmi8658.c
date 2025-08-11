@@ -1,75 +1,62 @@
 /*
- * Fichero: ./diymon_bsp/WS1.9TS/bsp_qmi8658.c
- * Fecha: 08/08/2025 - 02:40
- * Último cambio: Corregido el include para la nueva estructura de ficheros.
- * Descripción: Driver para el sensor IMU QMI8658, adaptado a la API I2C legacy y a la estructura de componentes de ESP-IDF.
- */
-#include "bsp_api.h"        // API Pública del BSP
-#include "bsp_qmi8658.h"    // Cabecera privada con los registros del sensor
+  Fichero: ./components/diymon_bsp/WS1.9TS/bsp_qmi8658.c
+  Fecha: 12/08/2025 - 09:00
+  Último cambio: Corregido para usar el bus I2C global en lugar de pasarlo.
+  Descripción: Driver del sensor IMU QMI8658. Ahora utiliza la función pública
+               `bsp_get_i2c_bus_handle` para obtener el manejador del bus I2C,
+               simplificando su inicialización y asegurando la modularidad.
+*/
+#include "bsp_api.h"
+#include "bsp_qmi8658.h"
 #include "esp_log.h"
-#include "driver/i2c.h"
+#include "driver/i2c_master.h"
 
 static const char *TAG = "bsp_qmi8658";
 
-#define I2C_PORT_NUM     I2C_NUM_0
 #define IMU_I2C_ADDRESS  0x6B
-#define I2C_TIMEOUT_MS   100
+#define I2C_CLK_SPEED_HZ 400000
 
-// Función privada para escribir en un registro usando la API legacy.
-static esp_err_t qmi8658_write_reg(uint8_t reg, uint8_t value)
-{
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, (IMU_I2C_ADDRESS << 1) | I2C_MASTER_WRITE, true);
-    i2c_master_write_byte(cmd, reg, true);
-    i2c_master_write_byte(cmd, value, true);
-    i2c_master_stop(cmd);
-    esp_err_t ret = i2c_master_cmd_begin(I2C_PORT_NUM, cmd, pdMS_TO_TICKS(I2C_TIMEOUT_MS));
-    i2c_cmd_link_delete(cmd);
-    return ret;
-}
-
-// Función privada para leer de un registro usando la API legacy.
-static esp_err_t qmi8658_read_reg(uint8_t reg, uint8_t *data, size_t len)
-{
-    if (len == 0) {
-        return ESP_OK;
-    }
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, (IMU_I2C_ADDRESS << 1) | I2C_MASTER_WRITE, true);
-    i2c_master_write_byte(cmd, reg, true);
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, (IMU_I2C_ADDRESS << 1) | I2C_MASTER_READ, true);
-    if (len > 1) {
-        i2c_master_read(cmd, data, len - 1, I2C_MASTER_ACK);
-    }
-    i2c_master_read_byte(cmd, data + len - 1, I2C_MASTER_NACK);
-    i2c_master_stop(cmd);
-    esp_err_t ret = i2c_master_cmd_begin(I2C_PORT_NUM, cmd, pdMS_TO_TICKS(I2C_TIMEOUT_MS));
-    i2c_cmd_link_delete(cmd);
-    return ret;
-}
+static i2c_master_dev_handle_t g_imu_dev_handle = NULL;
 
 esp_err_t bsp_imu_init(void)
 {
-    ESP_LOGI(TAG, "[IMU DRIVER] <<<< My Custom QMI8658 Driver is Running >>>>");
-
-    uint8_t who_am_i = 0;
-    esp_err_t ret = qmi8658_read_reg(QMI8658_WHO_AM_I, &who_am_i, 1);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to communicate with QMI8658. I2C error: %s", esp_err_to_name(ret));
+    ESP_LOGI(TAG, "Initializing IMU QMI8658 with Modern I2C API...");
+    
+    i2c_master_bus_handle_t bus_handle = bsp_get_i2c_bus_handle();
+    if (bus_handle == NULL) {
+        ESP_LOGE(TAG, "I2C bus handle is not initialized!");
         return ESP_FAIL;
     }
+
+    i2c_device_config_t dev_cfg = {
+        .device_address = IMU_I2C_ADDRESS,
+        .scl_speed_hz = I2C_CLK_SPEED_HZ,
+    };
+    
+    ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_cfg, &g_imu_dev_handle));
+    ESP_LOGI(TAG, "IMU device added to I2C bus successfully.");
+
+    uint8_t who_am_i = 0;
+    ESP_ERROR_CHECK(i2c_master_transmit_receive(g_imu_dev_handle, 
+                                                (uint8_t[]){QMI8658_WHO_AM_I}, 1, 
+                                                &who_am_i, 1, 
+                                                pdMS_TO_TICKS(100)));
+
     if (who_am_i != 0x05) {
         ESP_LOGE(TAG, "QMI8658 not found! WhoAmI check failed. Read value: 0x%02X", who_am_i);
         return ESP_FAIL;
     }
     ESP_LOGI(TAG, "QMI8658 found successfully! WhoAmI: 0x%02X", who_am_i);
 
-    qmi8658_write_reg(QMI8658_CTRL7, 0x03);
-    qmi8658_write_reg(QMI8658_CTRL2, 0x23);
-    qmi8658_write_reg(QMI8658_CTRL3, 0x53);
+    uint8_t ctrl_regs_data[][2] = {
+        {QMI8658_CTRL7, 0x03},
+        {QMI8658_CTRL2, 0x23},
+        {QMI8658_CTRL3, 0x53}
+    };
+
+    for (int i = 0; i < sizeof(ctrl_regs_data) / sizeof(ctrl_regs_data[0]); i++) {
+        ESP_ERROR_CHECK(i2c_master_transmit(g_imu_dev_handle, ctrl_regs_data[i], 2, pdMS_TO_TICKS(100)));
+    }
     
     ESP_LOGI(TAG, "IMU initialized.");
     return ESP_OK;
@@ -77,11 +64,19 @@ esp_err_t bsp_imu_init(void)
 
 void bsp_imu_read(float acc[3], float gyro[3])
 {
+    if (g_imu_dev_handle == NULL) {
+        ESP_LOGE(TAG, "IMU device handle not initialized, cannot read.");
+        return;
+    }
+
     uint8_t buf_reg[12];
     short raw_acc_xyz[3];
     short raw_gyro_xyz[3];
 
-    qmi8658_read_reg(QMI8658_AX_L, buf_reg, 12);
+    i2c_master_transmit_receive(g_imu_dev_handle,
+                                (uint8_t[]){QMI8658_AX_L}, 1,
+                                buf_reg, 12,
+                                pdMS_TO_TICKS(100));
 
     raw_acc_xyz[0] = (int16_t)((buf_reg[1] << 8) | buf_reg[0]);
     raw_acc_xyz[1] = (int16_t)((buf_reg[3] << 8) | buf_reg[2]);

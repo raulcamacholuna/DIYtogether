@@ -1,9 +1,10 @@
 /*
- * Fichero: ./components/diymon_ui/ui_actions_panel.h
- * Fecha: 11/08/2025 - 14:30
- * Último cambio: Renombrados los getters de botones del panel de administración.
- * Descripción: Interfaz pública para el módulo gestor de paneles de acción. Expone funciones para crear los paneles, manejar gestos y obtener los manejadores de todos los botones.
- */
+  Fichero: ./components/diymon_ui/ui_actions_panel.h
+  Fecha: 11/08/2025 - 21:15
+  Último cambio: Renombrados los getters de botones para la funcionalidad FTP.
+  Descripción: Interfaz pública para el gestor de paneles. Se actualiza el nombre del
+               getter del botón para habilitar FTP, haciéndolo más claro y consistente.
+*/
 #ifndef UI_ACTIONS_PANEL_H
 #define UI_ACTIONS_PANEL_H
 
@@ -28,12 +29,12 @@ lv_obj_t* ui_actions_panel_get_eat_btn(void);
 lv_obj_t* ui_actions_panel_get_gym_btn(void);
 lv_obj_t* ui_actions_panel_get_atk_btn(void);
 
-// --- ANOTACIÓN: Getters para botones del panel SUPERIOR de ADMIN (nuevas funciones) ---
-lv_obj_t* ui_actions_panel_get_brightness_btn(void); // Antes ui_actions_panel_get_lvl_down_btn
-lv_obj_t* ui_actions_panel_get_toggle_screen_btn(void); // Antes ui_actions_panel_get_screen_off_btn
-lv_obj_t* ui_actions_panel_get_erase_wifi_btn(void); // Antes ui_actions_panel_get_lvl_up_btn
+// --- Getters para botones del panel SUPERIOR de ADMIN ---
+lv_obj_t* ui_actions_panel_get_brightness_btn(void);
+lv_obj_t* ui_actions_panel_get_toggle_screen_btn(void);
+lv_obj_t* ui_actions_panel_get_enable_ftp_btn(void); // [CORRECCIÓN] Renombrado desde get_erase_wifi_btn
 
-// --- Getters para botones del panel LATERAL de EVOLUCIÓN --- (Se mantienen)
+// --- Getters para botones del panel LATERAL de EVOLUCIÓN ---
 lv_obj_t* ui_actions_panel_get_evo_fire_btn(void);
 lv_obj_t* ui_actions_panel_get_evo_water_btn(void);
 lv_obj_t* ui_actions_panel_get_evo_earth_btn(void);

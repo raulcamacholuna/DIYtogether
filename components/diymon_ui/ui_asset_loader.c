@@ -1,10 +1,10 @@
 /*
   Fichero: ./components/diymon_ui/ui_asset_loader.c
-  Fecha: 11/08/2025 - 14:30
-  Último cambio: Actualizados los nombres de fichero para los iconos del panel de administración.
-  Descripción: Implementación del gestor de assets. Se han actualizado los nombres
-               de los ficheros de iconos para que coincidan con las nuevas funcionalidades
-               de los botones del panel de administración.
+  Fecha: 11/08/2025 - 21:15
+  Último cambio: Actualizado el nombre del fichero para el icono FTP.
+  Descripción: Implementación del gestor de assets. Se ha actualizado la carga de 
+               iconos para utilizar el nuevo ID 'ASSET_ICON_FTP' y se le ha asignado
+               el fichero "ICON_FTP.bin".
 */
 #include "ui_asset_loader.h"
 #include "diymon_ui_helpers.h"
@@ -80,13 +80,12 @@ void ui_assets_init(void) {
     load_asset(ASSET_ICON_GYM, "ICON_GYM.bin");
     load_asset(ASSET_ICON_ATK, "ICON_ATK.bin");
     
-    // --- ANOTACIÓN: Panel de admin (NUEVOS nombres de fichero) ---
-    // Asegúrate de que los archivos .bin con estos nombres existan en tu SD.
-    // Puedes reutilizar ICON_LD.bin para brillo, ICON_OFF.bin para pantalla,
-    // y crear o renombrar un ICON_RESET.bin para el borrado de WiFi.
-    load_asset(ASSET_ICON_BRIGHTNESS, "ICON_LUZ.bin"); // Antes ICON_LD.bin
-    load_asset(ASSET_ICON_SCREEN_OFF, "ICON_OFF.bin");    // Mantiene el nombre
-    load_asset(ASSET_ICON_ERASE_WIFI, "ICON_SD.bin");  // Antes ICON_LU.bin
+    // Panel de admin
+    load_asset(ASSET_ICON_BRIGHTNESS, "ICON_LUZ.bin");
+    load_asset(ASSET_ICON_SCREEN_OFF, "ICON_OFF.bin");
+    // [CORRECCIÓN] Se utiliza el nuevo ID de asset y un nombre de fichero descriptivo.
+    // Asegúrate de que el archivo 'ICON_FTP.bin' existe en '/sdcard/buttons/'.
+    load_asset(ASSET_ICON_FTP, "ICON_FTP.bin");
 
     // Panel lateral de evolución, usando los nombres de la imagen.
     load_asset(ASSET_ICON_EVO_FIRE,  "LVL_FIRE.BIN");
