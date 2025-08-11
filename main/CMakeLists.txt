@@ -1,5 +1,3 @@
-# CMakeLists.txt para el componente principal de la aplicación
-
 idf_component_register(
     SRCS 
         "main.c"
@@ -7,17 +5,18 @@ idf_component_register(
         # ...añade aquí otros ficheros .c que tengas en 'main'...
     INCLUDE_DIRS "."
     
-    # [LA SOLUCIÓN FINAL]
-    # Declaramos TODAS las dependencias que nuestra aplicación y sus
-    # componentes (como el BSP) necesitan para comunicarse entre sí.
+    # --- ANOTACIÓN: Declaración de todas las dependencias del componente 'main'. ---
+    # Al añadir 'wifi_portal', el sistema de compilación hará que 'wifi_portal.h'
+    # sea visible para 'main.c', solucionando el error de "fichero no encontrado".
     REQUIRES
         # Tus componentes de alto nivel
         diymon_bsp
         diymon_core
         diymon_ui
-        lvgl
+        wifi_portal # <-- ANOTACIÓN: Dependencia añadida.
 
-        # Los drivers de bajo nivel que el BSP expone en su API
+        # Dependencias de bajo nivel que usan tus componentes
+        lvgl
         esp_lcd
         esp_lcd_touch
         driver

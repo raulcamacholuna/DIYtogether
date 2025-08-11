@@ -18,7 +18,7 @@
 static const char *TAG = "UI_IDLE_ANIM";
 
 #define IDLE_ANIM_FRAME_COUNT 3
-#define IDLE_FRAME_INTERVAL 750
+#define IDLE_FRAME_INTERVAL 1500
 
 // Variables estáticas para la gestión de la animación de reposo
 static lv_obj_t *g_anim_img_obj;

@@ -1,6 +1,6 @@
 # Fichero: ./components/diymon_ui/CMakeLists.txt
-# Fecha: 09/08/2025 - 09:25
-# Último cambio: Corregida la sintaxis de los comentarios a '#'.
+# Fecha: 11/08/2025 - 08:55
+# Último cambio: Añadido welcome_screen.c a la lista de fuentes.
 # Descripción: Se ha añadido 'diymon_core' a la lista de requerimientos (REQUIRES)
 #              para permitir que la UI pueda consultar el estado de evolución
 #              del personaje y cargar las animaciones correspondientes.
@@ -12,6 +12,10 @@ file(GLOB component_sources
     "actions/*.c"
     "styles/*.c"
 )
+
+# --- ANOTACIÓN: Se añade el fichero de la pantalla de bienvenida a la lista. ---
+list(APPEND component_sources "welcome_screen.c")
+
 
 # 2. REGISTRO DEL COMPONENTE
 idf_component_register(
