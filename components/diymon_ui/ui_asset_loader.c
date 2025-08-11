@@ -1,8 +1,10 @@
 /*
   Fichero: ./components/diymon_ui/ui_asset_loader.c
-  Fecha: 13/08/2025 - 09:35
-  Último cambio: Corregidos los nombres de fichero de los iconos del panel lateral.
-  Descripción: Implementación del gestor de assets. Se han corregido los nombres de los ficheros de iconos del panel de administración para que coincidan con los nombres válidos en el sistema de ficheros FAT (8.3).
+  Fecha: 11/08/2025 - 14:30
+  Último cambio: Actualizados los nombres de fichero para los iconos del panel de administración.
+  Descripción: Implementación del gestor de assets. Se han actualizado los nombres
+               de los ficheros de iconos para que coincidan con las nuevas funcionalidades
+               de los botones del panel de administración.
 */
 #include "ui_asset_loader.h"
 #include "diymon_ui_helpers.h"
@@ -78,12 +80,15 @@ void ui_assets_init(void) {
     load_asset(ASSET_ICON_GYM, "ICON_GYM.bin");
     load_asset(ASSET_ICON_ATK, "ICON_ATK.bin");
     
-    // Panel de admin (con nombres 8.3 corregidos)
-    load_asset(ASSET_ICON_LVL_DOWN, "ICON_LD.bin");
-    load_asset(ASSET_ICON_SCREEN_OFF, "ICON_OFF.bin");
-    load_asset(ASSET_ICON_LVL_UP, "ICON_LU.bin");
+    // --- ANOTACIÓN: Panel de admin (NUEVOS nombres de fichero) ---
+    // Asegúrate de que los archivos .bin con estos nombres existan en tu SD.
+    // Puedes reutilizar ICON_LD.bin para brillo, ICON_OFF.bin para pantalla,
+    // y crear o renombrar un ICON_RESET.bin para el borrado de WiFi.
+    load_asset(ASSET_ICON_BRIGHTNESS, "ICON_LUZ.bin"); // Antes ICON_LD.bin
+    load_asset(ASSET_ICON_SCREEN_OFF, "ICON_OFF.bin");    // Mantiene el nombre
+    load_asset(ASSET_ICON_ERASE_WIFI, "ICON_SD.bin");  // Antes ICON_LU.bin
 
-    // [CORREGIDO] Panel lateral de evolución, usando los nombres de la imagen.
+    // Panel lateral de evolución, usando los nombres de la imagen.
     load_asset(ASSET_ICON_EVO_FIRE,  "LVL_FIRE.BIN");
     load_asset(ASSET_ICON_EVO_WATER, "LVL_WATE.BIN");
     load_asset(ASSET_ICON_EVO_EARTH, "LVL_EART.BIN");

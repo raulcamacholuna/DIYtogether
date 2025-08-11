@@ -1,15 +1,18 @@
 #include "wifi_portal.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "freertos/event_groups.h"
 #include "esp_wifi.h"
 #include "esp_log.h"
 #include "esp_event.h"
 #include "esp_http_server.h"
 #include "nvs_flash.h"
+#include "nvs.h"
 #include "lwip/netif.h"
 #include "lvgl.h"
 #include "esp_mac.h"
 #include "esp_lvgl_port.h"
+#include "esp_system.h"
 
 #define PORTAL_AP_SSID          "DIYTogether"
 #define PORTAL_AP_PASS          "MakeItYours"
@@ -20,7 +23,8 @@ static const char *TAG = "WIFI_PORTAL";
 
 static EventGroupHandle_t s_portal_event_group;
 const int CREDENTIALS_RECEIVED_BIT = BIT0;
-const int SKIP_BIT = BIT1; // <-- ANOTACIÓN: Nuevo bit para el botón de omitir.
+const int SKIP_BIT = BIT1;
+static esp_event_handler_instance_t instance_any_id;
 
 static const char* HTML_FORM =
     "<!DOCTYPE html><html><head><title>Configuracion WiFi DIYMON</title><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head>"
@@ -96,7 +100,7 @@ static void wifi_init_softap(void) {
     esp_netif_create_default_wifi_ap();
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL, &instance_any_id));
     wifi_config_t wifi_config = {
         .ap = {.ssid = PORTAL_AP_SSID, .password = PORTAL_AP_PASS, .ssid_len = strlen(PORTAL_AP_SSID), .channel = PORTAL_AP_CHANNEL, .authmode = WIFI_AUTH_WPA2_PSK, .max_connection = PORTAL_AP_MAX_CONN}};
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
@@ -104,10 +108,8 @@ static void wifi_init_softap(void) {
     ESP_ERROR_CHECK(esp_wifi_start());
 }
 
-// --- ANOTACIÓN: Callback para el botón de omitir. ---
 static void skip_button_event_cb(lv_event_t *e) {
-    lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_CLICKED) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
         xEventGroupSetBits(s_portal_event_group, SKIP_BIT);
     }
 }
@@ -127,18 +129,11 @@ static void display_portal_info_on_screen(void) {
         lv_obj_set_style_text_color(label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
     }
     
-    // --- ANOTACIÓN: Texto de instrucciones actualizado. ---
-    lv_obj_t *info_label = lv_label_create(scr);
-    lv_label_set_text(info_label, "Conectate a esta red desde tu movil\ny visita la IP para configurar el WiFi.");
-    lv_obj_set_style_text_color(info_label, lv_color_hex(0xAAAAAA), LV_PART_MAIN);
-    lv_obj_set_style_text_align(info_label, LV_TEXT_ALIGN_CENTER, 0);
-
-    // --- ANOTACIÓN: Creación del botón de omitir. ---
     lv_obj_t *skip_btn = lv_btn_create(scr);
     lv_obj_add_event_cb(skip_btn, skip_button_event_cb, LV_EVENT_CLICKED, NULL);
-    lv_obj_set_style_pad_top(skip_btn, 20, LV_PART_MAIN); // Añade espacio extra arriba
+    lv_obj_set_style_pad_top(skip_btn, 20, LV_PART_MAIN);
     lv_obj_t *label_btn = lv_label_create(skip_btn);
-    lv_label_set_text(label_btn, "Omitir");
+    lv_label_set_text(label_btn, "Omitir y Reiniciar");
     lv_obj_center(label_btn);
 
     lv_screen_load(scr);
@@ -148,55 +143,70 @@ bool wifi_portal_credentials_saved(void) {
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open("storage", NVS_READONLY, &nvs_handle);
     if (err != ESP_OK) return false;
-
     size_t required_size = 0;
     err = nvs_get_str(nvs_handle, "wifi_ssid", NULL, &required_size);
     nvs_close(nvs_handle);
-
-    if (err == ESP_OK && required_size > 1) { // >1 para no contar un string vacío.
+    if (err == ESP_OK && required_size > 1) {
         ESP_LOGI(TAG, "Credenciales WiFi encontradas en NVS.");
         return true;
     }
-    
     ESP_LOGI(TAG, "No se encontraron credenciales WiFi en NVS.");
     return false;
 }
 
-wifi_portal_result_t wifi_portal_start(void) {
+void wifi_portal_start(void) {
     s_portal_event_group = xEventGroupCreate();
-    
     wifi_init_softap();
     httpd_handle_t server = start_webserver();
-
     if (server == NULL) {
-        ESP_LOGE(TAG, "Error al iniciar el servidor web.");
-        return PORTAL_CONFIG_SKIPPED; // Devuelve skip como un error seguro.
+        ESP_LOGE(TAG, "Error al iniciar servidor, reiniciando...");
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        esp_restart();
     }
     
     if(lvgl_port_lock(0)) {
         display_portal_info_on_screen();
         lvgl_port_unlock();
     }
-
     ESP_LOGI(TAG, "Portal en marcha. Esperando interaccion del usuario...");
+    
+    EventBits_t bits = xEventGroupWaitBits(s_portal_event_group, CREDENTIALS_RECEIVED_BIT | SKIP_BIT, pdTRUE, pdFALSE, portMAX_DELAY);
 
-    EventBits_t bits = xEventGroupWaitBits(s_portal_event_group,
-                                           CREDENTIALS_RECEIVED_BIT | SKIP_BIT,
-                                           pdTRUE, pdFALSE, portMAX_DELAY);
-
-    wifi_portal_result_t result;
-    if (bits & CREDENTIALS_RECEIVED_BIT) {
-        ESP_LOGI(TAG, "Credenciales recibidas, deteniendo portal...");
-        result = PORTAL_CONFIG_SAVED;
-    } else {
-        ESP_LOGI(TAG, "Portal omitido por el usuario...");
-        result = PORTAL_CONFIG_SKIPPED;
+    if (bits & SKIP_BIT) {
+        // --- ANOTACIÓN: Lógica para guardar una configuración "omitida". ---
+        // Esto previene que el portal aparezca en el siguiente arranque.
+        ESP_LOGI(TAG, "Portal omitido. Guardando configuracion 'skipped' para el proximo arranque.");
+        nvs_handle_t nvs_handle;
+        ESP_ERROR_CHECK(nvs_open("storage", NVS_READWRITE, &nvs_handle));
+        ESP_ERROR_CHECK(nvs_set_str(nvs_handle, "wifi_ssid", "skipped"));
+        ESP_ERROR_CHECK(nvs_set_str(nvs_handle, "wifi_pass", ""));
+        ESP_ERROR_CHECK(nvs_commit(nvs_handle));
+        nvs_close(nvs_handle);
     }
+    
+    ESP_LOGI(TAG, "Accion de usuario recibida. Deteniendo portal y reiniciando...");
 
     httpd_stop(server);
     esp_wifi_stop();
+    esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, instance_any_id);
+    esp_event_loop_delete_default();
     esp_netif_destroy_default_wifi(esp_netif_get_handle_from_ifkey("WIFI_AP_DEF"));
     vEventGroupDelete(s_portal_event_group);
+    
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    esp_restart();
+}
 
-    return result;
+void wifi_portal_erase_credentials(void) {
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Error (%s) abriendo NVS para borrar.", esp_err_to_name(err));
+        return;
+    }
+    nvs_erase_key(nvs_handle, "wifi_ssid");
+    nvs_erase_key(nvs_handle, "wifi_pass");
+    nvs_commit(nvs_handle);
+    nvs_close(nvs_handle);
+    ESP_LOGI(TAG, "Credenciales WiFi borradas de NVS.");
 }

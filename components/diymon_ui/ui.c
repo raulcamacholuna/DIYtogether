@@ -1,14 +1,16 @@
 /*
   Fichero: ./components/diymon_ui/ui.c
-  Fecha: 13/08/2025 - 09:10
-  Último cambio: Conectados los eventos de los botones del panel lateral.
-  Descripción: Se corrige el error de compilación por 'declaración implícita' añadiendo la cabecera del panel de acciones. Esto permite que el fichero conozca las funciones ui_actions_panel_get_..._btn y sus tipos de retorno correctos.
+  Fecha: 11/08/2025 - 14:30
+  Último cambio: Actualizadas las conexiones de eventos para los botones de administración.
+  Descripción: Se actualizan los eventos de los botones del panel de administración para
+               reflejar sus nuevas funcionalidades de brillo, encendido/apagado de pantalla
+               y borrado de configuración WiFi.
 */
 #include "ui.h"
 #include "screens.h"
 #include "actions.h"
-#include "ui_actions_panel.h" // <-- LA LÍNEA QUE FALTABA
-#include "ui_asset_loader.h" 
+#include "ui_actions_panel.h"
+#include "ui_asset_loader.h"
 #include "esp_log.h"
 
 extern lv_obj_t *g_main_screen_obj; 
@@ -32,10 +34,10 @@ static void ui_connect_actions(void) {
     lv_obj_add_event_cb(ui_actions_panel_get_gym_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EJERCICIO);
     lv_obj_add_event_cb(ui_actions_panel_get_atk_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_ATACAR);
 
-    // Conectar acciones del panel de admin
-    lv_obj_add_event_cb(ui_actions_panel_get_lvl_down_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_LVL_DOWN);
-    lv_obj_add_event_cb(ui_actions_panel_get_screen_off_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_SCREEN_OFF);
-    lv_obj_add_event_cb(ui_actions_panel_get_lvl_up_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_LVL_UP);
+    // --- ANOTACIÓN: Conectar acciones del panel de admin (NUEVAS FUNCIONES) ---
+    lv_obj_add_event_cb(ui_actions_panel_get_brightness_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_BRIGHTNESS_CYCLE);
+    lv_obj_add_event_cb(ui_actions_panel_get_toggle_screen_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_TOGGLE_SCREEN);
+    lv_obj_add_event_cb(ui_actions_panel_get_erase_wifi_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_ERASE_WIFI);
     
     // Conectar acciones del panel lateral de evolución
     lv_obj_add_event_cb(ui_actions_panel_get_evo_fire_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EVO_FIRE);
@@ -48,10 +50,7 @@ static void ui_connect_actions(void) {
 }
 
 void ui_init(void) {
-    // 1. Precargar todos los assets necesarios para la UI.
     ui_assets_init();
-
-    // 2. Crear las pantallas, que ahora pueden usar los assets ya cargados.
     create_screens();
     
     if (g_main_screen_obj) {

@@ -5,13 +5,14 @@
 #include "nvs_flash.h"
 #include "esp_lvgl_port.h"
 #include "esp_timer.h"
-#include "esp_system.h"
+#include "esp_system.h" 
 
 #include "hardware_manager.h"
 #include "diymon_evolution.h"
 #include "ui.h"
 #include "screens.h"
 #include "wifi_portal.h"
+#include "screen_manager.h"
 
 static const char *TAG = "DIYMON_MAIN";
 
@@ -38,7 +39,6 @@ static void evolution_timer_callback(void* arg) {
 
 void app_main(void)
 {
-    // --- PASO 1: Inicialización de NVS ---
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
@@ -47,31 +47,20 @@ void app_main(void)
     ESP_ERROR_CHECK(ret);
     ESP_LOGI(TAG, "Sistema NVS inicializado.");
 
-    // --- PASO 2: Comprobación de configuración WiFi ---
-    bool needs_portal = !wifi_portal_credentials_saved();
-    
-    if (needs_portal) {
-        // --- ANOTACIÓN: Si no hay WiFi, se inicializa el hardware y se lanza el portal. ---
+    if (!wifi_portal_credentials_saved()) {
+        // --- ANOTACIÓN: Flujo de PRIMER ARRANQUE ---
+        // Si no hay WiFi, inicializamos el hardware y lanzamos el portal.
+        // Esta función NUNCA retornará, ya que siempre termina en un reinicio.
         hardware_manager_init();
-        ESP_LOGI(TAG, "Hardware y LVGL inicializados para el portal.");
-        
-        wifi_portal_result_t portal_result = wifi_portal_start();
-        
-        if (portal_result == PORTAL_CONFIG_SAVED) {
-            ESP_LOGI(TAG, "Configuracion guardada. Reiniciando dispositivo...");
-            vTaskDelay(pdMS_TO_TICKS(1000)); // Pequeña pausa para que se complete cualquier I/O.
-            esp_restart();
-        }
-        // Si se omite (portal_result == PORTAL_CONFIG_SKIPPED), simplemente continuamos.
+        screen_manager_init();
+        ESP_LOGI(TAG, "No hay credenciales WiFi. Lanzando portal de configuracion...");
+        wifi_portal_start();
     }
 
-    // --- PASO 3: Carga de la aplicación principal ---
-    // Este código se ejecuta si las credenciales ya existían, o si el usuario omitió el portal.
-    if (!needs_portal) {
-        // Si saltamos el portal, el hardware aún no está inicializado.
-        hardware_manager_init();
-        ESP_LOGI(TAG, "Hardware y LVGL inicializados para la aplicacion principal.");
-    }
+    // --- ANOTACIÓN: Flujo NORMAL de la aplicación ---
+    // Este código solo se ejecuta si las credenciales ya estaban guardadas.
+    hardware_manager_init();
+    screen_manager_init();
     
     ESP_LOGI(TAG, "Cargando aplicacion principal...");
 
@@ -84,7 +73,6 @@ void app_main(void)
     }
     ESP_LOGI(TAG, "Interfaz de Usuario principal inicializada.");
 
-    // --- PASO 4: Iniciar la lógica de juego ---
     const esp_timer_create_args_t evolution_timer_args = {
             .callback = &evolution_timer_callback, .name = "evolution-timer"
     };

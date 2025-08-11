@@ -1,7 +1,7 @@
 /*
  * Fichero: ./components/diymon_ui/ui_actions_panel.h
- * Fecha: 13/08/2025 - 09:10
- * Último cambio: Añadidas las declaraciones para los botones y la gestión del panel lateral.
+ * Fecha: 11/08/2025 - 14:30
+ * Último cambio: Renombrados los getters de botones del panel de administración.
  * Descripción: Interfaz pública para el módulo gestor de paneles de acción. Expone funciones para crear los paneles, manejar gestos y obtener los manejadores de todos los botones.
  */
 #ifndef UI_ACTIONS_PANEL_H
@@ -28,12 +28,12 @@ lv_obj_t* ui_actions_panel_get_eat_btn(void);
 lv_obj_t* ui_actions_panel_get_gym_btn(void);
 lv_obj_t* ui_actions_panel_get_atk_btn(void);
 
-// --- Getters para botones del panel SUPERIOR de ADMIN ---
-lv_obj_t* ui_actions_panel_get_lvl_down_btn(void);
-lv_obj_t* ui_actions_panel_get_screen_off_btn(void);
-lv_obj_t* ui_actions_panel_get_lvl_up_btn(void);
+// --- ANOTACIÓN: Getters para botones del panel SUPERIOR de ADMIN (nuevas funciones) ---
+lv_obj_t* ui_actions_panel_get_brightness_btn(void); // Antes ui_actions_panel_get_lvl_down_btn
+lv_obj_t* ui_actions_panel_get_toggle_screen_btn(void); // Antes ui_actions_panel_get_screen_off_btn
+lv_obj_t* ui_actions_panel_get_erase_wifi_btn(void); // Antes ui_actions_panel_get_lvl_up_btn
 
-// --- Getters para botones del panel LATERAL de EVOLUCIÓN ---
+// --- Getters para botones del panel LATERAL de EVOLUCIÓN --- (Se mantienen)
 lv_obj_t* ui_actions_panel_get_evo_fire_btn(void);
 lv_obj_t* ui_actions_panel_get_evo_water_btn(void);
 lv_obj_t* ui_actions_panel_get_evo_earth_btn(void);

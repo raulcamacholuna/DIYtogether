@@ -1,16 +1,10 @@
-/*
- * Fichero: ./components/diymon_ui/screens.c
- * Fecha: 13/08/2025 - 09:10
- * Último cambio: Añadida la captura de la coordenada X del toque.
- * Descripción: Se modifica el manejador de eventos de la pantalla para capturar no solo la coordenada 'y' del inicio del toque, sino también la 'x'. Esto es necesario para que el gestor de paneles pueda detectar gestos de borde (edge swipes).
- */
 #include "screens.h"
 #include "ui_idle_animation.h"
 #include "ui_actions_panel.h"
 #include "ui_action_animations.h"
 #include "esp_log.h"
-#include "screen_state.h" 
-#include "bsp_api.h"      
+#include "bsp_api.h"
+#include "screen_manager.h" // <-- ANOTACIÓN: Incluimos el gestor para usar sus funciones.
 
 static const char *TAG = "SCREENS";
 
@@ -65,29 +59,29 @@ static void main_screen_event_cb(lv_event_t *e) {
             touch_start_y = -1;
             break;
         case LV_EVENT_GESTURE: {
-            if (!g_screen_is_off) { 
+            // --- ANOTACIÓN: Se pregunta al gestor si la pantalla está apagada. ---
+            if (!screen_manager_is_off()) { 
                 lv_dir_t dir = lv_indev_get_gesture_dir(indev);
                 ui_actions_panel_handle_gesture(dir, touch_start_x, touch_start_y);
             }
             break;
         }
-        case LV_EVENT_CLICKED: { // Se usa CLICKED en lugar de DOUBLE_CLICKED
-            if (g_screen_is_off) {
+        case LV_EVENT_CLICKED: {
+            // --- ANOTACIÓN: Se pregunta al gestor si la pantalla está apagada. ---
+            if (screen_manager_is_off()) {
                 g_click_count++;
                 if (g_click_count == 1) {
-                    // Primer clic, iniciar temporizador de 300ms
                     g_double_click_timer = lv_timer_create(double_click_timer_cb, 300, NULL);
                     lv_timer_set_repeat_count(g_double_click_timer, 1);
                 } else if (g_click_count == 2) {
-                    // Segundo clic dentro de la ventana del temporizador
                     if (g_double_click_timer) {
                         lv_timer_del(g_double_click_timer);
                         g_double_click_timer = NULL;
                     }
-                    ESP_LOGI(TAG, "Doble toque (manual) detectado. ¡Encendiendo pantalla!");
-                    bsp_display_turn_on();
-                    g_screen_is_off = false;
-                    g_click_count = 0; // Reiniciar contador
+                    ESP_LOGI(TAG, "Doble toque detectado. Encendiendo pantalla...");
+                    // --- ANOTACIÓN: Le pedimos al gestor que encienda la pantalla. ---
+                    screen_manager_turn_on();
+                    g_click_count = 0;
                 }
             }
             break;
