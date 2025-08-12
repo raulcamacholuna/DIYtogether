@@ -1,8 +1,8 @@
 // Fichero: ./components/diymon_ui/ui_actions_panel.c
-// Fecha: 14/08/2025 - 02:30 pm
-// Último cambio: Reanudada la animación de reposo al ocultar los paneles.
-// Descripción: Se añade la lógica para reanudar la animación de reposo (idle) cuando un panel de acciones se oculta, ya sea por un gesto del usuario o por el temporizador de auto-ocultado.
-
+// Fecha: 12/08/2025 - 14:00
+// Último cambio: Renombrada la implementación de la función `get` del botón de configuración.
+// Descripción: Se actualiza el nombre de la función `ui_actions_panel_get_enable_ftp_btn`
+//              para que coincida con su nueva declaración en la cabecera, completando el refactor.
 
 #include "ui_actions_panel.h"
 #include "ui_asset_loader.h"
@@ -36,8 +36,6 @@ static lv_obj_t *s_side_btns[NUM_SIDE_BUTTONS];
 static lv_obj_t *s_config_btns[NUM_TOP_BUTTONS];
 static lv_timer_t *s_hide_timer = NULL;
 static panel_state_t s_panel_state = PANEL_STATE_HIDDEN;
-
-// ANOTACIÓN: Variable de estado para bloquear gestos mientras hay una animación en curso.
 static bool s_is_animating = false;
 
 // --- Declaraciones de funciones internas ---
@@ -50,8 +48,6 @@ static lv_obj_t* create_top_action_button(lv_obj_t *parent, ui_asset_id_t asset_
 static lv_obj_t* create_side_action_button(lv_obj_t *parent, ui_asset_id_t asset_id, int index);
 static void button_event_cb(lv_event_t *e);
 static void anim_ready_hide_cb(lv_anim_t *a);
-
-// ANOTACIÓN: Nuevos callbacks para ser notificados cuando las animaciones terminan.
 static void animation_finish_cb(lv_anim_t *a);
 static void last_button_out_anim_ready_cb(lv_anim_t *a);
 
@@ -94,7 +90,7 @@ void ui_actions_panel_create(lv_obj_t *parent) {
     s_admin_btns[2] = create_top_action_button(parent, ASSET_ICON_ADMIN_PLACEHOLDER, 2);
 
     s_config_btns[0] = create_top_action_button(parent, ASSET_ICON_RESET_ALL, 0);
-    s_config_btns[1] = create_top_action_button(parent, ASSET_ICON_ENABLE_FTP, 1);
+    s_config_btns[1] = create_top_action_button(parent, ASSET_ICON_ENABLE_FTP, 1); // El asset sigue siendo el mismo
     s_config_btns[2] = create_top_action_button(parent, ASSET_ICON_CONFIG_PLACEHOLDER, 2);
 
     s_side_btns[0] = create_side_action_button(parent, ASSET_ICON_EVO_FIRE, 0);
@@ -113,7 +109,7 @@ lv_obj_t* ui_actions_panel_get_brightness_btn(void) { return s_admin_btns[0]; }
 lv_obj_t* ui_actions_panel_get_toggle_screen_btn(void) { return s_admin_btns[1]; }
 lv_obj_t* ui_actions_panel_get_admin_placeholder_btn(void) { return s_admin_btns[2]; }
 lv_obj_t* ui_actions_panel_get_reset_all_btn(void) { return s_config_btns[0]; }
-lv_obj_t* ui_actions_panel_get_enable_ftp_btn(void) { return s_config_btns[1]; }
+lv_obj_t* ui_actions_panel_get_enable_config_mode_btn(void) { return s_config_btns[1]; } // Renombrado
 lv_obj_t* ui_actions_panel_get_config_placeholder_btn(void) { return s_config_btns[2]; }
 lv_obj_t* ui_actions_panel_get_evo_fire_btn(void) { return s_side_btns[0]; }
 lv_obj_t* ui_actions_panel_get_evo_water_btn(void) { return s_side_btns[1]; }
@@ -135,21 +131,15 @@ static void timer_auto_hide_callback(lv_timer_t *timer) {
     s_hide_timer = NULL;
 }
 
-// ANOTACIÓN: Callback que se ejecuta cuando la animación de OCULTAR termina.
-// Oculta el objeto (botón) que ha terminado su animación.
 static void anim_ready_hide_cb(lv_anim_t *a) {
     lv_obj_add_flag((lv_obj_t *)a->var, LV_OBJ_FLAG_HIDDEN);
 }
 
-// ANOTACIÓN: Callback que se ejecuta cuando la animación de MOSTRAR (animación "in") termina.
-// Se asigna solo al último botón de un panel. Libera el bloqueo de gestos.
 static void animation_finish_cb(lv_anim_t *a) {
     s_is_animating = false;
     ESP_LOGD(TAG, "Panel IN animation finished. Gesture lock released.");
 }
 
-// ANOTACIÓN: Callback que se ejecuta cuando la animación de OCULTAR (animación "out") del último botón termina.
-// Oculta el objeto Y libera el bloqueo de gestos.
 static void last_button_out_anim_ready_cb(lv_anim_t *a) {
     lv_obj_add_flag((lv_obj_t *)a->var, LV_OBJ_FLAG_HIDDEN);
     s_is_animating = false;
@@ -172,7 +162,6 @@ static void animate_panel_in_top(lv_obj_t **buttons) {
             lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_y);
             lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
             lv_anim_set_delay(&a, i * 50);
-            // ANOTACIÓN: Asigna el callback de finalización solo al último botón.
             if (i == NUM_TOP_BUTTONS - 1) {
                 lv_anim_set_ready_cb(&a, animation_finish_cb);
             }
@@ -199,7 +188,6 @@ static void animate_panel_out_top(lv_obj_t **buttons) {
             lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_y);
             lv_anim_set_path_cb(&a, lv_anim_path_ease_in);
             lv_anim_set_delay(&a, i * 50);
-            // ANOTACIÓN: Asigna un callback diferente para el último botón.
             if (i == NUM_TOP_BUTTONS - 1) {
                 lv_anim_set_ready_cb(&a, last_button_out_anim_ready_cb);
             } else {
@@ -262,7 +250,6 @@ static void animate_panel_out_side(lv_obj_t **buttons) {
 }
 
 void ui_actions_panel_handle_gesture(lv_dir_t dir, lv_coord_t start_x, lv_coord_t start_y) {
-    // ANOTACIÓN: Si una animación está en curso, se ignora el gesto.
     if (s_is_animating) {
         ESP_LOGD(TAG, "Animation in progress, gesture ignored.");
         return;

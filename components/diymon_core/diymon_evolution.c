@@ -19,13 +19,26 @@ static const struct {
     const char* evo_code;
     const diymon_stats_t stats;
 } G_MASTER_TABLE[] = {
-    {"0",     {5, 5, 5, 5}},
-    {"1",     {7, 5, 6, 6}},
-    {"1.1",   {9, 5, 7, 7}},
-    {"1.1.1", {11, 5, 8, 8}},
+    // Base
+    {"0",       {5, 5, 5, 5}},
+    // Etapa 1
+    {"1",       {7, 5, 6, 6}},
+    // Etapa 2 (ramas de "1")
+    {"1.1",     {10, 5, 7, 7}}, // Fuego
+    {"1.2",     {7, 10, 5, 7}}, // Agua
+    {"1.3",     {8, 8, 8, 5}}, // Tierra
+    {"1.4",     {7, 5, 10, 7}}, // Aire
+    // Etapa 3 (ramas de "1.1")
+    {"1.1.1",   {12, 5, 8, 8}},
+    {"1.1.2",   {10, 8, 7, 8}},
+    {"1.1.3",   {11, 7, 9, 6}},
+    {"1.1.4",   {10, 5, 9, 9}},
 };
 
 static char G_CURRENT_DIYMON_CODE[16] = "0";
+// Búfer estático para construir códigos de evolución candidatos.
+static char G_EVO_CODE_BUFFER[16];
+
 
 // ----- Funciones para interactuar con la memoria FLASH (NVS) -----
 
@@ -105,10 +118,43 @@ const char* diymon_get_next_evolution_in_sequence(const char* current_code) {
 }
 
 const char* diymon_get_previous_evolution_in_sequence(const char* current_code) {
-    if (strcmp(current_code, "1.1.1") == 0) return "1.1";
-    if (strcmp(current_code, "1.1") == 0) return "1";
-    if (strcmp(current_code, "1") == 0) return "0";
-    return NULL;
+    if (strcmp(current_code, "0") == 0) {
+        return NULL; // Ya está en la forma base.
+    }
+
+    const char* last_dot = strrchr(current_code, '.');
+    
+    // Si no hay punto, la involución es hacia "0".
+    if (!last_dot) {
+        return "0";
+    }
+
+    // Si hay un punto, se trunca el código.
+    size_t parent_len = last_dot - current_code;
+    strncpy(G_EVO_CODE_BUFFER, current_code, parent_len);
+    G_EVO_CODE_BUFFER[parent_len] = '\0';
+
+    // Se busca el código padre en la tabla para devolver un puntero válido.
+    for (int i = 0; i < sizeof(G_MASTER_TABLE) / sizeof(G_MASTER_TABLE[0]); ++i) {
+        if (strcmp(G_MASTER_TABLE[i].evo_code, G_EVO_CODE_BUFFER) == 0) {
+            return G_MASTER_TABLE[i].evo_code;
+        }
+    }
+
+    return NULL; // El padre no existe en la tabla.
+}
+
+const char* diymon_get_branched_evolution(const char* current_code, int branch_id) {
+    snprintf(G_EVO_CODE_BUFFER, sizeof(G_EVO_CODE_BUFFER), "%s.%d", current_code, branch_id);
+
+    // Buscar si el código generado existe en la tabla de evoluciones
+    for (int i = 0; i < sizeof(G_MASTER_TABLE) / sizeof(G_MASTER_TABLE[0]); ++i) {
+        if (strcmp(G_MASTER_TABLE[i].evo_code, G_EVO_CODE_BUFFER) == 0) {
+            return G_MASTER_TABLE[i].evo_code; // Devuelve el puntero de la tabla
+        }
+    }
+
+    return NULL; // La evolución no es válida
 }
 
 void diymon_evolution_reset_state(void) {

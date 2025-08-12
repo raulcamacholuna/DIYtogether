@@ -56,6 +56,14 @@ const char* diymon_get_next_evolution_in_sequence(const char* current_code);
 const char* diymon_get_previous_evolution_in_sequence(const char* current_code);
 
 /**
+ * @brief Construye un código de evolución ramificado y comprueba si existe.
+ * @param current_code El código de evolución actual.
+ * @param branch_id El identificador de la rama elemental (1-4).
+ * @return El nuevo código de evolución si es válido, o NULL si no existe.
+ */
+const char* diymon_get_branched_evolution(const char* current_code, int branch_id);
+
+/**
  * @brief Borra el estado de evolución guardado en la NVS.
  */
 void diymon_evolution_reset_state(void);

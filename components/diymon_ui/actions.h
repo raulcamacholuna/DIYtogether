@@ -1,8 +1,10 @@
 /*
   Fichero: ./components/diymon_ui/actions.h
-  Fecha: 14/08/2025 - 10:15 am
-  Último cambio: Refactorizada la firma de la función de ejecución de acciones.
-  Descripción: Define los identificadores para todas las acciones de usuario. La firma de `execute_diymon_action` se ha simplificado para no requerir el objeto de animación de reposo, ya que ahora se gestiona de forma global.
+  Fecha: 12/08/2025 - 13:30
+  Último cambio: Corregido el ID de acción para habilitar el modo de configuración.
+  Descripción: Se actualiza el enumerado de acciones para que coincida con la
+               implementación en `actions.c`, renombrando `ACTION_ID_ENABLE_FTP` a
+               `ACTION_ID_ENABLE_CONFIG_MODE`.
 */
 #ifndef ACTIONS_H
 #define ACTIONS_H
@@ -34,7 +36,7 @@ typedef enum {
     
     // Acciones del panel de configuración (superior 3)
     ACTION_ID_RESET_ALL,
-    ACTION_ID_ENABLE_FTP,
+    ACTION_ID_ENABLE_CONFIG_MODE, // Anteriormente ACTION_ID_ENABLE_FTP
     ACTION_ID_CONFIG_PLACEHOLDER,
 
     ACTION_ID_COUNT 
@@ -42,10 +44,6 @@ typedef enum {
 
 
 // --- El Orquestador de Acciones ---
-/**
- * @brief Orquestador principal de acciones, llamado por los eventos de los botones.
- * @param action_id El identificador de la acción a ejecutar.
- */
 void execute_diymon_action(diymon_action_id_t action_id);
 
 

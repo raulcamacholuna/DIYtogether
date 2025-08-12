@@ -1,11 +1,11 @@
 /*
   Fichero: ./components/diymon_bsp/WS1.9TS/bsp_wifi.c
-  Fecha: 12/08/2025 - 11:00
-  Último cambio: Eliminada la gestión del stack de red de las funciones internas.
-  Descripción: Driver WiFi. Las funciones ahora asumen que el stack de red
-               (`netif`, `event_loop`) ya está inicializado. Se gestiona
-               únicamente el ciclo de vida del driver WiFi y de las interfaces
-               de red temporales, asegurando un comportamiento predecible y estable.
+  Fecha: 12/08/2025 - 03:00 pm
+  Último cambio: Forzado el modo automático a WPA2-PSK para máxima compatibilidad.
+  Descripción: Se ha modificado el modo de autenticación por defecto (authmode 0) para
+               que utilice WPA2-PSK con PMF desactivado. Esto soluciona fallos de
+               'authentication expired' (Razón 211) con ciertos routers que no
+               gestionan bien la negociación de protocolos mixtos.
 */
 #include "bsp_api.h"
 #include <string.h>
@@ -154,18 +154,13 @@ void bsp_wifi_init_sta_from_nvs(void) {
         wifi_config.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
         
         switch (authmode) {
-            case 1:
-                ESP_LOGI(TAG, "Forzando modo de autenticación WPA2-PSK (PMF desactivado).");
-                wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
-                wifi_config.sta.pmf_cfg.capable = false;
-                wifi_config.sta.pmf_cfg.required = false;
-                break;
             case 2:
                 ESP_LOGI(TAG, "Forzando modo de autenticación WPA3-PSK.");
                 wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA3_PSK;
                 break;
-            default:
-                ESP_LOGI(TAG, "Usando modo de autenticación automático (WPA2/WPA3 con PMF desactivado).");
+            case 1:
+            default: // Caso 0 y cualquier otro valor
+                ESP_LOGI(TAG, "Usando modo de autenticación WPA2-PSK (Máxima compatibilidad).");
                 wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
                 wifi_config.sta.pmf_cfg.capable = false;
                 wifi_config.sta.pmf_cfg.required = false;

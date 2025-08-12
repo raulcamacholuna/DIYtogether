@@ -1,8 +1,10 @@
 /*
   Fichero: ./components/diymon_ui/actions.c
-  Fecha: 14/08/2025 - 10:15 am
-  Último cambio: Adaptado a la nueva arquitectura de animación compartida.
-  Descripción: Lógica para las acciones de los botones. Se actualiza la función de ejecución de acciones y la llamada al reproductor de animaciones para no pasar punteros a objetos, ya que ahora son gestionados de forma centralizada.
+  Fecha: 12/08/2025 - 02:15 pm
+  Último cambio: Acortada la clave NVS para cumplir el límite de 15 caracteres.
+  Descripción: Se ha corregido el error ESP_ERR_NVS_KEY_TOO_LONG al cambiar el nombre de
+               la clave de "enable_config_mode" (18 caracteres) a "config_mode" (11 caracteres),
+               lo que cumple con el límite máximo de la API de NVS.
 */
 #include "actions.h"
 #include "ui_action_animations.h" 
@@ -21,12 +23,11 @@ static const char *TAG = "DIYMON_ACTIONS";
 static int s_brightness_levels[] = {25, 50, 75, 100};
 static int s_current_brightness_idx = 3;
 
-// --- ANOTACIÓN: Función de utilidad para borrar la bandera FTP de NVS. ---
-static void erase_ftp_flag(void) {
+static void erase_nvs_key(const char* key) {
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
     if (err == ESP_OK) {
-        nvs_erase_key(nvs_handle, "enable_ftp");
+        nvs_erase_key(nvs_handle, key);
         nvs_commit(nvs_handle);
         nvs_close(nvs_handle);
     }
@@ -38,7 +39,6 @@ void execute_diymon_action(diymon_action_id_t action_id) {
         case ACTION_ID_EJERCICIO:
         case ACTION_ID_ATACAR:
             ESP_LOGI(TAG, "Accion de jugador. Delegando a reproductor.");
-            // La llamada se simplifica, ya no necesita el puntero al objeto de idle.
             ui_action_animations_play(action_id);
             break;
 
@@ -63,25 +63,34 @@ void execute_diymon_action(diymon_action_id_t action_id) {
             ESP_LOGW(TAG, "ACCIÓN: Borrado completo de configuraciones.");
             wifi_portal_erase_credentials();
             diymon_evolution_reset_state();
-            erase_ftp_flag();
+            erase_nvs_key("config_mode");
             ESP_LOGW(TAG, "Todas las configuraciones han sido borradas. Reiniciando en 1 segundo...");
             vTaskDelay(pdMS_TO_TICKS(1000));
             esp_restart();
             break;
             
-        case ACTION_ID_ENABLE_FTP: {
-            ESP_LOGI(TAG, "Accion: Habilitar modo FTP en el proximo reinicio.");
+        case ACTION_ID_ENABLE_CONFIG_MODE: {
+            ESP_LOGI(TAG, "Accion: Habilitar modo Servidor Web en el proximo reinicio.");
             nvs_handle_t nvs_handle;
             esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
             if (err == ESP_OK) {
-                nvs_set_str(nvs_handle, "enable_ftp", "1");
-                nvs_commit(nvs_handle);
+                err = nvs_set_str(nvs_handle, "config_mode", "1");
+                if (err != ESP_OK) {
+                    ESP_LOGE(TAG, "Error (%s) al establecer la bandera 'config_mode' en NVS.", esp_err_to_name(err));
+                }
+
+                err = nvs_commit(nvs_handle);
+                if (err != ESP_OK) {
+                    ESP_LOGE(TAG, "Error (%s) al hacer commit de la bandera 'config_mode' en NVS.", esp_err_to_name(err));
+                } else {
+                    ESP_LOGI(TAG, "Marca de modo configuración guardada y commit realizado. Reiniciando en 2 segundos...");
+                }
+                
                 nvs_close(nvs_handle);
-                ESP_LOGI(TAG, "Marca FTP guardada. Reiniciando en 500ms...");
             } else {
-                ESP_LOGE(TAG, "Error (%s) abriendo NVS para habilitar FTP.", esp_err_to_name(err));
+                ESP_LOGE(TAG, "Error (%s) abriendo NVS para habilitar modo config.", esp_err_to_name(err));
             }
-            vTaskDelay(pdMS_TO_TICKS(500)); 
+            vTaskDelay(pdMS_TO_TICKS(2000));
             esp_restart();
             break;
         }
@@ -89,8 +98,40 @@ void execute_diymon_action(diymon_action_id_t action_id) {
         case ACTION_ID_EVO_FIRE:
         case ACTION_ID_EVO_WATER:
         case ACTION_ID_EVO_EARTH:
-        case ACTION_ID_EVO_WIND:
-        case ACTION_ID_EVO_BACK:
+        case ACTION_ID_EVO_WIND: {
+            const char* current_code = diymon_get_current_code();
+            int branch_id = 0;
+            if (action_id == ACTION_ID_EVO_FIRE)  branch_id = 1;
+            if (action_id == ACTION_ID_EVO_WATER) branch_id = 2;
+            if (action_id == ACTION_ID_EVO_EARTH) branch_id = 3;
+            if (action_id == ACTION_ID_EVO_WIND)  branch_id = 4;
+            
+            const char* next_code = diymon_get_branched_evolution(current_code, branch_id);
+            if (next_code) {
+                ESP_LOGI(TAG, "Evolucionando de '%s' a '%s'. Reiniciando...", current_code, next_code);
+                diymon_set_current_code(next_code);
+                vTaskDelay(pdMS_TO_TICKS(500));
+                esp_restart();
+            } else {
+                ESP_LOGW(TAG, "Evolución no válida desde '%s' con la rama %d.", current_code, branch_id);
+            }
+            break;
+        }
+
+        case ACTION_ID_EVO_BACK: {
+            const char* current_code = diymon_get_current_code();
+            const char* prev_code = diymon_get_previous_evolution_in_sequence(current_code);
+            if (prev_code) {
+                ESP_LOGI(TAG, "Involucionando de '%s' a '%s'. Reiniciando...", current_code, prev_code);
+                diymon_set_current_code(prev_code);
+                vTaskDelay(pdMS_TO_TICKS(500));
+                esp_restart();
+            } else {
+                ESP_LOGW(TAG, "Ya se encuentra en la forma base '%s'. No se puede involucionar.", current_code);
+            }
+            break;
+        }
+        
         case ACTION_ID_ADMIN_PLACEHOLDER:
         case ACTION_ID_CONFIG_PLACEHOLDER:
             ESP_LOGI(TAG, "Accion %d (sin implementación actual).", action_id);

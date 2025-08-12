@@ -1,7 +1,8 @@
 # Fichero: ./main/CMakeLists.txt
-# Fecha: 12/08/2025 - 07:15
-# Último cambio: Añadida la dependencia del nuevo componente service_screen.
-# Descripción: CMakeLists para el componente principal.
+# Fecha: 12/08/2025 - 13:00
+# Último cambio: Actualizadas las dependencias para usar el nuevo servidor web.
+# Descripción: Se elimina la dependencia del componente `ftp_server` y se añade
+#              la dependencia del nuevo componente `web_server`.
 
 idf_component_register(
     SRCS 
@@ -14,7 +15,7 @@ idf_component_register(
         diymon_core
         diymon_ui
         wifi_portal
-        ftp_server
+        web_server
         screen_manager
         service_screen
 

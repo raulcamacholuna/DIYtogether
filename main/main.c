@@ -1,12 +1,11 @@
 /*
   Fichero: ./main/main.c
-  Fecha: 12/08/2025 - 12:30
-  Último cambio: Movida la inicialización del stack de red a los modos de operación específicos.
-  Descripción: Orquestador principal. La inicialización del stack de red se ha movido
-               de `app_main` a las funciones `run_ftp_mode` y `run_wifi_portal_mode`.
-               Esto soluciona el fallo de asignación de memoria en el modo de aplicación
-               principal al no reservar recursos de red innecesarios, y mantiene la
-               correcta obtención de IP en los modos que sí la requieren.
+  Fecha: 12/08/2025 - 02:30 pm
+  Último cambio: Restaurado el modo de conexión STA para el servidor de configuración.
+  Descripción: Se revierte la lógica del modo de configuración para que el dispositivo
+               se conecte como cliente (STA) a la red WiFi guardada, en lugar de
+               crear un Punto de Acceso (AP). Esto alinea el comportamiento con el
+               requisito original de servir la web desde la red local.
 */
 #include <stdio.h>
 #include <string.h>
@@ -26,18 +25,18 @@
 #include "ui.h"
 #include "screens.h"
 #include "wifi_portal.h"
-#include "ftp_server.h"
+#include "web_server.h"
 #include "screen_manager.h"
 #include "service_screen.h"
 
 static const char *TAG = "DIYMON_MAIN";
 
 // --- Declaraciones de funciones ---
-static void run_ftp_mode(void);
+static void run_config_server_mode(void);
 static void run_wifi_portal_mode(void);
 static void run_main_application_mode(void);
-static bool check_ftp_flag(void);
-static void erase_ftp_flag(void);
+static bool check_config_mode_flag(void);
+static void erase_config_mode_flag(void);
 static void evolution_timer_callback(void* arg);
 
 static esp_timer_handle_t evolution_timer_handle;
@@ -52,9 +51,9 @@ void app_main(void)
     ESP_ERROR_CHECK(ret);
     ESP_LOGI(TAG, "Sistema NVS inicializado.");
 
-    if (check_ftp_flag()) {
-        erase_ftp_flag();
-        run_ftp_mode();
+    if (check_config_mode_flag()) {
+        erase_config_mode_flag();
+        run_config_server_mode();
     } else if (!wifi_portal_credentials_saved()) {
         run_wifi_portal_mode();
     } else {
@@ -62,10 +61,8 @@ void app_main(void)
     }
 }
 
-static void run_ftp_mode(void) {
-    ESP_LOGI(TAG, "Arrancando en modo FTP...");
-    
-    // Se inicializa el stack de red SOLO para este modo.
+static void run_config_server_mode(void) {
+    ESP_LOGI(TAG, "Arrancando en modo Servidor Web de Configuración (STA)...");
     bsp_wifi_init_stack();
     
     service_screen_show("/sdcard/config/FTP.bin");
@@ -76,8 +73,8 @@ static void run_ftp_mode(void) {
     if (ip_ok) {
         char ip_addr_buffer[16] = "0.0.0.0";
         bsp_wifi_get_ip(ip_addr_buffer);
-        ESP_LOGI(TAG, "Dispositivo conectado. IP: %s. Iniciando servidor FTP.", ip_addr_buffer);
-        ftp_server_start(); // Bloqueante
+        ESP_LOGI(TAG, "Dispositivo conectado. IP: %s. Iniciando servidor web.", ip_addr_buffer);
+        web_server_start(); // Bloqueante
     } else {
         ESP_LOGE(TAG, "No se pudo obtener IP. Reiniciando en 10 segundos...");
         vTaskDelay(pdMS_TO_TICKS(10000));
@@ -87,12 +84,9 @@ static void run_ftp_mode(void) {
 
 static void run_wifi_portal_mode(void) {
     ESP_LOGI(TAG, "No hay credenciales. Arrancando en modo Portal WiFi...");
-    
-    // Se inicializa el stack de red SOLO para este modo.
     bsp_wifi_init_stack();
-
     service_screen_show("/sdcard/config/WIFI.bin");
-    wifi_portal_start(); // Bloqueante, reinicia al finalizar
+    wifi_portal_start();
 }
 
 static void run_main_application_mode(void) {
@@ -113,31 +107,56 @@ static void run_main_application_mode(void) {
     const esp_timer_create_args_t evolution_timer_args = {
         .callback = &evolution_timer_callback, .name = "evolution-timer"
     };
-    ESP_ERROR_CHECK(esp_timer_create(&evolution_timer_args, &evolution_timer_handle));
-    ESP_ERROR_CHECK(esp_timer_start_periodic(evolution_timer_handle, 5 * 1000000));
+    // Desactivado para permitir evolución manual
+    // ESP_ERROR_CHECK(esp_timer_create(&evolution_timer_args, &evolution_timer_handle));
+    // ESP_ERROR_CHECK(esp_timer_start_periodic(evolution_timer_handle, 5 * 1000000));
     
     ESP_LOGI(TAG, "¡Firmware DIYMON en marcha!");
 }
 
-static bool check_ftp_flag(void) {
+static bool check_config_mode_flag(void) {
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open("storage", NVS_READONLY, &nvs_handle);
-    if (err != ESP_OK) return false;
-    char ftp_flag[2] = {0};
-    size_t len = sizeof(ftp_flag);
-    err = nvs_get_str(nvs_handle, "enable_ftp", ftp_flag, &len);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Fallo al abrir NVS para comprobar la bandera de config. Error: %s", esp_err_to_name(err));
+        return false;
+    }
+
+    char config_flag[8] = {0};
+    size_t len = sizeof(config_flag);
+    err = nvs_get_str(nvs_handle, "config_mode", config_flag, &len);
     nvs_close(nvs_handle);
-    return (err == ESP_OK && strcmp(ftp_flag, "1") == 0);
+
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "Encontrada la bandera 'config_mode' en NVS. Valor: '%s'", config_flag);
+        return (strcmp(config_flag, "1") == 0);
+    } else if (err == ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGW(TAG, "La bandera 'config_mode' NO se encontró en NVS.");
+        return false;
+    } else {
+        ESP_LOGE(TAG, "Error al leer la bandera 'config_mode' de NVS. Error: %s", esp_err_to_name(err));
+        return false;
+    }
 }
 
-static void erase_ftp_flag(void) {
+static void erase_config_mode_flag(void) {
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
     if (err == ESP_OK) {
-        nvs_erase_key(nvs_handle, "enable_ftp");
-        nvs_commit(nvs_handle);
+        err = nvs_erase_key(nvs_handle, "config_mode");
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Error (%s) al borrar la clave 'config_mode'.", esp_err_to_name(err));
+        }
+
+        err = nvs_commit(nvs_handle);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Error (%s) al hacer commit del borrado de la bandera.", esp_err_to_name(err));
+        } else {
+            ESP_LOGI(TAG, "Marca de modo configuración borrada de NVS.");
+        }
         nvs_close(nvs_handle);
-        ESP_LOGI(TAG, "Marca FTP borrada de NVS.");
+    } else {
+        ESP_LOGE(TAG, "Error (%s) al abrir NVS para borrar la bandera.", esp_err_to_name(err));
     }
 }
 

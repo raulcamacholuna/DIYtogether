@@ -1,8 +1,11 @@
 /*
   Fichero: ./components/diymon_ui/ui.c
-  Fecha: 14/08/2025 - 10:30 am
-  Último cambio: Corregida la llamada a `execute_diymon_action` para alinearla con la nueva firma.
-  Descripción: Orquestador principal de la UI. Se elimina el segundo parámetro en la llamada a la función de ejecución de acciones, completando así la refactorización a un búfer de animación compartido.
+  Fecha: 12/08/2025 - 14:00
+  Último cambio: Corregida la llamada para registrar el evento del botón de modo configuración.
+  Descripción: Orquestador principal de la UI. Se actualiza la función 
+               `ui_connect_actions` para usar el nuevo nombre de la función `get`
+               y el nuevo ID de acción, completando la refactorización del modo
+               FTP a modo de configuración web.
 */
 #include "ui.h"
 #include "screens.h"
@@ -11,7 +14,6 @@
 #include "ui_asset_loader.h"
 #include "esp_log.h"
 
-// El objeto de la pantalla principal se define en screens.c y se declara aquí para su uso.
 extern lv_obj_t *g_main_screen_obj; 
 
 static const char *TAG = "DIYMON_UI_MAIN";
@@ -22,7 +24,6 @@ static void button_event_cb(lv_event_t *e) {
     
     if (code == LV_EVENT_CLICKED || code == LV_EVENT_LONG_PRESSED) {
         ESP_LOGI(TAG, "Evento de botón detectado para la acción ID: %d", action_id);
-        // Llamada corregida con un solo argumento, como requiere la nueva firma.
         execute_diymon_action(action_id);
     }
 }
@@ -40,7 +41,7 @@ static void ui_connect_actions(void) {
     
     // Panel 3: Configuración
     lv_obj_add_event_cb(ui_actions_panel_get_reset_all_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_RESET_ALL);
-    lv_obj_add_event_cb(ui_actions_panel_get_enable_ftp_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_ENABLE_FTP);
+    lv_obj_add_event_cb(ui_actions_panel_get_enable_config_mode_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_ENABLE_CONFIG_MODE);
     lv_obj_add_event_cb(ui_actions_panel_get_config_placeholder_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_CONFIG_PLACEHOLDER);
     
     // Panel Lateral: Evolución

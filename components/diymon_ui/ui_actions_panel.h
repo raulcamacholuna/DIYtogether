@@ -1,27 +1,18 @@
 /*
   Fichero: ./components/diymon_ui/ui_actions_panel.h
-  Fecha: 13/08/2025 - 21:15
-  Último cambio: Añadidos getters para los botones del panel de configuración.
-  Descripción: Interfaz pública para el gestor de paneles. Se añaden getters
-               para el nuevo panel de configuración superior.
+  Fecha: 12/08/2025 - 14:00
+  Último cambio: Renombrada la función `get` para el botón de modo configuración.
+  Descripción: Interfaz pública para el gestor de paneles. Se renombra 
+               `ui_actions_panel_get_enable_ftp_btn` a 
+               `ui_actions_panel_get_enable_config_mode_btn` para que 
+               coincida con la nueva funcionalidad.
 */
 #ifndef UI_ACTIONS_PANEL_H
 #define UI_ACTIONS_PANEL_H
 
 #include <lvgl.h>
 
-/**
- * @brief Crea todos los paneles de acciones (superiores y lateral).
- * @param parent El objeto padre sobre el que se crearán los paneles.
- */
 void ui_actions_panel_create(lv_obj_t *parent);
-
-/**
- * @brief Procesa un gesto detectado en la pantalla principal para mostrar/ocultar los paneles.
- * @param dir La dirección del gesto.
- * @param start_x La coordenada 'x' donde se inició el toque.
- * @param start_y La coordenada 'y' donde se inició el toque.
- */
 void ui_actions_panel_handle_gesture(lv_dir_t dir, lv_coord_t start_x, lv_coord_t start_y);
 
 // --- Getters para botones del panel SUPERIOR 1 (JUGADOR) ---
@@ -43,8 +34,7 @@ lv_obj_t* ui_actions_panel_get_evo_back_btn(void);
 
 // --- Getters para botones del panel SUPERIOR 3 (CONFIG) ---
 lv_obj_t* ui_actions_panel_get_reset_all_btn(void);
-lv_obj_t* ui_actions_panel_get_enable_ftp_btn(void);
+lv_obj_t* ui_actions_panel_get_enable_config_mode_btn(void); // Renombrado
 lv_obj_t* ui_actions_panel_get_config_placeholder_btn(void);
-
 
 #endif // UI_ACTIONS_PANEL_H
