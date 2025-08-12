@@ -1,31 +1,31 @@
 # DIYTogether - Tu Mascota Virtual DIY
 
-![Ilustración de DIYMON en acción]([Link a git3.png])
+![Ilustración de DIYTogether en acción]([Link a git3.png])
 
-**DIYMON** no es solo un gadget. Es una aventura de aprendizaje, una puerta a la creatividad y una excusa para construir algo increíble con las personas que te importan.
+**DIYTogether** no es solo un gadget. Es una aventura de aprendizaje, una puerta a la creatividad y una excusa para construir algo increíble con las personas que te importan.
 
-## La Historia detrás de DIYMON
+## La Historia detrás de DIYTogether
 
 Constantemente sueño despierto.
 
 Fantaseo con ser *"ese tío guay"* para mis sobrinos, el que les enseña a crear, a entender la tecnología, a jugar con la electrónica y la domótica. Quería construir algo que nos uniera, un juego que les apasionara y despertara su curiosidad por dentro. Una excusa perfecta para aprender divirtiéndose y pasar tiempo de calidad juntos.
 
-De esa idea nace **DIYMON**.
+De esa idea nace **DIYTogether**.
 
 Un proyecto que empezó con mis mejores amigos y que ahora abro al mundo, invitando a todo aquel que quiera unirse a crear una tecnología con alma.
 
 ---
 
-## ¿Qué es DIYMON?
+## ¿Qué es DIYTogether?
 
-DIYMON es un proyecto de mascota virtual open-source basada en hardware ESP32. Es un **"Tamagotchi para Hackers"** diseñado desde cero para ser:
+DIYTogether es un proyecto de mascota virtual open-source basada en hardware ESP32. Es un **"Tamagotchi para Hackers"** diseñado desde cero para ser:
 
-*   🎨 **Personalizable**: Crea y carga tus propios "Skins" (gráficos, animaciones y sonidos) sin necesidad de reprogramar nada. ¡Haz tu DIYMON verdaderamente tuyo!
+*   🎨 **Personalizable**: Crea y carga tus propios "Skins" (gráficos, animaciones y sonidos) sin necesidad de reprogramar nada. ¡Haz tu DIYTogether verdaderamente tuyo!
 *   🧠 **Educativo**: Aprende electrónica, programación (C++/Arduino) y conectividad IoT de una forma práctica y progresiva. Cada paso es una lección, y los errores son parte del viaje.
 *   🌍 **Interactivo**: Utiliza sensores como el acelerómetro y la conectividad Bluetooth para interactuar con tu criatura de formas nuevas y creativas.
 *   ❤️ **Abierto y Comunitario**: Todo el proyecto (firmware, hardware, diseños 3D) es libre. Queremos que lo copies, lo modifiques, lo mejores y lo compartas.
 
-![Variedad de colores y criaturas DIYMON]([Link a git2.png])
+![Variedad de colores y criaturas DIYTogether]([Link a git2.png])
 
 ---
 
@@ -38,7 +38,7 @@ DIYMON es un proyecto de mascota virtual open-source basada en hardware ESP32. E
     *   **Código**: `GPLv3` - ¡Libre para siempre!
     *   **Diseños de la carcasa**: `CC BY-NC` - ¡Compártela, pero no para uso comercial sin permiso!
 
-![Prototipo de DIYMON con interfaz holográfica]([Link a git1.png])
+![Prototipo de DIYTogether con interfaz holográfica]([Link a git1.png])
 
 ---
 
@@ -56,7 +56,7 @@ DIYMON es un proyecto de mascota virtual open-source basada en hardware ESP32. E
 
 *(Esta sección se irá completando con guías detalladas)*
 
-1.  **Monta tu propio DIYMON**: `[Enlace a la Wiki con la lista de componentes y guía de montaje]`
+1.  **Monta tu propio DIYTogether**: `[Enlace a la Wiki con la lista de componentes y guía de montaje]`
 2.  **Flashea el Firmware**: Sigue las instrucciones de nuestra `[Guía de instalación]`.
 3.  **Diseña tu Skin**: ¡Aprende a crear tus propios gráficos y personaliza tu experiencia! `[Enlace a la guía de creación de skins]`
 
