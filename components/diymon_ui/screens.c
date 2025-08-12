@@ -4,7 +4,7 @@
 #include "ui_action_animations.h"
 #include "esp_log.h"
 #include "bsp_api.h"
-#include "screen_manager.h" // <-- ANOTACIÓN: Incluimos el gestor para usar sus funciones.
+#include "screen_manager.h"
 
 static const char *TAG = "SCREENS";
 
@@ -52,6 +52,12 @@ static void main_screen_event_cb(lv_event_t *e) {
             lv_indev_get_point(indev, &p);
             touch_start_x = p.x;
             touch_start_y = p.y;
+            // ANOTACIÓN: Se pausa la animación de reposo al detectar cualquier toque en la pantalla.
+            // Esto libera la CPU para que las animaciones de los paneles sean fluidas.
+            if (!screen_manager_is_off()) {
+                ESP_LOGD(TAG, "Touch detected, pausing idle animation.");
+                ui_idle_animation_pause();
+            }
             break;
         }
         case LV_EVENT_RELEASED:
@@ -59,7 +65,6 @@ static void main_screen_event_cb(lv_event_t *e) {
             touch_start_y = -1;
             break;
         case LV_EVENT_GESTURE: {
-            // --- ANOTACIÓN: Se pregunta al gestor si la pantalla está apagada. ---
             if (!screen_manager_is_off()) { 
                 lv_dir_t dir = lv_indev_get_gesture_dir(indev);
                 ui_actions_panel_handle_gesture(dir, touch_start_x, touch_start_y);
@@ -67,7 +72,6 @@ static void main_screen_event_cb(lv_event_t *e) {
             break;
         }
         case LV_EVENT_CLICKED: {
-            // --- ANOTACIÓN: Se pregunta al gestor si la pantalla está apagada. ---
             if (screen_manager_is_off()) {
                 g_click_count++;
                 if (g_click_count == 1) {
@@ -79,10 +83,14 @@ static void main_screen_event_cb(lv_event_t *e) {
                         g_double_click_timer = NULL;
                     }
                     ESP_LOGI(TAG, "Doble toque detectado. Encendiendo pantalla...");
-                    // --- ANOTACIÓN: Le pedimos al gestor que encienda la pantalla. ---
                     screen_manager_turn_on();
                     g_click_count = 0;
                 }
+            } else {
+                // ANOTACIÓN: Si es un click simple y no un gesto, la animación de idle debe reanudarse,
+                // ya que los paneles no se mostrarán.
+                ESP_LOGD(TAG, "Simple click detected, resuming idle animation.");
+                ui_idle_animation_resume();
             }
             break;
         }

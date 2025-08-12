@@ -1,12 +1,13 @@
-/*
-  Fichero: ./components/diymon_ui/ui_actions_panel.c
-  Fecha: 14/08/2025 - 11:15 am
-  Último cambio: Corregidos los identificadores de assets para la creación de botones.
-  Descripción: Se actualizan las llamadas a `create_top_action_button` para utilizar los identificadores de assets descriptivos (ej. `ASSET_ICON_RESET_ALL`) en lugar de los genéricos, alineando el fichero con las definiciones actuales y resolviendo el error de compilación.
-*/
+// Fichero: ./components/diymon_ui/ui_actions_panel.c
+// Fecha: 14/08/2025 - 02:30 pm
+// Último cambio: Reanudada la animación de reposo al ocultar los paneles.
+// Descripción: Se añade la lógica para reanudar la animación de reposo (idle) cuando un panel de acciones se oculta, ya sea por un gesto del usuario o por el temporizador de auto-ocultado.
+
+
 #include "ui_actions_panel.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
+#include "ui_idle_animation.h"
 #include "esp_log.h"
 #include <stdio.h>
 
@@ -36,6 +37,9 @@ static lv_obj_t *s_config_btns[NUM_TOP_BUTTONS];
 static lv_timer_t *s_hide_timer = NULL;
 static panel_state_t s_panel_state = PANEL_STATE_HIDDEN;
 
+// ANOTACIÓN: Variable de estado para bloquear gestos mientras hay una animación en curso.
+static bool s_is_animating = false;
+
 // --- Declaraciones de funciones internas ---
 static void animate_panel_in_top(lv_obj_t **buttons);
 static void animate_panel_out_top(lv_obj_t **buttons);
@@ -46,6 +50,11 @@ static lv_obj_t* create_top_action_button(lv_obj_t *parent, ui_asset_id_t asset_
 static lv_obj_t* create_side_action_button(lv_obj_t *parent, ui_asset_id_t asset_id, int index);
 static void button_event_cb(lv_event_t *e);
 static void anim_ready_hide_cb(lv_anim_t *a);
+
+// ANOTACIÓN: Nuevos callbacks para ser notificados cuando las animaciones terminan.
+static void animation_finish_cb(lv_anim_t *a);
+static void last_button_out_anim_ready_cb(lv_anim_t *a);
+
 
 static lv_obj_t* create_top_action_button(lv_obj_t *parent, ui_asset_id_t asset_id, int index) {
     lv_obj_t *btn = lv_btn_create(parent);
@@ -84,7 +93,6 @@ void ui_actions_panel_create(lv_obj_t *parent) {
     s_admin_btns[1] = create_top_action_button(parent, ASSET_ICON_SCREEN_OFF, 1);
     s_admin_btns[2] = create_top_action_button(parent, ASSET_ICON_ADMIN_PLACEHOLDER, 2);
 
-    // --- CORRECCIÓN: Usar los identificadores de asset descriptivos ---
     s_config_btns[0] = create_top_action_button(parent, ASSET_ICON_RESET_ALL, 0);
     s_config_btns[1] = create_top_action_button(parent, ASSET_ICON_ENABLE_FTP, 1);
     s_config_btns[2] = create_top_action_button(parent, ASSET_ICON_CONFIG_PLACEHOLDER, 2);
@@ -120,17 +128,39 @@ static void timer_auto_hide_callback(lv_timer_t *timer) {
     if (s_panel_state == PANEL_STATE_CONFIG_VISIBLE) animate_panel_out_top(s_config_btns);
     if (s_panel_state == PANEL_STATE_SIDE_VISIBLE) animate_panel_out_side(s_side_btns);
     
+    ESP_LOGD(TAG, "Auto-hide timer triggered. Resuming idle animation.");
+    ui_idle_animation_resume();
+
     s_panel_state = PANEL_STATE_HIDDEN;
     s_hide_timer = NULL;
 }
 
+// ANOTACIÓN: Callback que se ejecuta cuando la animación de OCULTAR termina.
+// Oculta el objeto (botón) que ha terminado su animación.
 static void anim_ready_hide_cb(lv_anim_t *a) {
     lv_obj_add_flag((lv_obj_t *)a->var, LV_OBJ_FLAG_HIDDEN);
 }
 
+// ANOTACIÓN: Callback que se ejecuta cuando la animación de MOSTRAR (animación "in") termina.
+// Se asigna solo al último botón de un panel. Libera el bloqueo de gestos.
+static void animation_finish_cb(lv_anim_t *a) {
+    s_is_animating = false;
+    ESP_LOGD(TAG, "Panel IN animation finished. Gesture lock released.");
+}
+
+// ANOTACIÓN: Callback que se ejecuta cuando la animación de OCULTAR (animación "out") del último botón termina.
+// Oculta el objeto Y libera el bloqueo de gestos.
+static void last_button_out_anim_ready_cb(lv_anim_t *a) {
+    lv_obj_add_flag((lv_obj_t *)a->var, LV_OBJ_FLAG_HIDDEN);
+    s_is_animating = false;
+    ESP_LOGD(TAG, "Panel OUT animation finished. Gesture lock released.");
+}
+
+
 static void animate_panel_in_top(lv_obj_t **buttons) {
     if (s_hide_timer) lv_timer_del(s_hide_timer);
     
+    s_is_animating = true;
     for (int i = 0; i < NUM_TOP_BUTTONS; i++) {
         if (buttons[i]) {
             lv_obj_clear_flag(buttons[i], LV_OBJ_FLAG_HIDDEN);
@@ -142,6 +172,10 @@ static void animate_panel_in_top(lv_obj_t **buttons) {
             lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_y);
             lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
             lv_anim_set_delay(&a, i * 50);
+            // ANOTACIÓN: Asigna el callback de finalización solo al último botón.
+            if (i == NUM_TOP_BUTTONS - 1) {
+                lv_anim_set_ready_cb(&a, animation_finish_cb);
+            }
             lv_anim_start(&a);
         }
     }
@@ -154,6 +188,7 @@ static void animate_panel_out_top(lv_obj_t **buttons) {
         lv_timer_del(s_hide_timer);
         s_hide_timer = NULL;
     }
+    s_is_animating = true;
     for (int i = 0; i < NUM_TOP_BUTTONS; i++) {
         if (buttons[i]) {
             lv_anim_t a;
@@ -164,7 +199,12 @@ static void animate_panel_out_top(lv_obj_t **buttons) {
             lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_y);
             lv_anim_set_path_cb(&a, lv_anim_path_ease_in);
             lv_anim_set_delay(&a, i * 50);
-            lv_anim_set_ready_cb(&a, anim_ready_hide_cb);
+            // ANOTACIÓN: Asigna un callback diferente para el último botón.
+            if (i == NUM_TOP_BUTTONS - 1) {
+                lv_anim_set_ready_cb(&a, last_button_out_anim_ready_cb);
+            } else {
+                lv_anim_set_ready_cb(&a, anim_ready_hide_cb);
+            }
             lv_anim_start(&a);
         }
     }
@@ -173,6 +213,7 @@ static void animate_panel_out_top(lv_obj_t **buttons) {
 static void animate_panel_in_side(lv_obj_t **buttons) {
     if (s_hide_timer) lv_timer_del(s_hide_timer);
     
+    s_is_animating = true;
     for (int i = 0; i < NUM_SIDE_BUTTONS; i++) {
         if (buttons[i]) {
             lv_obj_clear_flag(buttons[i], LV_OBJ_FLAG_HIDDEN);
@@ -184,6 +225,9 @@ static void animate_panel_in_side(lv_obj_t **buttons) {
             lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_x);
             lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
             lv_anim_set_delay(&a, i * 50);
+            if (i == NUM_SIDE_BUTTONS - 1) {
+                lv_anim_set_ready_cb(&a, animation_finish_cb);
+            }
             lv_anim_start(&a);
         }
     }
@@ -196,6 +240,7 @@ static void animate_panel_out_side(lv_obj_t **buttons) {
         lv_timer_del(s_hide_timer);
         s_hide_timer = NULL;
     }
+    s_is_animating = true;
     for (int i = 0; i < NUM_SIDE_BUTTONS; i++) {
         if (buttons[i]) {
             lv_anim_t a;
@@ -206,62 +251,81 @@ static void animate_panel_out_side(lv_obj_t **buttons) {
             lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_x);
             lv_anim_set_path_cb(&a, lv_anim_path_ease_in);
             lv_anim_set_delay(&a, i * 50);
-            lv_anim_set_ready_cb(&a, anim_ready_hide_cb);
+            if (i == NUM_SIDE_BUTTONS - 1) {
+                lv_anim_set_ready_cb(&a, last_button_out_anim_ready_cb);
+            } else {
+                lv_anim_set_ready_cb(&a, anim_ready_hide_cb);
+            }
             lv_anim_start(&a);
         }
     }
 }
 
 void ui_actions_panel_handle_gesture(lv_dir_t dir, lv_coord_t start_x, lv_coord_t start_y) {
-    // --- ANOTACIÓN: Añadido log de depuración para gestos ---
-    // LV_DIR_TOP: 0, LV_DIR_BOTTOM: 1, LV_DIR_LEFT: 2, LV_DIR_RIGHT: 3
-    ESP_LOGI(TAG, "Gesto: Dir=%d, X=%d, Y=%d, Estado=%d", dir, start_x, start_y, s_panel_state);
+    // ANOTACIÓN: Si una animación está en curso, se ignora el gesto.
+    if (s_is_animating) {
+        ESP_LOGD(TAG, "Animation in progress, gesture ignored.");
+        return;
+    }
+
+    ESP_LOGD(TAG, "Gesture: Dir=%d, X=%d, Y=%d, State=%d", dir, start_x, start_y, s_panel_state);
 
     switch(s_panel_state) {
         case PANEL_STATE_HIDDEN:
-            // Para abrir un panel, el gesto debe empezar en el borde.
-            if (dir == LV_DIR_BOTTOM && start_y < EDGE_SWIPE_THRESHOLD) {
+            if ((dir == LV_DIR_BOTTOM && start_y < EDGE_SWIPE_THRESHOLD) || (dir == LV_DIR_RIGHT && start_x < EDGE_SWIPE_THRESHOLD)) {
+                // El gesto es válido, no hacemos nada más aquí.
+            } else {
+                ESP_LOGD(TAG, "Invalid gesture. Resuming idle animation.");
+                ui_idle_animation_resume();
+                return;
+            }
+
+            if (dir == LV_DIR_BOTTOM) {
                 animate_panel_in_top(s_player_btns);
                 s_panel_state = PANEL_STATE_PLAYER_VISIBLE;
-            } else if (dir == LV_DIR_RIGHT && start_x < EDGE_SWIPE_THRESHOLD) {
+            } else if (dir == LV_DIR_RIGHT) {
                 animate_panel_in_side(s_side_btns);
                 s_panel_state = PANEL_STATE_SIDE_VISIBLE;
             }
             break;
 
         case PANEL_STATE_PLAYER_VISIBLE:
-            if (dir == LV_DIR_BOTTOM) { // Ciclar hacia abajo
+            if (dir == LV_DIR_BOTTOM) {
                 animate_panel_out_top(s_player_btns);
                 animate_panel_in_top(s_admin_btns);
                 s_panel_state = PANEL_STATE_ADMIN_VISIBLE;
-            } else if (dir == LV_DIR_TOP) { // Cerrar
+            } else if (dir == LV_DIR_TOP) {
                 animate_panel_out_top(s_player_btns);
                 s_panel_state = PANEL_STATE_HIDDEN;
+                ui_idle_animation_resume();
             }
             break;
 
         case PANEL_STATE_ADMIN_VISIBLE:
-            if (dir == LV_DIR_BOTTOM) { // Ciclar hacia abajo
+            if (dir == LV_DIR_BOTTOM) {
                 animate_panel_out_top(s_admin_btns);
                 animate_panel_in_top(s_config_btns);
                 s_panel_state = PANEL_STATE_CONFIG_VISIBLE;
-            } else if (dir == LV_DIR_TOP) { // Cerrar
+            } else if (dir == LV_DIR_TOP) {
                 animate_panel_out_top(s_admin_btns);
                 s_panel_state = PANEL_STATE_HIDDEN;
+                ui_idle_animation_resume();
             }
             break;
             
         case PANEL_STATE_CONFIG_VISIBLE:
-            if (dir == LV_DIR_TOP) { // Cerrar (no hay más paneles abajo)
+            if (dir == LV_DIR_TOP) {
                 animate_panel_out_top(s_config_btns);
                 s_panel_state = PANEL_STATE_HIDDEN;
+                ui_idle_animation_resume();
             }
             break;
         
         case PANEL_STATE_SIDE_VISIBLE:
-            if (dir == LV_DIR_LEFT) { // Cerrar
+            if (dir == LV_DIR_LEFT) {
                 animate_panel_out_side(s_side_btns);
                 s_panel_state = PANEL_STATE_HIDDEN;
+                ui_idle_animation_resume();
             }
             break;
     }
