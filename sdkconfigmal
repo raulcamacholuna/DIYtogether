@@ -2599,12 +2599,6 @@ CONFIG_LV_BUILD_EXAMPLES=y
 # end of LVGL configuration
 
 #
-# DIYMON Board Options
-#
-CONFIG_BSP_SD_CARD_ENABLED=y
-# end of DIYMON Board Options
-
-#
 # IoT Button
 #
 CONFIG_BUTTON_PERIOD_TIME_MS=5

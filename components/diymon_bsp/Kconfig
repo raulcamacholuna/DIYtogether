@@ -1,0 +1,27 @@
+# Fichero: ./components/diymon_bsp/Kconfig
+# Fecha: 12/08/2025 - 07:45 pm
+# Último cambio: Añadida opción para habilitar/deshabilitar la tarjeta SD.
+# Descripción: Fichero de configuración para el BSP. Se añade una opción booleana
+#              que permite compilar con o sin el soporte para la tarjeta SD.
+#              Esto es crucial para resolver un conflicto de hardware en la placa,
+#              donde el pin de la SD (GPIO20) interfiere con el monitor serie USB.
+
+menu "DIYMON Board Options"
+
+    config BSP_SD_CARD_ENABLED
+        bool "Enable SD Card Support"
+        default y
+        help
+            Enable this option to initialize and use the onboard SD card reader.
+
+            WARNING: On the Waveshare ESP32-C6 Touch LCD board, the SD Card's
+            Chip Select (CS) pin is connected to GPIO20. This pin is also used
+            by the internal USB-JTAG interface for the serial monitor output.
+
+            If you enable this option, YOU WILL LOSE THE SERIAL MONITOR LOGS
+            as soon as the SD card is initialized.
+
+            Disable this option during development and debugging if you need to
+            see log output via the USB port. Re-enable it for final deployment.
+
+endmenu
