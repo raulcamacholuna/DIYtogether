@@ -1,10 +1,8 @@
 /*
   Fichero: ./components/wifi_portal/wifi_portal.c
-  Fecha: 12/08/2025 - 11:00
-  Último cambio: Eliminada la inicialización redundante del stack de red.
-  Descripción: Portal de configuración WiFi. Se elimina la llamada a `bsp_wifi_init_stack()`
-               para que el componente dependa de la inicialización global en `app_main`,
-               evitando conflictos y asegurando un estado de red consistente.
+  Fecha: 12/08/2025 - 05:10 pm
+  Último cambio: Implementada una función de decodificación de URL local.
+  Descripción: Se añade una función url_decode para reemplazar manualmente los caracteres codificados (como %24 por $) en la contraseña. Esto resuelve el error de compilación implicit declaration y asegura que los caracteres especiales se guarden correctamente en la NVS.
 */
 #include "wifi_portal.h"
 #include "freertos/FreeRTOS.h"
@@ -19,6 +17,7 @@
 #include "esp_system.h"
 #include "bsp_api.h"
 #include <stdlib.h>
+#include <ctype.h>
 
 static const char *TAG = "WIFI_PORTAL";
 static EventGroupHandle_t s_portal_event_group;
@@ -40,6 +39,33 @@ static const char* HTML_FORM =
     "<p><button type='submit'>Guardar y Reiniciar</button></p>"
     "</form></body></html>";
 
+
+// --- [SOLUCIÓN DEFINITIVA] Función de decodificación de URL local ---
+static void url_decode(char *dst, const char *src) {
+    char a, b;
+    while (*src) {
+        if ((*src == '%') &&
+            ((a = src[1]) && (b = src[2])) &&
+            (isxdigit(a) && isxdigit(b))) {
+            if (a >= 'a') a -= 'a'-'A';
+            if (a >= 'A') a -= ('A' - 10);
+            else a -= '0';
+            if (b >= 'a') b -= 'a'-'A';
+            if (b >= 'A') b -= ('A' - 10);
+            else b -= '0';
+            *dst++ = 16*a + b;
+            src+=3;
+        } else if (*src == '+') {
+            *dst++ = ' ';
+            src++;
+        } else {
+            *dst++ = *src++;
+        }
+    }
+    *dst++ = '\0';
+}
+
+
 static esp_err_t root_get_handler(httpd_req_t *req) {
     httpd_resp_send(req, HTML_FORM, HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
@@ -52,17 +78,23 @@ static esp_err_t save_post_handler(httpd_req_t *req) {
     buf[ret] = '\0';
 
     char ssid[32] = {0};
-    char password[64] = {0};
+    char password_encoded[64] = {0};
+    char password_decoded[64] = {0};
     char authmode_str[4] = {0};
+    
     httpd_query_key_value(buf, "ssid", ssid, sizeof(ssid));
-    httpd_query_key_value(buf, "password", password, sizeof(password));
+    httpd_query_key_value(buf, "password", password_encoded, sizeof(password_encoded));
     httpd_query_key_value(buf, "authmode", authmode_str, sizeof(authmode_str));
     int32_t authmode = atoi(authmode_str);
+
+    ESP_LOGI(TAG, "Contraseña recibida (codificada): %s", password_encoded);
+    url_decode(password_decoded, password_encoded);
+    ESP_LOGI(TAG, "Contraseña decodificada: %s", password_decoded);
 
     nvs_handle_t nvs_handle;
     ESP_ERROR_CHECK(nvs_open("storage", NVS_READWRITE, &nvs_handle));
     ESP_ERROR_CHECK(nvs_set_str(nvs_handle, "wifi_ssid", ssid));
-    ESP_ERROR_CHECK(nvs_set_str(nvs_handle, "wifi_pass", password));
+    ESP_ERROR_CHECK(nvs_set_str(nvs_handle, "wifi_pass", password_decoded));
     ESP_ERROR_CHECK(nvs_set_i32(nvs_handle, "wifi_authmode", authmode));
     ESP_ERROR_CHECK(nvs_commit(nvs_handle));
     nvs_close(nvs_handle);
@@ -92,7 +124,6 @@ static httpd_handle_t start_webserver(void) {
 void wifi_portal_start(void) {
     s_portal_event_group = xEventGroupCreate();
     
-    // Se elimina la inicialización del stack, ya que ahora se hace en main.c
     bsp_wifi_start_ap();
     
     httpd_handle_t server = start_webserver();

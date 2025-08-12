@@ -1,8 +1,8 @@
 /*
- * Fichero: ./diymon_bsp/WS1.9TS/bsp_display.c
- * Fecha: 12/08/2025 - 12:15
- * Último cambio: Integrado el control del backlight en el apagado/encendido.
- * Descripción: Driver del display. Se ha añadido lógica para guardar el último nivel de brillo y apagar/restaurar el backlight (PWM) junto con el panel LCD, logrando un apagado completo.
+ * Fichero: ./components/diymon_bsp/WS1.9TS/bsp_display.c
+ * Fecha: 12/08/2025 - 02:10 pm
+ * Último cambio: Corregido el formato de los comentarios del encabezado a C-style.
+ * Descripción: Driver del display. Ahora guarda el nivel de brillo en la memoria no volátil (NVS) cada vez que se cambia, y lo restaura al iniciar el dispositivo.
  */
 #include "bsp_api.h"
 #include "esp_log.h"
@@ -11,6 +11,8 @@
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_panel_vendor.h"
+#include "nvs_flash.h"
+#include "nvs.h"
 
 static const char *TAG = "bsp_display";
 
@@ -44,7 +46,24 @@ esp_err_t bsp_display_init(void) {
         .channel = LEDC_CHANNEL_0, .timer_sel = LEDC_TIMER_0, .duty = 0, .hpoint = 0
     };
     ESP_ERROR_CHECK(ledc_channel_config(&bl_channel_conf));
-    ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
+
+    // Carga el último nivel de brillo guardado en NVS.
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open("storage", NVS_READONLY, &nvs_handle);
+    int32_t saved_brightness = 100; // Valor por defecto si no se encuentra nada.
+    if (err == ESP_OK) {
+        err = nvs_get_i32(nvs_handle, "brightness", &saved_brightness);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "No se encontró brillo en NVS, usando valor por defecto (100).");
+            saved_brightness = 100;
+        } else {
+            ESP_LOGI(TAG, "Brillo cargado desde NVS: %d%%", (int)saved_brightness);
+        }
+        nvs_close(nvs_handle);
+    } else {
+        ESP_LOGE(TAG, "Error al abrir NVS para leer brillo: %s", esp_err_to_name(err));
+    }
+    bsp_display_set_brightness((int)saved_brightness);
 
     esp_lcd_panel_io_spi_config_t io_config = {
         .cs_gpio_num = PIN_NUM_LCD_CS, .dc_gpio_num = PIN_NUM_LCD_DC,
@@ -76,14 +95,31 @@ void bsp_display_set_brightness(int percentage) {
     if (percentage > 100) percentage = 100;
     if (percentage < 0) percentage = 0;
 
-    // Guardar el último nivel de brillo SOLO si es mayor que 0
+    // Guarda el último nivel de brillo (si es mayor a 0) para la función de re-encendido.
     if (percentage > 0) {
         s_last_brightness_percentage = percentage;
     }
 
+    // Calcula y establece el ciclo de trabajo del PWM para el backlight.
     uint32_t duty = 255 - ((255 * percentage) / 100);
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
+
+    // Guarda el nuevo nivel de brillo en la memoria no volátil (NVS).
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
+    if (err == ESP_OK) {
+        err = nvs_set_i32(nvs_handle, "brightness", (int32_t)percentage);
+        if (err == ESP_OK) {
+            nvs_commit(nvs_handle);
+            ESP_LOGD(TAG, "Brillo (%d%%) guardado en NVS.", percentage);
+        } else {
+            ESP_LOGE(TAG, "Error al guardar brillo en NVS: %s", esp_err_to_name(err));
+        }
+        nvs_close(nvs_handle);
+    } else {
+        ESP_LOGE(TAG, "Error al abrir NVS para guardar brillo: %s", esp_err_to_name(err));
+    }
 }
 
 void bsp_display_turn_on(void) {

@@ -1,8 +1,8 @@
 /*
  * Fichero: ./main/hardware_manager.c
- * Fecha: 08/08/2025 - 15:30
- * Último cambio: Corregida la orientación del panel táctil para alinear con el display.
- * Descripción: Orquestador de hardware. Inicializa y configura los periféricos, incluyendo el display y el panel táctil. Garantiza que la orientación del táctil se corresponda con la rotación del display configurada en el BSP.
+ * Fecha: 12/08/2025 - 02:10 pm
+ * Último cambio: Corregido el formato de los comentarios del encabezado a C-style.
+ * Descripción: Orquestador de hardware. Se elimina la llamada explícita a bsp_display_set_brightness(100), ya que ahora la función bsp_display_init se encarga de restaurar el brillo desde la NVS.
  */
 #include "hardware_manager.h"
 #include "esp_log.h"
@@ -33,9 +33,9 @@ esp_err_t hardware_manager_init(void) {
      * Configuración de la orientación del panel táctil.
      * Para alinear el sistema de coordenadas del táctil con la rotación del display (configurada en el BSP),
      * es necesario aplicar la misma secuencia de transformaciones que el display:
-     * 1. Intercambiar los ejes X e Y (`swap_xy` en 'true').
-     * 2. No aplicar espejo en el nuevo eje X (`mirror_x` en 'false').
-     * 3. Aplicar espejo en el nuevo eje Y (`mirror_y` en 'true').
+     * 1. Intercambiar los ejes X e Y (swap_xy en 'true').
+     * 2. No aplicar espejo en el nuevo eje X (mirror_x en 'false').
+     * 3. Aplicar espejo en el nuevo eje Y (mirror_y en 'true').
      * Esta configuración asegura que un toque en una posición física de la pantalla se corresponda
      * con la misma posición en el framebuffer de LVGL.
      */
@@ -52,6 +52,6 @@ esp_err_t hardware_manager_init(void) {
     };
     lvgl_port_add_touch(&touch_cfg);
 
-    bsp_display_set_brightness(100);
+    // El brillo ahora se establece automáticamente desde la NVS durante bsp_init().
     return ESP_OK;
 }

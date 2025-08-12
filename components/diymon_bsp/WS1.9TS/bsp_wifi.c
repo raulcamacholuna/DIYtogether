@@ -1,11 +1,8 @@
 /*
   Fichero: ./components/diymon_bsp/WS1.9TS/bsp_wifi.c
-  Fecha: 12/08/2025 - 03:00 pm
-  Último cambio: Forzado el modo automático a WPA2-PSK para máxima compatibilidad.
-  Descripción: Se ha modificado el modo de autenticación por defecto (authmode 0) para
-               que utilice WPA2-PSK con PMF desactivado. Esto soluciona fallos de
-               'authentication expired' (Razón 211) con ciertos routers que no
-               gestionan bien la negociación de protocolos mixtos.
+  Fecha: 12/08/2025 - 04:35 pm
+  Último cambio: Añadido log de depuración para mostrar la contraseña leída de NVS.
+  Descripción: Gestor de conexión WiFi. Se añade un log de advertencia para imprimir la contraseña real utilizada durante la conexión, facilitando la depuración de caracteres especiales.
 */
 #include "bsp_api.h"
 #include <string.h>
@@ -31,21 +28,40 @@
 static const char *TAG = "bsp_wifi";
 static SemaphoreHandle_t s_ip_acquired_sem = NULL;
 
-static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+static void event_handler(void* arg, esp_event_base_t event_base,
+                                int32_t event_id, void* event_data)
 {
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
-        esp_wifi_connect();
-    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        wifi_event_sta_disconnected_t* event = (wifi_event_sta_disconnected_t*) event_data;
-        ESP_LOGE(TAG, "Fallo en la conexión WiFi. Razón: %d", event->reason);
+    if (event_base == WIFI_EVENT) {
+        switch(event_id) {
+            case WIFI_EVENT_STA_START:
+                ESP_LOGI(TAG, "EVENTO: WIFI_EVENT_STA_START - Intentando conectar...");
+                esp_wifi_connect();
+                break;
+            case WIFI_EVENT_STA_CONNECTED:
+                ESP_LOGI(TAG, "EVENTO: WIFI_EVENT_STA_CONNECTED - Conectado al AP, esperando IP.");
+                break;
+            case WIFI_EVENT_STA_DISCONNECTED: {
+                wifi_event_sta_disconnected_t* event = (wifi_event_sta_disconnected_t*) event_data;
+                ESP_LOGE(TAG, "EVENTO: WIFI_EVENT_STA_DISCONNECTED - Desconexión de la red.");
+                ESP_LOGE(TAG, "Razón de la desconexión: %d", event->reason);
+                if (event->reason == WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT) {
+                    ESP_LOGE(TAG, "DIAGNÓSTICO: Error '4-Way Handshake Timeout'. ¡Verifica que la contraseña guardada sea correcta para la red!");
+                }
+                break;
+            }
+            default:
+                ESP_LOGD(TAG, "Recibido evento WiFi no gestionado: %d", (int)event_id);
+                break;
+        }
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-        ESP_LOGI(TAG, "Got IP:" IPSTR, IP2STR(&event->ip_info.ip));
+        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
+        ESP_LOGI(TAG, "EVENTO: IP_EVENT_STA_GOT_IP - ¡IP Obtenida!: " IPSTR, IP2STR(&event->ip_info.ip));
         if (s_ip_acquired_sem) {
             xSemaphoreGive(s_ip_acquired_sem);
         }
     }
 }
+
 
 void bsp_wifi_init_stack(void) {
     ESP_ERROR_CHECK(esp_netif_init());
@@ -148,19 +164,30 @@ void bsp_wifi_init_sta_from_nvs(void) {
     nvs_close(nvs_handle);
 
     if (len_ssid > 1 && strcmp(ssid, "skipped") != 0) {
+        // --- [NUEVO] Log de depuración para mostrar la contraseña ---
+        ESP_LOGW(TAG, "DEPURACIÓN: Usando SSID:[%s] | Contraseña:[%s] | ModoAuth:[%d]", ssid, pass, (int)authmode);
+
         wifi_config_t wifi_config = {0};
         strcpy((char *)wifi_config.sta.ssid, ssid);
         strcpy((char *)wifi_config.sta.password, pass);
         wifi_config.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
         
         switch (authmode) {
-            case 2:
-                ESP_LOGI(TAG, "Forzando modo de autenticación WPA3-PSK.");
+            case 2: // Forzar WPA3
+                ESP_LOGI(TAG, "Configurando conexión: WPA3-PSK (PMF Requerido).");
                 wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA3_PSK;
+                wifi_config.sta.pmf_cfg.capable = true;
+                wifi_config.sta.pmf_cfg.required = true;
                 break;
-            case 1:
-            default: // Caso 0 y cualquier otro valor
-                ESP_LOGI(TAG, "Usando modo de autenticación WPA2-PSK (Máxima compatibilidad).");
+            case 1: // Forzar WPA2
+                ESP_LOGI(TAG, "Configurando conexión: WPA2-PSK (PMF Desactivado).");
+                wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+                wifi_config.sta.pmf_cfg.capable = false;
+                wifi_config.sta.pmf_cfg.required = false;
+                break;
+            case 0: // Automático (por defecto)
+            default:
+                ESP_LOGI(TAG, "Configurando conexión: Modo automático -> WPA2-PSK (PMF Desactivado para compatibilidad).");
                 wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
                 wifi_config.sta.pmf_cfg.capable = false;
                 wifi_config.sta.pmf_cfg.required = false;
@@ -170,13 +197,13 @@ void bsp_wifi_init_sta_from_nvs(void) {
         ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
         ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
         
-        ESP_LOGI(TAG, "Forzando protocolo a 802.11b/g/n para máxima compatibilidad.");
+        ESP_LOGI(TAG, "Protocolos WiFi limitados a 802.11b/g/n para máxima compatibilidad.");
         ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N));
         
         ESP_ERROR_CHECK(esp_wifi_start());
         ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
 
-        ESP_LOGI(TAG, "Conectando a la red guardada: %s", ssid);
+        ESP_LOGI(TAG, "Iniciando conexión a la red guardada: %s", ssid);
     } else {
         ESP_LOGW(TAG, "No hay credenciales WiFi válidas para conectar.");
     }
