@@ -1,8 +1,10 @@
 /*
   Fichero: ./components/wifi_portal/wifi_portal.c
-  Fecha: 13/08/2025 - 11:30
-  Último cambio: Cambiado el modo de autenticación por defecto en el formulario HTML a 'Automático'.
-  Descripción: Portal de configuración WiFi. Se modifica la opción `selected` en el formulario HTML para que 'Automático' sea la selección por defecto. Esto aumenta la compatibilidad inicial con la mayoría de routers, ya que permite al dispositivo negociar el protocolo de seguridad adecuado (WPA2/WPA3) sin intervención del usuario.
+  Fecha: 12/08/2025 - 11:00
+  Último cambio: Eliminada la inicialización redundante del stack de red.
+  Descripción: Portal de configuración WiFi. Se elimina la llamada a `bsp_wifi_init_stack()`
+               para que el componente dependa de la inicialización global en `app_main`,
+               evitando conflictos y asegurando un estado de red consistente.
 */
 #include "wifi_portal.h"
 #include "freertos/FreeRTOS.h"
@@ -90,7 +92,7 @@ static httpd_handle_t start_webserver(void) {
 void wifi_portal_start(void) {
     s_portal_event_group = xEventGroupCreate();
     
-    bsp_wifi_init_stack();
+    // Se elimina la inicialización del stack, ya que ahora se hace en main.c
     bsp_wifi_start_ap();
     
     httpd_handle_t server = start_webserver();
@@ -106,6 +108,7 @@ void wifi_portal_start(void) {
     ESP_LOGI(TAG, "Credenciales recibidas. Deteniendo portal y reiniciando...");
     httpd_stop(server);
     esp_wifi_stop();
+    esp_wifi_deinit();
     vEventGroupDelete(s_portal_event_group);
     
     vTaskDelay(pdMS_TO_TICKS(1000));

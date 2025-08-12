@@ -1,9 +1,12 @@
 /*
   Fichero: ./main/main.c
-  Fecha: 12/08/2025 - 09:30
-  Último cambio: Sin cambios. Se mantiene la arquitectura de modos de operación.
-  Descripción: Orquestador principal. Decide el modo de operación (FTP, Portal, App)
-               y ejecuta únicamente los componentes necesarios para cada modo.
+  Fecha: 12/08/2025 - 12:30
+  Último cambio: Movida la inicialización del stack de red a los modos de operación específicos.
+  Descripción: Orquestador principal. La inicialización del stack de red se ha movido
+               de `app_main` a las funciones `run_ftp_mode` y `run_wifi_portal_mode`.
+               Esto soluciona el fallo de asignación de memoria en el modo de aplicación
+               principal al no reservar recursos de red innecesarios, y mantiene la
+               correcta obtención de IP en los modos que sí la requieren.
 */
 #include <stdio.h>
 #include <string.h>
@@ -61,6 +64,10 @@ void app_main(void)
 
 static void run_ftp_mode(void) {
     ESP_LOGI(TAG, "Arrancando en modo FTP...");
+    
+    // Se inicializa el stack de red SOLO para este modo.
+    bsp_wifi_init_stack();
+    
     service_screen_show("/sdcard/config/FTP.bin");
     
     bsp_wifi_init_sta_from_nvs();
@@ -80,6 +87,10 @@ static void run_ftp_mode(void) {
 
 static void run_wifi_portal_mode(void) {
     ESP_LOGI(TAG, "No hay credenciales. Arrancando en modo Portal WiFi...");
+    
+    // Se inicializa el stack de red SOLO para este modo.
+    bsp_wifi_init_stack();
+
     service_screen_show("/sdcard/config/WIFI.bin");
     wifi_portal_start(); // Bloqueante, reinicia al finalizar
 }
@@ -89,9 +100,7 @@ static void run_main_application_mode(void) {
     hardware_manager_init();
     screen_manager_init();
     
-    ESP_LOGI(TAG, "Desactivando WiFi para liberar memoria RAM...");
-    esp_wifi_stop();
-    esp_wifi_deinit();
+    ESP_LOGI(TAG, "El driver WiFi permanece desactivado para ahorrar RAM.");
     
     diymon_evolution_init();
 

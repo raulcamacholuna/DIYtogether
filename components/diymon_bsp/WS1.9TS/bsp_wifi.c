@@ -1,8 +1,11 @@
 /*
   Fichero: ./components/diymon_bsp/WS1.9TS/bsp_wifi.c
-  Fecha: 13/08/2025 - 17:30
-  Último cambio: Corregido el método para forzar el protocolo a 802.11b/g/n.
-  Descripción: Driver WiFi. Se corrige el error de compilación para ESP-IDF v5.5. Se utiliza la función `esp_wifi_set_protocol` en lugar de un campo de la estructura de configuración para forzar la compatibilidad con 802.11b/g/n y resolver problemas de conexión.
+  Fecha: 12/08/2025 - 11:00
+  Último cambio: Eliminada la gestión del stack de red de las funciones internas.
+  Descripción: Driver WiFi. Las funciones ahora asumen que el stack de red
+               (`netif`, `event_loop`) ya está inicializado. Se gestiona
+               únicamente el ciclo de vida del driver WiFi y de las interfaces
+               de red temporales, asegurando un comportamiento predecible y estable.
 */
 #include "bsp_api.h"
 #include <string.h>
@@ -18,6 +21,7 @@
 #include "nvs.h"
 #include "lwip/err.h"
 #include "lwip/sys.h"
+#include <assert.h>
 
 #define PORTAL_AP_SSID          "DIYTogether"
 #define PORTAL_AP_PASS          "MakeItYours"
@@ -51,9 +55,8 @@ void bsp_wifi_init_stack(void) {
 esp_err_t bsp_wifi_scan(void) {
     ESP_LOGI(TAG, "Iniciando escaneo de redes WiFi (modo autónomo)...");
     
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
     esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();
+    assert(sta_netif);
     
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
@@ -85,7 +88,6 @@ esp_err_t bsp_wifi_scan(void) {
     ESP_ERROR_CHECK(esp_wifi_stop());
     ESP_ERROR_CHECK(esp_wifi_deinit());
     esp_netif_destroy(sta_netif);
-    ESP_ERROR_CHECK(esp_event_loop_delete_default());
     
     ESP_LOGI(TAG, "Escaneo autónomo finalizado, recursos liberados.");
     return ESP_OK;
@@ -122,12 +124,11 @@ void bsp_wifi_start_ap(void) {
 void bsp_wifi_init_sta_from_nvs(void) {
     bsp_wifi_scan();
     
-    bsp_wifi_init_stack();
     esp_netif_create_default_wifi_sta();
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL, NULL));
 
     s_ip_acquired_sem = xSemaphoreCreateBinary();
 
@@ -174,8 +175,6 @@ void bsp_wifi_init_sta_from_nvs(void) {
         ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
         ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
         
-        // --- CAMBIO CLAVE ---
-        // Se establece el protocolo aquí, usando la función correcta para IDF v5.5
         ESP_LOGI(TAG, "Forzando protocolo a 802.11b/g/n para máxima compatibilidad.");
         ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N));
         
@@ -194,7 +193,10 @@ bool bsp_wifi_wait_for_ip(uint32_t timeout_ms) {
 }
 
 void bsp_wifi_get_ip(char *ip) {
-    esp_netif_ip_info_t ip_info;
-    esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), &ip_info);
-    sprintf(ip, IPSTR, IP2STR(&ip_info.ip));
+    esp_netif_t* netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if(netif) {
+        esp_netif_ip_info_t ip_info;
+        esp_netif_get_ip_info(netif, &ip_info);
+        sprintf(ip, IPSTR, IP2STR(&ip_info.ip));
+    }
 }
