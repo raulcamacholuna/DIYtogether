@@ -1,8 +1,9 @@
 /*
-  Fichero: ./components/diymon_ui/ui_actions_panel.c
-  Fecha: 14/08/2025 - 11:15 am
-  Último cambio: Corregidos los identificadores de assets para la creación de botones.
-  Descripción: Se actualizan las llamadas a `create_top_action_button` para utilizar los identificadores de assets descriptivos (ej. `ASSET_ICON_RESET_ALL`) en lugar de los genéricos, alineando el fichero con las definiciones actuales y resolviendo el error de compilación.
+  Fichero: ./components/diymon_ui_panels/action_panels.c
+  Fecha: 12/08/2025 - 07:45
+  Último cambio: Creación del componente.
+  Descripción: Corazón de la nueva arquitectura de paneles. Centraliza la definición 
+               de los botones, sus iconos y acciones en un único lugar fácil de editar.
 */
 #include "ui_actions_panel.h"
 #include "ui_asset_loader.h"
@@ -21,18 +22,21 @@ static const char *TAG = "UI_PANELS";
 #define NUM_SIDE_BUTTONS 5
 #define EDGE_SWIPE_THRESHOLD 50
 
+// --- Definición de estados del panel ---
 typedef enum {
     PANEL_STATE_HIDDEN,
     PANEL_STATE_PLAYER_VISIBLE,
     PANEL_STATE_ADMIN_VISIBLE,
-    PANEL_STATE_SIDE_VISIBLE,
     PANEL_STATE_CONFIG_VISIBLE,
+    PANEL_STATE_SIDE_VISIBLE,
 } panel_state_t;
 
+// --- Variables estáticas del módulo ---
 static lv_obj_t *s_player_btns[NUM_TOP_BUTTONS];
 static lv_obj_t *s_admin_btns[NUM_TOP_BUTTONS];
-static lv_obj_t *s_side_btns[NUM_SIDE_BUTTONS];
 static lv_obj_t *s_config_btns[NUM_TOP_BUTTONS];
+static lv_obj_t *s_side_btns[NUM_SIDE_BUTTONS];
+
 static lv_timer_t *s_hide_timer = NULL;
 static panel_state_t s_panel_state = PANEL_STATE_HIDDEN;
 
@@ -42,95 +46,87 @@ static void animate_panel_out_top(lv_obj_t **buttons);
 static void animate_panel_in_side(lv_obj_t **buttons);
 static void animate_panel_out_side(lv_obj_t **buttons);
 static void timer_auto_hide_callback(lv_timer_t *timer);
-static lv_obj_t* create_top_action_button(lv_obj_t *parent, ui_asset_id_t asset_id, int index);
-static lv_obj_t* create_side_action_button(lv_obj_t *parent, ui_asset_id_t asset_id, int index);
+static lv_obj_t* create_button(lv_obj_t *parent, ui_asset_id_t asset_id, int index, bool is_top);
 static void button_event_cb(lv_event_t *e);
 static void anim_ready_hide_cb(lv_anim_t *a);
 
-static lv_obj_t* create_top_action_button(lv_obj_t *parent, ui_asset_id_t asset_id, int index) {
+/**
+ * @brief Función de utilidad para crear un botón de acción.
+ */
+static lv_obj_t* create_button(lv_obj_t *parent, ui_asset_id_t asset_id, int index, bool is_top) {
     lv_obj_t *btn = lv_btn_create(parent);
     lv_obj_remove_style_all(btn);
     lv_obj_set_size(btn, BUTTON_SIZE, BUTTON_SIZE);
     lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, 0);
+
     lv_obj_t *img = lv_img_create(btn);
     lv_img_set_src(img, ui_assets_get_icon(asset_id));
     lv_obj_center(img);
-    lv_obj_set_pos(btn, (BUTTON_SIZE + BUTTON_PADDING) * index, -BUTTON_SIZE);
-    lv_obj_add_flag(btn, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_event_cb(btn, button_event_cb, LV_EVENT_PRESSED, NULL);
-    return btn;
-}
 
-static lv_obj_t* create_side_action_button(lv_obj_t *parent, ui_asset_id_t asset_id, int index) {
-    lv_obj_t *btn = lv_btn_create(parent);
-    lv_obj_remove_style_all(btn);
-    lv_obj_set_size(btn, BUTTON_SIZE, BUTTON_SIZE);
-    lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, 0);
-    lv_obj_t *img = lv_img_create(btn);
-    lv_img_set_src(img, ui_assets_get_icon(asset_id));
-    lv_obj_center(img);
-    lv_obj_set_pos(btn, -BUTTON_SIZE, BUTTON_PADDING + (BUTTON_SIZE + BUTTON_PADDING) * index);
-    lv_obj_add_flag(btn, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_event_cb(btn, button_event_cb, LV_EVENT_PRESSED, NULL);
-    return btn;
-}
-
-void ui_actions_panel_create(lv_obj_t *parent) {
-    s_player_btns[0] = create_top_action_button(parent, ASSET_ICON_EAT, 0);
-    s_player_btns[1] = create_top_action_button(parent, ASSET_ICON_GYM, 1);
-    s_player_btns[2] = create_top_action_button(parent, ASSET_ICON_ATK, 2);
-
-    s_admin_btns[0] = create_top_action_button(parent, ASSET_ICON_BRIGHTNESS, 0);
-    s_admin_btns[1] = create_top_action_button(parent, ASSET_ICON_SCREEN_OFF, 1);
-    s_admin_btns[2] = create_top_action_button(parent, ASSET_ICON_ADMIN_PLACEHOLDER, 2);
-
-    // --- CORRECCIÓN: Usar los identificadores de asset descriptivos ---
-    s_config_btns[0] = create_top_action_button(parent, ASSET_ICON_RESET_ALL, 0);
-    s_config_btns[1] = create_top_action_button(parent, ASSET_ICON_ENABLE_FTP, 1);
-    s_config_btns[2] = create_top_action_button(parent, ASSET_ICON_CONFIG_PLACEHOLDER, 2);
-
-    s_side_btns[0] = create_side_action_button(parent, ASSET_ICON_EVO_FIRE, 0);
-    s_side_btns[1] = create_side_action_button(parent, ASSET_ICON_EVO_WATER, 1);
-    s_side_btns[2] = create_side_action_button(parent, ASSET_ICON_EVO_EARTH, 2);
-    s_side_btns[3] = create_side_action_button(parent, ASSET_ICON_EVO_WIND, 3);
-    s_side_btns[4] = create_side_action_button(parent, ASSET_ICON_EVO_BACK, 4);
-
-    ESP_LOGI(TAG, "Todos los paneles de acción creados.");
-}
-
-lv_obj_t* ui_actions_panel_get_eat_btn(void) { return s_player_btns[0]; }
-lv_obj_t* ui_actions_panel_get_gym_btn(void) { return s_player_btns[1]; }
-lv_obj_t* ui_actions_panel_get_atk_btn(void) { return s_player_btns[2]; }
-lv_obj_t* ui_actions_panel_get_brightness_btn(void) { return s_admin_btns[0]; }
-lv_obj_t* ui_actions_panel_get_toggle_screen_btn(void) { return s_admin_btns[1]; }
-lv_obj_t* ui_actions_panel_get_admin_placeholder_btn(void) { return s_admin_btns[2]; }
-lv_obj_t* ui_actions_panel_get_reset_all_btn(void) { return s_config_btns[0]; }
-lv_obj_t* ui_actions_panel_get_enable_ftp_btn(void) { return s_config_btns[1]; }
-lv_obj_t* ui_actions_panel_get_config_placeholder_btn(void) { return s_config_btns[2]; }
-lv_obj_t* ui_actions_panel_get_evo_fire_btn(void) { return s_side_btns[0]; }
-lv_obj_t* ui_actions_panel_get_evo_water_btn(void) { return s_side_btns[1]; }
-lv_obj_t* ui_actions_panel_get_evo_earth_btn(void) { return s_side_btns[2]; }
-lv_obj_t* ui_actions_panel_get_evo_wind_btn(void) { return s_side_btns[3]; }
-lv_obj_t* ui_actions_panel_get_evo_back_btn(void) { return s_side_btns[4]; }
-
-
-static void timer_auto_hide_callback(lv_timer_t *timer) {
-    if (s_panel_state == PANEL_STATE_PLAYER_VISIBLE) animate_panel_out_top(s_player_btns);
-    if (s_panel_state == PANEL_STATE_ADMIN_VISIBLE) animate_panel_out_top(s_admin_btns);
-    if (s_panel_state == PANEL_STATE_CONFIG_VISIBLE) animate_panel_out_top(s_config_btns);
-    if (s_panel_state == PANEL_STATE_SIDE_VISIBLE) animate_panel_out_side(s_side_btns);
+    if (is_top) {
+        lv_obj_set_pos(btn, (BUTTON_SIZE + BUTTON_PADDING) * index, -BUTTON_SIZE);
+    } else {
+        lv_obj_set_pos(btn, -BUTTON_SIZE, BUTTON_PADDING + (BUTTON_SIZE + BUTTON_PADDING) * index);
+    }
     
-    s_panel_state = PANEL_STATE_HIDDEN;
-    s_hide_timer = NULL;
+    lv_obj_add_flag(btn, LV_OBJ_FLAG_HIDDEN);
+    return btn;
 }
 
+/**
+ * @brief Orquestador principal de la creación de todos los paneles y botones.
+ */
+void ui_actions_panel_create(lv_obj_t *parent) {
+    // Panel 1: Jugador
+    s_player_btns[0] = create_button(parent, ASSET_BTN_1, 0, true);
+    s_player_btns[1] = create_button(parent, ASSET_BTN_2, 1, true);
+    s_player_btns[2] = create_button(parent, ASSET_BTN_3, 2, true);
+    lv_obj_add_event_cb(s_player_btns[0], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_COMER);
+    lv_obj_add_event_cb(s_player_btns[1], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EJERCICIO);
+    lv_obj_add_event_cb(s_player_btns[2], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_ATACAR);
+
+    // Panel 2: Admin
+    s_admin_btns[0] = create_button(parent, ASSET_BTN_4, 0, true);
+    s_admin_btns[1] = create_button(parent, ASSET_BTN_5, 1, true);
+    s_admin_btns[2] = create_button(parent, ASSET_BTN_6, 2, true);
+    lv_obj_add_event_cb(s_admin_btns[0], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_BRIGHTNESS_CYCLE);
+    lv_obj_add_event_cb(s_admin_btns[1], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_TOGGLE_SCREEN);
+    lv_obj_add_event_cb(s_admin_btns[2], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_ADMIN_PLACEHOLDER);
+
+    // Panel 3: Configuración
+    s_config_btns[0] = create_button(parent, ASSET_BTN_7, 0, true);
+    s_config_btns[1] = create_button(parent, ASSET_BTN_8, 1, true);
+    s_config_btns[2] = create_button(parent, ASSET_BTN_9, 2, true);
+    lv_obj_add_event_cb(s_config_btns[0], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_RESET_ALL);
+    lv_obj_add_event_cb(s_config_btns[1], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_ENABLE_FTP);
+    lv_obj_add_event_cb(s_config_btns[2], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_CONFIG_PLACEHOLDER);
+
+    // Panel 4: Lateral (Evolución)
+    s_side_btns[0] = create_button(parent, ASSET_EVO_1, 0, false);
+    s_side_btns[1] = create_button(parent, ASSET_EVO_2, 1, false);
+    s_side_btns[2] = create_button(parent, ASSET_EVO_3, 2, false);
+    s_side_btns[3] = create_button(parent, ASSET_EVO_4, 3, false);
+    s_side_btns[4] = create_button(parent, ASSET_EVO_5, 4, false);
+    lv_obj_add_event_cb(s_side_btns[0], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EVO_FIRE);
+    lv_obj_add_event_cb(s_side_btns[1], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EVO_WATER);
+    lv_obj_add_event_cb(s_side_btns[2], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EVO_EARTH);
+    lv_obj_add_event_cb(s_side_btns[3], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EVO_WIND);
+    lv_obj_add_event_cb(s_side_btns[4], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EVO_BACK);
+    
+    ESP_LOGI(TAG, "Paneles de acción modulares creados.");
+}
+
+/**
+ * @brief Callback que se ejecuta cuando la animación de ocultar termina.
+ */
 static void anim_ready_hide_cb(lv_anim_t *a) {
     lv_obj_add_flag((lv_obj_t *)a->var, LV_OBJ_FLAG_HIDDEN);
 }
 
+/**
+ * @brief Lógica para animar la entrada de un panel superior.
+ */
 static void animate_panel_in_top(lv_obj_t **buttons) {
-    if (s_hide_timer) lv_timer_del(s_hide_timer);
-    
     for (int i = 0; i < NUM_TOP_BUTTONS; i++) {
         if (buttons[i]) {
             lv_obj_clear_flag(buttons[i], LV_OBJ_FLAG_HIDDEN);
@@ -145,15 +141,12 @@ static void animate_panel_in_top(lv_obj_t **buttons) {
             lv_anim_start(&a);
         }
     }
-    s_hide_timer = lv_timer_create(timer_auto_hide_callback, PANEL_AUTO_HIDE_DELAY, NULL);
-    lv_timer_set_repeat_count(s_hide_timer, 1);
 }
 
+/**
+ * @brief Lógica para animar la salida de un panel superior.
+ */
 static void animate_panel_out_top(lv_obj_t **buttons) {
-    if (s_hide_timer) {
-        lv_timer_del(s_hide_timer);
-        s_hide_timer = NULL;
-    }
     for (int i = 0; i < NUM_TOP_BUTTONS; i++) {
         if (buttons[i]) {
             lv_anim_t a;
@@ -170,9 +163,10 @@ static void animate_panel_out_top(lv_obj_t **buttons) {
     }
 }
 
+/**
+ * @brief Lógica para animar la entrada de un panel lateral.
+ */
 static void animate_panel_in_side(lv_obj_t **buttons) {
-    if (s_hide_timer) lv_timer_del(s_hide_timer);
-    
     for (int i = 0; i < NUM_SIDE_BUTTONS; i++) {
         if (buttons[i]) {
             lv_obj_clear_flag(buttons[i], LV_OBJ_FLAG_HIDDEN);
@@ -187,15 +181,12 @@ static void animate_panel_in_side(lv_obj_t **buttons) {
             lv_anim_start(&a);
         }
     }
-    s_hide_timer = lv_timer_create(timer_auto_hide_callback, PANEL_AUTO_HIDE_DELAY, NULL);
-    lv_timer_set_repeat_count(s_hide_timer, 1);
 }
 
+/**
+ * @brief Lógica para animar la salida de un panel lateral.
+ */
 static void animate_panel_out_side(lv_obj_t **buttons) {
-    if (s_hide_timer) {
-        lv_timer_del(s_hide_timer);
-        s_hide_timer = NULL;
-    }
     for (int i = 0; i < NUM_SIDE_BUTTONS; i++) {
         if (buttons[i]) {
             lv_anim_t a;
@@ -212,14 +203,32 @@ static void animate_panel_out_side(lv_obj_t **buttons) {
     }
 }
 
+/**
+ * @brief Callback del temporizador de auto-ocultado.
+ */
+static void timer_auto_hide_callback(lv_timer_t *timer) {
+    ESP_LOGI(TAG, "Temporizador de auto-ocultado disparado.");
+    if (s_panel_state == PANEL_STATE_PLAYER_VISIBLE) animate_panel_out_top(s_player_btns);
+    if (s_panel_state == PANEL_STATE_ADMIN_VISIBLE) animate_panel_out_top(s_admin_btns);
+    if (s_panel_state == PANEL_STATE_CONFIG_VISIBLE) animate_panel_out_top(s_config_btns);
+    if (s_panel_state == PANEL_STATE_SIDE_VISIBLE) animate_panel_out_side(s_side_btns);
+    s_panel_state = PANEL_STATE_HIDDEN;
+    s_hide_timer = NULL;
+}
+
+/**
+ * @brief Máquina de estados que gestiona la visibilidad de los paneles según los gestos.
+ */
 void ui_actions_panel_handle_gesture(lv_dir_t dir, lv_coord_t start_x, lv_coord_t start_y) {
-    // --- ANOTACIÓN: Añadido log de depuración para gestos ---
-    // LV_DIR_TOP: 0, LV_DIR_BOTTOM: 1, LV_DIR_LEFT: 2, LV_DIR_RIGHT: 3
-    ESP_LOGI(TAG, "Gesto: Dir=%d, X=%d, Y=%d, Estado=%d", dir, start_x, start_y, s_panel_state);
+    if (s_hide_timer) {
+        lv_timer_reset(s_hide_timer);
+    } else {
+        s_hide_timer = lv_timer_create(timer_auto_hide_callback, PANEL_AUTO_HIDE_DELAY, NULL);
+        lv_timer_set_repeat_count(s_hide_timer, 1);
+    }
 
     switch(s_panel_state) {
         case PANEL_STATE_HIDDEN:
-            // Para abrir un panel, el gesto debe empezar en el borde.
             if (dir == LV_DIR_BOTTOM && start_y < EDGE_SWIPE_THRESHOLD) {
                 animate_panel_in_top(s_player_btns);
                 s_panel_state = PANEL_STATE_PLAYER_VISIBLE;
@@ -230,36 +239,36 @@ void ui_actions_panel_handle_gesture(lv_dir_t dir, lv_coord_t start_x, lv_coord_
             break;
 
         case PANEL_STATE_PLAYER_VISIBLE:
-            if (dir == LV_DIR_BOTTOM) { // Ciclar hacia abajo
+            if (dir == LV_DIR_BOTTOM) {
                 animate_panel_out_top(s_player_btns);
                 animate_panel_in_top(s_admin_btns);
                 s_panel_state = PANEL_STATE_ADMIN_VISIBLE;
-            } else if (dir == LV_DIR_TOP) { // Cerrar
+            } else if (dir == LV_DIR_TOP) {
                 animate_panel_out_top(s_player_btns);
                 s_panel_state = PANEL_STATE_HIDDEN;
             }
             break;
 
         case PANEL_STATE_ADMIN_VISIBLE:
-            if (dir == LV_DIR_BOTTOM) { // Ciclar hacia abajo
+            if (dir == LV_DIR_BOTTOM) {
                 animate_panel_out_top(s_admin_btns);
                 animate_panel_in_top(s_config_btns);
                 s_panel_state = PANEL_STATE_CONFIG_VISIBLE;
-            } else if (dir == LV_DIR_TOP) { // Cerrar
+            } else if (dir == LV_DIR_TOP) {
                 animate_panel_out_top(s_admin_btns);
                 s_panel_state = PANEL_STATE_HIDDEN;
             }
             break;
             
         case PANEL_STATE_CONFIG_VISIBLE:
-            if (dir == LV_DIR_TOP) { // Cerrar (no hay más paneles abajo)
+            if (dir == LV_DIR_TOP) {
                 animate_panel_out_top(s_config_btns);
                 s_panel_state = PANEL_STATE_HIDDEN;
             }
             break;
         
         case PANEL_STATE_SIDE_VISIBLE:
-            if (dir == LV_DIR_LEFT) { // Cerrar
+            if (dir == LV_DIR_LEFT) {
                 animate_panel_out_side(s_side_btns);
                 s_panel_state = PANEL_STATE_HIDDEN;
             }
@@ -267,11 +276,13 @@ void ui_actions_panel_handle_gesture(lv_dir_t dir, lv_coord_t start_x, lv_coord_
     }
 }
 
+/**
+ * @brief Callback para todos los eventos de clic en los botones de acción.
+ */
 static void button_event_cb(lv_event_t *e) {
-    lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_PRESSED) {
-        if (s_hide_timer) {
-            lv_timer_reset(s_hide_timer);
-        }
+    if (s_hide_timer) {
+        lv_timer_reset(s_hide_timer);
     }
+    diymon_action_id_t action_id = (diymon_action_id_t)(intptr_t)lv_event_get_user_data(e);
+    execute_diymon_action(action_id);
 }

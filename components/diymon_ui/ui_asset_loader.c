@@ -1,9 +1,8 @@
 /*
   Fichero: ./components/diymon_ui/ui_asset_loader.c
-  Fecha: 13/08/2025 - 21:15
-  Último cambio: Mapeados los nuevos assets a los ficheros BTN_7, 8 y 9.
-  Descripción: Implementación del gestor de assets. Se añaden las llamadas para
-               cargar los iconos del nuevo panel de configuración superior.
+  Fecha: 14/08/2025 - 11:00 am
+  Último cambio: Actualizada la carga de assets para usar la nueva estructura de nombres.
+  Descripción: Implementación del gestor de assets. Se han modificado los nombres de los ficheros binarios para que coincidan con la estructura `BTN_X.bin` y `EVO_X.bin` proporcionada.
 */
 #include "ui_asset_loader.h"
 #include "diymon_ui_helpers.h"
@@ -73,29 +72,29 @@ static bool load_asset(ui_asset_id_t id, const char* filename) {
 }
 
 void ui_assets_init(void) {
-    ESP_LOGI(TAG, "Precargando todos los assets de la UI...");
-    // Panel de jugador
-    load_asset(ASSET_ICON_EAT, "ICON_EAT.bin");
-    load_asset(ASSET_ICON_GYM, "ICON_GYM.bin");
-    load_asset(ASSET_ICON_ATK, "ICON_ATK.bin");
+    ESP_LOGI(TAG, "Precargando todos los assets de la UI con la nueva estructura de nombres...");
     
-    // Panel de admin
-    load_asset(ASSET_ICON_BRIGHTNESS, "ICON_LUZ.bin");
-    load_asset(ASSET_ICON_SCREEN_OFF, "ICON_OFF.bin");
-    load_asset(ASSET_ICON_ADMIN_PLACEHOLDER, "ICON_ADM.bin");
+    // Panel de jugador (iconos 1-3)
+    load_asset(ASSET_ICON_EAT, "BTN_1.bin");
+    load_asset(ASSET_ICON_GYM, "BTN_2.bin");
+    load_asset(ASSET_ICON_ATK, "BTN_3.bin");
+    
+    // Panel de admin (iconos 4-6)
+    load_asset(ASSET_ICON_BRIGHTNESS, "BTN_4.bin");
+    load_asset(ASSET_ICON_SCREEN_OFF, "BTN_5.bin");
+    load_asset(ASSET_ICON_ADMIN_PLACEHOLDER, "BTN_6.bin");
 
-    // Panel lateral de evolución
-    load_asset(ASSET_ICON_EVO_FIRE,  "LVL_FIRE.BIN");
-    load_asset(ASSET_ICON_EVO_WATER, "LVL_WATE.BIN");
-    load_asset(ASSET_ICON_EVO_EARTH, "LVL_EART.BIN");
-    load_asset(ASSET_ICON_EVO_WIND,  "LVL_WIND.BIN");
-    load_asset(ASSET_ICON_EVO_BACK,  "LVL_DOWN.BIN");
+    // Panel de configuración (iconos 7-9)
+    load_asset(ASSET_ICON_RESET_ALL, "BTN_7.bin");
+    load_asset(ASSET_ICON_ENABLE_FTP, "BTN_8.bin");
+    load_asset(ASSET_ICON_CONFIG_PLACEHOLDER, "BTN_9.bin");
 
-    // --- ANOTACIÓN: Carga de los nuevos iconos para el TERCER panel superior. ---
-    // Asegúrate de que estos ficheros existen en /sdcard/buttons/
-    load_asset(ASSET_ICON_BTN_7, "BTN_7.bin");
-    load_asset(ASSET_ICON_BTN_8, "BTN_8.bin");
-    load_asset(ASSET_ICON_BTN_9, "BTN_9.bin");
+    // Panel lateral de evolución (iconos EVO 1-5)
+    load_asset(ASSET_ICON_EVO_FIRE,  "EVO_1.bin");
+    load_asset(ASSET_ICON_EVO_WATER, "EVO_2.bin");
+    load_asset(ASSET_ICON_EVO_EARTH, "EVO_3.bin");
+    load_asset(ASSET_ICON_EVO_WIND,  "EVO_4.bin");
+    load_asset(ASSET_ICON_EVO_BACK,  "EVO_5.bin");
 }
 
 void ui_assets_deinit(void) {

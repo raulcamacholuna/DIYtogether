@@ -1,9 +1,8 @@
 /*
   Fichero: ./components/diymon_ui/ui.c
-  Fecha: 13/08/2025 - 21:15
-  Último cambio: Conectados los eventos para el nuevo panel de configuración.
-  Descripción: Se actualiza el conector de eventos para registrar los botones
-               del nuevo tercer panel superior.
+  Fecha: 14/08/2025 - 10:30 am
+  Último cambio: Corregida la llamada a `execute_diymon_action` para alinearla con la nueva firma.
+  Descripción: Orquestador principal de la UI. Se elimina el segundo parámetro en la llamada a la función de ejecución de acciones, completando así la refactorización a un búfer de animación compartido.
 */
 #include "ui.h"
 #include "screens.h"
@@ -12,8 +11,8 @@
 #include "ui_asset_loader.h"
 #include "esp_log.h"
 
+// El objeto de la pantalla principal se define en screens.c y se declara aquí para su uso.
 extern lv_obj_t *g_main_screen_obj; 
-extern lv_obj_t *g_idle_animation_obj; 
 
 static const char *TAG = "DIYMON_UI_MAIN";
 
@@ -23,7 +22,8 @@ static void button_event_cb(lv_event_t *e) {
     
     if (code == LV_EVENT_CLICKED || code == LV_EVENT_LONG_PRESSED) {
         ESP_LOGI(TAG, "Evento de botón detectado para la acción ID: %d", action_id);
-        execute_diymon_action(action_id, g_idle_animation_obj);
+        // Llamada corregida con un solo argumento, como requiere la nueva firma.
+        execute_diymon_action(action_id);
     }
 }
 

@@ -1,9 +1,8 @@
 /*
   Fichero: ./components/diymon_ui/actions.h
-  Fecha: 13/08/2025 - 21:15
-  Último cambio: Reorganizados los IDs de acción para el nuevo panel de configuración superior.
-  Descripción: Define los identificadores para todas las acciones de usuario posibles,
-               agrupados por su panel correspondiente.
+  Fecha: 14/08/2025 - 10:15 am
+  Último cambio: Refactorizada la firma de la función de ejecución de acciones.
+  Descripción: Define los identificadores para todas las acciones de usuario. La firma de `execute_diymon_action` se ha simplificado para no requerir el objeto de animación de reposo, ya que ahora se gestiona de forma global.
 */
 #ifndef ACTIONS_H
 #define ACTIONS_H
@@ -46,9 +45,8 @@ typedef enum {
 /**
  * @brief Orquestador principal de acciones, llamado por los eventos de los botones.
  * @param action_id El identificador de la acción a ejecutar.
- * @param idle_obj Un puntero al objeto de animación de idle para poder pausarlo.
  */
-void execute_diymon_action(diymon_action_id_t action_id, lv_obj_t* idle_obj);
+void execute_diymon_action(diymon_action_id_t action_id);
 
 
 #ifdef __cplusplus

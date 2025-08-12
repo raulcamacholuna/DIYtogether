@@ -1,9 +1,8 @@
 /*
   Fichero: ./components/diymon_ui/actions.c
-  Fecha: 13/08/2025 - 21:30
-  Último cambio: Corregido el ID de acción del botón placeholder de configuración.
-  Descripción: Lógica para las acciones de los botones. Se corrige el identificador
-               del panel de configuración para coincidir con la cabecera.
+  Fecha: 14/08/2025 - 10:15 am
+  Último cambio: Adaptado a la nueva arquitectura de animación compartida.
+  Descripción: Lógica para las acciones de los botones. Se actualiza la función de ejecución de acciones y la llamada al reproductor de animaciones para no pasar punteros a objetos, ya que ahora son gestionados de forma centralizada.
 */
 #include "actions.h"
 #include "ui_action_animations.h" 
@@ -33,13 +32,14 @@ static void erase_ftp_flag(void) {
     }
 }
 
-void execute_diymon_action(diymon_action_id_t action_id, lv_obj_t* idle_obj) {
+void execute_diymon_action(diymon_action_id_t action_id) {
     switch(action_id) {
         case ACTION_ID_COMER:
         case ACTION_ID_EJERCICIO:
         case ACTION_ID_ATACAR:
             ESP_LOGI(TAG, "Accion de jugador. Delegando a reproductor.");
-            ui_action_animations_play(action_id, idle_obj);
+            // La llamada se simplifica, ya no necesita el puntero al objeto de idle.
+            ui_action_animations_play(action_id);
             break;
 
         case ACTION_ID_BRIGHTNESS_CYCLE:
@@ -92,7 +92,7 @@ void execute_diymon_action(diymon_action_id_t action_id, lv_obj_t* idle_obj) {
         case ACTION_ID_EVO_WIND:
         case ACTION_ID_EVO_BACK:
         case ACTION_ID_ADMIN_PLACEHOLDER:
-        case ACTION_ID_CONFIG_PLACEHOLDER: // <-- CORRECCIÓN
+        case ACTION_ID_CONFIG_PLACEHOLDER:
             ESP_LOGI(TAG, "Accion %d (sin implementación actual).", action_id);
             break;
 
