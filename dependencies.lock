@@ -2,13 +2,13 @@ dependencies:
   diymon_bsp:
     dependencies: []
     source:
-      path: Z:\DIYMON\VSCODE\DIYToguether\components\diymon_bsp
+      path: Z:\DIYTOGETHER\DIYtogether\components\diymon_bsp
       type: local
     version: '*'
   diymon_core:
     dependencies: []
     source:
-      path: Z:\DIYMON\VSCODE\DIYToguether\components\diymon_core
+      path: Z:\DIYTOGETHER\DIYtogether\components\diymon_core
       type: local
     version: '*'
   diymon_ui:
@@ -16,25 +16,25 @@ dependencies:
     - name: lvgl/lvgl
       version: ^9.3.0
     source:
-      path: Z:\DIYMON\VSCODE\DIYToguether\components\diymon_ui
+      path: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui
       type: local
     version: '*'
   esp_lcd_touch:
     dependencies: []
     source:
-      path: Z:\DIYMON\VSCODE\DIYToguether\components_dependencies\esp_lcd_touch
+      path: Z:\DIYTOGETHER\DIYtogether\components_dependencies\esp_lcd_touch
       type: local
     version: 1.1.2
   esp_lvgl_port:
     dependencies: []
     source:
-      path: Z:\DIYMON\VSCODE\DIYToguether\components_dependencies\esp_lvgl_port
+      path: Z:\DIYTOGETHER\DIYtogether\components_dependencies\esp_lvgl_port
       type: local
     version: 2.6.0
   espressif/cmake_utilities:
     dependencies: []
     source:
-      path: Z:\DIYMON\VSCODE\DIYToguether\components_dependencies\espressif__cmake_utilities
+      path: Z:\DIYTOGETHER\DIYtogether\components_dependencies\espressif__cmake_utilities
       type: local
     version: 1.1.1
   espressif/esp_lcd_touch_cst816s:
@@ -45,7 +45,7 @@ dependencies:
     - name: idf
       version: '>=4.4.2'
     source:
-      path: Z:\DIYMON\VSCODE\DIYToguether\components\diymon_bsp\WS1.9TS\esp_lcd_touch_cst816s
+      path: Z:\DIYTOGETHER\DIYtogether\components\diymon_bsp\WS1.9TS\esp_lcd_touch_cst816s
       type: local
     version: 1.1.0
   idf:
@@ -62,7 +62,7 @@ dependencies:
   zlib:
     dependencies: []
     source:
-      path: Z:\DIYMON\VSCODE\DIYToguether\components_dependencies\zlib
+      path: Z:\DIYTOGETHER\DIYtogether\components_dependencies\zlib
       type: local
     version: 1.3.1
 direct_dependencies:

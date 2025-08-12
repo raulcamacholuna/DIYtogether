@@ -1,11 +1,8 @@
 /*
   Fichero: ./main/main.c
-  Fecha: 12/08/2025 - 02:30 pm
-  Último cambio: Restaurado el modo de conexión STA para el servidor de configuración.
-  Descripción: Se revierte la lógica del modo de configuración para que el dispositivo
-               se conecte como cliente (STA) a la red WiFi guardada, en lugar de
-               crear un Punto de Acceso (AP). Esto alinea el comportamiento con el
-               requisito original de servir la web desde la red local.
+  Fecha: 12/08/2025 - 05:05 pm
+  Último cambio: Centralizada la inicialización del hardware en los modos de servicio.
+  Descripción: Orquestador principal de la aplicación. Se ha modificado la lógica para que la inicialización del hardware (BSP) se realice aquí, antes de llamar a los componentes de servicio como service_screen, evitando así inicializaciones múltiples y resolviendo un error crítico de reinicialización del bus SPI.
 */
 #include <stdio.h>
 #include <string.h>
@@ -63,10 +60,13 @@ void app_main(void)
 
 static void run_config_server_mode(void) {
     ESP_LOGI(TAG, "Arrancando en modo Servidor Web de Configuración (STA)...");
-    bsp_wifi_init_stack();
     
+    // 1. Inicializar hardware mínimo para mostrar pantalla y usar SD.
+    bsp_init_service_mode();
     service_screen_show("/sdcard/config/FTP.bin");
-    
+
+    // 2. Inicializar y conectar WiFi.
+    bsp_wifi_init_stack();
     bsp_wifi_init_sta_from_nvs();
     bool ip_ok = bsp_wifi_wait_for_ip(15000);
 
@@ -84,9 +84,14 @@ static void run_config_server_mode(void) {
 
 static void run_wifi_portal_mode(void) {
     ESP_LOGI(TAG, "No hay credenciales. Arrancando en modo Portal WiFi...");
-    bsp_wifi_init_stack();
+    
+    // 1. Inicializar hardware mínimo y mostrar pantalla de portal.
+    bsp_init_service_mode();
     service_screen_show("/sdcard/config/WIFI.bin");
-    wifi_portal_start();
+    
+    // 2. Iniciar stack WiFi y portal.
+    bsp_wifi_init_stack();
+    wifi_portal_start(); // Bloqueante
 }
 
 static void run_main_application_mode(void) {

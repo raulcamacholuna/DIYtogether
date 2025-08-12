@@ -1,8 +1,8 @@
 /*
  * Fichero: ./main/hardware_manager.c
- * Fecha: 12/08/2025 - 02:10 pm
- * Último cambio: Corregido el formato de los comentarios del encabezado a C-style.
- * Descripción: Orquestador de hardware. Se elimina la llamada explícita a bsp_display_set_brightness(100), ya que ahora la función bsp_display_init se encarga de restaurar el brillo desde la NVS.
+ * Fecha: 12/08/2025 - 05:05 pm
+ * Último cambio: Eliminada la configuración redundante de brillo.
+ * Descripción: Orquestador de hardware. Se elimina la llamada explícita a bsp_display_set_brightness(100), ya que ahora la función bsp_display_init se encarga de restaurar el brillo desde la NVS, evitando sobreescribir la configuración del usuario.
  */
 #include "hardware_manager.h"
 #include "esp_log.h"

@@ -1,11 +1,8 @@
 /*
   Fichero: ./components/web_server/web_server.c
-  Fecha: 12/08/2025 - 02:30 pm
-  Último cambio: Corregida la ruta base para servir archivos desde la raíz de la SD.
-  Descripción: Se ha eliminado el subdirectorio "/web" de la ruta de búsqueda
-               de archivos. El servidor ahora buscará los ficheros (index.html, etc.)
-               directamente en la raíz del punto de montaje de la tarjeta SD,
-               coincidiendo con la estructura de archivos del usuario.
+  Fecha: 12/08/2025 - 07:15 pm
+  Último cambio: Modificada la ruta base para servir archivos desde /sdcard/config.
+  Descripción: Servidor web para configuración. Se corrige la ruta para que apunte al directorio /config/ en la SD, unificando la ubicación de todos los archivos de servicio y solucionando los errores 404 (Not Found).
 */
 #include "web_server.h"
 #include "esp_http_server.h"
@@ -98,19 +95,18 @@ static esp_err_t file_get_handler(httpd_req_t *req) {
         uri = "/index.html";
     }
 
-    // [CAMBIO CLAVE] Se elimina "/web" de la ruta base.
-    int len = snprintf(filepath, sizeof(filepath), "%s", WEB_MOUNT_POINT);
-    if (len < 0 || len >= sizeof(filepath)) {
-        ESP_LOGE(TAG, "Error al construir la ruta base del archivo.");
-        httpd_resp_send_500(req);
+    // [CORRECCIÓN] Se unifica la ruta base al directorio /config/ de la SD.
+    const char *base_path = WEB_MOUNT_POINT "/config";
+
+    // Comprobación de seguridad en tiempo de ejecución para evitar desbordamientos.
+    if ((strlen(base_path) + strlen(uri) + 1) > sizeof(filepath)) {
+        ESP_LOGE(TAG, "La ruta resultante de la URI es demasiado larga: %s", uri);
+        httpd_resp_send_err(req, HTTPD_414_URI_TOO_LONG, "URI is too long");
         return ESP_FAIL;
     }
 
-    if (len + strlen(uri) >= sizeof(filepath)) {
-        ESP_LOGE(TAG, "URI demasiado larga: %s", uri);
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "URI too long");
-        return ESP_FAIL;
-    }
+    // Concatenación manual para evitar el warning/error del compilador.
+    strcpy(filepath, base_path);
     strcat(filepath, uri);
 
     ESP_LOGI(TAG, "Sirviendo archivo: %s", filepath);
