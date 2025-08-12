@@ -1,10 +1,9 @@
 /*
   Fichero: ./components/diymon_ui/ui_asset_loader.c
-  Fecha: 11/08/2025 - 21:15
-  Último cambio: Actualizado el nombre del fichero para el icono FTP.
-  Descripción: Implementación del gestor de assets. Se ha actualizado la carga de 
-               iconos para utilizar el nuevo ID 'ASSET_ICON_FTP' y se le ha asignado
-               el fichero "ICON_FTP.bin".
+  Fecha: 13/08/2025 - 21:15
+  Último cambio: Mapeados los nuevos assets a los ficheros BTN_7, 8 y 9.
+  Descripción: Implementación del gestor de assets. Se añaden las llamadas para
+               cargar los iconos del nuevo panel de configuración superior.
 */
 #include "ui_asset_loader.h"
 #include "diymon_ui_helpers.h"
@@ -83,16 +82,20 @@ void ui_assets_init(void) {
     // Panel de admin
     load_asset(ASSET_ICON_BRIGHTNESS, "ICON_LUZ.bin");
     load_asset(ASSET_ICON_SCREEN_OFF, "ICON_OFF.bin");
-    // [CORRECCIÓN] Se utiliza el nuevo ID de asset y un nombre de fichero descriptivo.
-    // Asegúrate de que el archivo 'ICON_FTP.bin' existe en '/sdcard/buttons/'.
-    load_asset(ASSET_ICON_FTP, "ICON_FTP.bin");
+    load_asset(ASSET_ICON_ADMIN_PLACEHOLDER, "ICON_ADM.bin");
 
-    // Panel lateral de evolución, usando los nombres de la imagen.
+    // Panel lateral de evolución
     load_asset(ASSET_ICON_EVO_FIRE,  "LVL_FIRE.BIN");
     load_asset(ASSET_ICON_EVO_WATER, "LVL_WATE.BIN");
     load_asset(ASSET_ICON_EVO_EARTH, "LVL_EART.BIN");
     load_asset(ASSET_ICON_EVO_WIND,  "LVL_WIND.BIN");
     load_asset(ASSET_ICON_EVO_BACK,  "LVL_DOWN.BIN");
+
+    // --- ANOTACIÓN: Carga de los nuevos iconos para el TERCER panel superior. ---
+    // Asegúrate de que estos ficheros existen en /sdcard/buttons/
+    load_asset(ASSET_ICON_BTN_7, "BTN_7.bin");
+    load_asset(ASSET_ICON_BTN_8, "BTN_8.bin");
+    load_asset(ASSET_ICON_BTN_9, "BTN_9.bin");
 }
 
 void ui_assets_deinit(void) {
@@ -105,7 +108,7 @@ void ui_assets_deinit(void) {
 }
 
 const lv_img_dsc_t* ui_assets_get_icon(ui_asset_id_t asset_id) {
-    if (asset_id < ASSET_COUNT) {
+    if (asset_id < ASSET_COUNT && asset_id >= 0) {
         return &g_asset_dscs[asset_id];
     }
     return NULL;

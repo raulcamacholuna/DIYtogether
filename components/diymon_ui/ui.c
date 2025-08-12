@@ -1,10 +1,9 @@
 /*
   Fichero: ./components/diymon_ui/ui.c
-  Fecha: 11/08/2025 - 22:00
-  Último cambio: Corregida la conexión de eventos para el botón de FTP.
-  Descripción: Se actualiza el callback del botón del panel de administración
-               para usar el getter y el ID de acción correctos para la
-               funcionalidad de habilitar el modo FTP.
+  Fecha: 13/08/2025 - 21:15
+  Último cambio: Conectados los eventos para el nuevo panel de configuración.
+  Descripción: Se actualiza el conector de eventos para registrar los botones
+               del nuevo tercer panel superior.
 */
 #include "ui.h"
 #include "screens.h"
@@ -29,17 +28,22 @@ static void button_event_cb(lv_event_t *e) {
 }
 
 static void ui_connect_actions(void) {
-    // Conectar acciones del panel de jugador
+    // Panel 1: Jugador
     lv_obj_add_event_cb(ui_actions_panel_get_eat_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_COMER);
     lv_obj_add_event_cb(ui_actions_panel_get_gym_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EJERCICIO);
     lv_obj_add_event_cb(ui_actions_panel_get_atk_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_ATACAR);
 
-    // Conectar acciones del panel de admin
+    // Panel 2: Admin
     lv_obj_add_event_cb(ui_actions_panel_get_brightness_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_BRIGHTNESS_CYCLE);
     lv_obj_add_event_cb(ui_actions_panel_get_toggle_screen_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_TOGGLE_SCREEN);
-    lv_obj_add_event_cb(ui_actions_panel_get_enable_ftp_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_ENABLE_FTP);
+    lv_obj_add_event_cb(ui_actions_panel_get_admin_placeholder_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_ADMIN_PLACEHOLDER);
     
-    // Conectar acciones del panel lateral de evolución
+    // Panel 3: Configuración
+    lv_obj_add_event_cb(ui_actions_panel_get_reset_all_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_RESET_ALL);
+    lv_obj_add_event_cb(ui_actions_panel_get_enable_ftp_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_ENABLE_FTP);
+    lv_obj_add_event_cb(ui_actions_panel_get_config_placeholder_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_CONFIG_PLACEHOLDER);
+    
+    // Panel Lateral: Evolución
     lv_obj_add_event_cb(ui_actions_panel_get_evo_fire_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EVO_FIRE);
     lv_obj_add_event_cb(ui_actions_panel_get_evo_water_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EVO_WATER);
     lv_obj_add_event_cb(ui_actions_panel_get_evo_earth_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EVO_EARTH);

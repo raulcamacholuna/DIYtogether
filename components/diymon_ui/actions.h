@@ -1,9 +1,9 @@
 /*
   Fichero: ./components/diymon_ui/actions.h
-  Fecha: 11/08/2025 - 22:30
-  Último cambio: Corregido el ID de acción para habilitar FTP.
-  Descripción: Define los identificadores para todas las acciones de usuario posibles.
-               Se reemplaza la acción de borrado de WiFi por la de activación de FTP.
+  Fecha: 13/08/2025 - 21:15
+  Último cambio: Reorganizados los IDs de acción para el nuevo panel de configuración superior.
+  Descripción: Define los identificadores para todas las acciones de usuario posibles,
+               agrupados por su panel correspondiente.
 */
 #ifndef ACTIONS_H
 #define ACTIONS_H
@@ -16,15 +16,15 @@ extern "C" {
 
 // --- El Modelo de Datos para las Acciones ---
 typedef enum {
-    // Acciones del panel de jugador (superior)
+    // Acciones del panel de jugador (superior 1)
     ACTION_ID_COMER,
     ACTION_ID_EJERCICIO,
     ACTION_ID_ATACAR,
 
-    // Acciones del panel de administración
+    // Acciones del panel de administración (superior 2)
     ACTION_ID_BRIGHTNESS_CYCLE,
     ACTION_ID_TOGGLE_SCREEN,
-    ACTION_ID_ENABLE_FTP,       // Reemplaza a ACTION_ID_ERASE_WIFI
+    ACTION_ID_ADMIN_PLACEHOLDER,
 
     // Acciones del panel de evolución (lateral)
     ACTION_ID_EVO_FIRE,
@@ -33,6 +33,11 @@ typedef enum {
     ACTION_ID_EVO_WIND,
     ACTION_ID_EVO_BACK,
     
+    // Acciones del panel de configuración (superior 3)
+    ACTION_ID_RESET_ALL,
+    ACTION_ID_ENABLE_FTP,
+    ACTION_ID_CONFIG_PLACEHOLDER,
+
     ACTION_ID_COUNT 
 } diymon_action_id_t;
 

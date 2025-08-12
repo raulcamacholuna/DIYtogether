@@ -1,13 +1,13 @@
 /*
  * Fichero: ./components/diymon_core/diymon_evolution.c
- * Fecha: 12/08/2025 - 10:40
- * Último cambio: Implementada la función 'diymon_get_previous_evolution_in_sequence'.
- * Descripción: Añadida la lógica para obtener la evolución anterior en la secuencia, permitiendo la funcionalidad de "bajar nivel".
+ * Fecha: 13/08/2025 - 19:45
+ * Último cambio: Implementada la función de reseteo de estado.
+ * Descripción: Añadida la lógica para obtener la evolución anterior y para resetear el estado de evolución guardado en la NVS.
  */
 
 #include "diymon_evolution.h"
 #include <string.h>
-#include <stdlib.h> // <-- Incluido para usar atoi()
+#include <stdlib.h>
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "nvs.h"
@@ -53,6 +53,7 @@ static void diymon_core_load_state(void) {
     esp_err_t err = nvs_open("diymon_storage", NVS_READONLY, &nvs_handle);
     if (err != ESP_OK) {
         ESP_LOGI(TAG, "NVS: No se encontró partición, empezando de cero.");
+        strcpy(G_CURRENT_DIYMON_CODE, "0"); // Asegurar estado inicial si no hay NVS
         return;
     }
     size_t required_size = sizeof(G_CURRENT_DIYMON_CODE);
@@ -63,6 +64,7 @@ static void diymon_core_load_state(void) {
             break;
         case ESP_ERR_NVS_NOT_FOUND:
             ESP_LOGI(TAG, "NVS: Clave 'evo_code' no encontrada. Es la primera ejecución.");
+            strcpy(G_CURRENT_DIYMON_CODE, "0"); // Estado inicial
             break;
         default:
             ESP_LOGE(TAG, "Error (%s) cargando 'evo_code' desde NVS!", esp_err_to_name(err));
@@ -109,22 +111,19 @@ const char* diymon_get_previous_evolution_in_sequence(const char* current_code) 
     return NULL;
 }
 
-/**
- * @brief [IMPLEMENTACIÓN AÑADIDA] Convierte el código de evolución a un ID numérico.
- */
-int diymon_core_get_evolution_id(void) {
-    const char *code_str = diymon_get_current_code();
-    char numeric_str[16];
-    int j = 0;
-
-    // Recorremos el string original y copiamos solo los dígitos
-    for (int i = 0; code_str[i] != '\0' && j < sizeof(numeric_str) - 1; i++) {
-        if (code_str[i] >= '0' && code_str[i] <= '9') {
-            numeric_str[j++] = code_str[i];
-        }
+void diymon_evolution_reset_state(void) {
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open("diymon_storage", NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Error (%s) abriendo NVS para borrar estado de evolución.", esp_err_to_name(err));
+        return;
     }
-    numeric_str[j] = '\0'; // Terminamos el nuevo string
-
-    // Convertimos el string de solo dígitos a un entero
-    return atoi(numeric_str);
+    err = nvs_erase_key(nvs_handle, "evo_code");
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "Clave 'evo_code' borrada de NVS.");
+    } else {
+        ESP_LOGE(TAG, "Error al borrar 'evo_code': %s", esp_err_to_name(err));
+    }
+    nvs_commit(nvs_handle);
+    nvs_close(nvs_handle);
 }

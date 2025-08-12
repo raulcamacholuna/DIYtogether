@@ -1,10 +1,9 @@
 /*
   Fichero: ./components/diymon_ui/actions.c
-  Fecha: 12/08/2025 - 03:30
-  Último cambio: Añadida la funcionalidad de borrado de WiFi al botón de brillo.
-  Descripción: Lógica para todas las acciones de los botones de la UI. El botón de brillo
-               ahora cicla la intensidad y, adicionalmente, borra las credenciales
-               WiFi guardadas en NVS, forzando un reinicio al modo portal.
+  Fecha: 13/08/2025 - 21:30
+  Último cambio: Corregido el ID de acción del botón placeholder de configuración.
+  Descripción: Lógica para las acciones de los botones. Se corrige el identificador
+               del panel de configuración para coincidir con la cabecera.
 */
 #include "actions.h"
 #include "ui_action_animations.h" 
@@ -23,6 +22,17 @@ static const char *TAG = "DIYMON_ACTIONS";
 static int s_brightness_levels[] = {25, 50, 75, 100};
 static int s_current_brightness_idx = 3;
 
+// --- ANOTACIÓN: Función de utilidad para borrar la bandera FTP de NVS. ---
+static void erase_ftp_flag(void) {
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
+    if (err == ESP_OK) {
+        nvs_erase_key(nvs_handle, "enable_ftp");
+        nvs_commit(nvs_handle);
+        nvs_close(nvs_handle);
+    }
+}
+
 void execute_diymon_action(diymon_action_id_t action_id, lv_obj_t* idle_obj) {
     switch(action_id) {
         case ACTION_ID_COMER:
@@ -37,11 +47,6 @@ void execute_diymon_action(diymon_action_id_t action_id, lv_obj_t* idle_obj) {
             int new_brightness = s_brightness_levels[s_current_brightness_idx];
             screen_manager_set_brightness(new_brightness);
             ESP_LOGI(TAG, "Accion: Ciclar Brillo a %d%%", new_brightness);
-
-            ESP_LOGI(TAG, "Borrando credenciales WiFi y reiniciando para entrar en modo portal...");
-            wifi_portal_erase_credentials();
-            vTaskDelay(pdMS_TO_TICKS(500));
-            esp_restart();
             break;
 
         case ACTION_ID_TOGGLE_SCREEN:
@@ -52,6 +57,16 @@ void execute_diymon_action(diymon_action_id_t action_id, lv_obj_t* idle_obj) {
                 ESP_LOGI(TAG, "Accion: Apagar pantalla.");
                 screen_manager_turn_off();
             }
+            break;
+
+        case ACTION_ID_RESET_ALL:
+            ESP_LOGW(TAG, "ACCIÓN: Borrado completo de configuraciones.");
+            wifi_portal_erase_credentials();
+            diymon_evolution_reset_state();
+            erase_ftp_flag();
+            ESP_LOGW(TAG, "Todas las configuraciones han sido borradas. Reiniciando en 1 segundo...");
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            esp_restart();
             break;
             
         case ACTION_ID_ENABLE_FTP: {
@@ -76,7 +91,9 @@ void execute_diymon_action(diymon_action_id_t action_id, lv_obj_t* idle_obj) {
         case ACTION_ID_EVO_EARTH:
         case ACTION_ID_EVO_WIND:
         case ACTION_ID_EVO_BACK:
-            ESP_LOGI(TAG, "Accion de evolucion (logica pendiente).");
+        case ACTION_ID_ADMIN_PLACEHOLDER:
+        case ACTION_ID_CONFIG_PLACEHOLDER: // <-- CORRECCIÓN
+            ESP_LOGI(TAG, "Accion %d (sin implementación actual).", action_id);
             break;
 
         default:
