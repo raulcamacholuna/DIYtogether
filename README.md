@@ -1,4 +1,4 @@
-# DIYMON - Tu Mascota Virtual DIY
+# DIYTogether - Tu Mascota Virtual DIY
 
 ![Ilustración de DIYMON en acción]([Link a git3.png])
 
