@@ -1,7 +1,7 @@
 /*
  * Fichero: ./components/diymon_ui/ui_idle_animation.c
- * Fecha: 13/08/2025 - 11:45 
- * Último cambio: Corregida la firma de la función de inicio.
+ * Fecha: 13/08/2025 - 01:49 
+ * Último cambio: Cambiado el prefijo de la animación de idle a 'ANIM_IDLE_'.
  * Descripción: Implementación de la animación de reposo. Se corrige la firma de
  *              la función 'ui_idle_animation_start' para que coincida con su
  *              declaración, aceptando un objeto padre y devolviendo el objeto
@@ -31,7 +31,7 @@ static void idle_animation_timer_cb(lv_timer_t *timer) {
     
     g_current_frame_index = (g_current_frame_index + 1) % g_idle_animation_player.frame_count;
     
-    if (animation_loader_load_frame(&g_idle_animation_player, g_current_frame_index, "IDLE_")) {
+    if (animation_loader_load_frame(&g_idle_animation_player, g_current_frame_index, "ANIM_IDLE_")) {
         // g_animation_img_obj es el objeto global declarado en ui_action_animations.h
         if (g_animation_img_obj) {
             lv_obj_invalidate(g_animation_img_obj);

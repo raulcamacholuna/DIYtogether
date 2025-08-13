@@ -1,8 +1,8 @@
 /*
-  Fichero: ./main/main.c
-  Fecha: 13/08/2025 - 10:20 
-  Último cambio: Eliminada la integración con el sistema de ficheros de LVGL para evitar errores de compilación.
-  Descripción: Se ha eliminado la llamada a lv_fs_fatfs_init() y su prototipo. El acceso a la SD para cargar recursos se gestionará con funciones estándar de C, volviendo a un enfoque más estable que no depende de la integración directa de LVGL con FatFS.
+ * Fichero: ./main/main.c
+ * Fecha: 13/08/2025 - 01:52 
+ * Último cambio: Eliminada la llamada a la función lv_fs_fatfs_init no definida.
+ * Descripción: Fichero principal de la aplicación DIYMON. Se ha eliminado la llamada a lv_fs_fatfs_init() y su prototipo. El acceso a la SD para cargar recursos se gestionará con funciones estándar de C, volviendo a un enfoque más estable que no depende de la integración directa de LVGL con FatFS.
 */
 #include <stdio.h>
 #include <string.h>
