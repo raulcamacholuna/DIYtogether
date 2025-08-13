@@ -1,11 +1,10 @@
 /*
   Fichero: ./components/diymon_ui/ui_actions_panel.c
-  Fecha: 13/08/2025 - 12:23 
-  Último cambio: Corregida la transparencia de los botones de acción.
+  Fecha: 13/08/2025 - 08:30 
+  Último cambio: Corregidas las funciones de chroma key a la API de LVGL v9.
   Descripción: Se ha modificado la creación de botones para asegurar que su fondo sea
-               completamente transparente en todos los estados (normal, presionado, etc.).
-               Esto soluciona un problema visual donde los botones mostraban un fondo opaco,
-               y ahora permite que la animación de fondo sea visible a través de ellos.
+               completamente transparente. Se habilita la transparencia por chroma key para el asset 
+               ASSET_ICON_CONFIG_PLACEHOLDER, usando las funciones correctas de LVGL v9 (lv_obj_set_style_img_chroma_keyed).
 */
 #include "ui_actions_panel.h"
 #include "ui_asset_loader.h"
@@ -68,6 +67,7 @@ static lv_obj_t* create_top_action_button(lv_obj_t *parent, ui_asset_id_t asset_
     lv_obj_t *img = lv_img_create(btn);
     lv_img_set_src(img, ui_assets_get_icon(asset_id));
     lv_obj_center(img);
+        
     lv_obj_set_pos(btn, (BUTTON_SIZE + BUTTON_PADDING) * index, -BUTTON_SIZE);
     lv_obj_add_flag(btn, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_event_cb(btn, button_event_cb, LV_EVENT_PRESSED, NULL);
@@ -87,6 +87,7 @@ static lv_obj_t* create_side_action_button(lv_obj_t *parent, ui_asset_id_t asset
     lv_obj_t *img = lv_img_create(btn);
     lv_img_set_src(img, ui_assets_get_icon(asset_id));
     lv_obj_center(img);
+    
     lv_obj_set_pos(btn, -BUTTON_SIZE, BUTTON_PADDING + (BUTTON_SIZE + BUTTON_PADDING) * index);
     lv_obj_add_flag(btn, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_event_cb(btn, button_event_cb, LV_EVENT_PRESSED, NULL);
