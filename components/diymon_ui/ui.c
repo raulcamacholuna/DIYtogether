@@ -1,8 +1,8 @@
 /*
   Fichero: ./components/diymon_ui/ui.c
-  Fecha: 13/08/2025 - 07:34 
+  Fecha: 13/08/2025 - 07:51 
   Último cambio: Modificado el evento de activación de los botones de acción del jugador.
-  Descripción: Se ha modificado el callback de los botones para que las acciones del jugador (Comer, Ejercicio, Atacar) se disparen con el evento 'LV_EVENT_PRESSED' (al pulsar), mientras que el resto de acciones siguen esperando a 'LV_EVENT_CLICKED' (al soltar). Esto proporciona una respuesta más inmediata para las acciones principales.
+  Descripción: Se ha modificado el callback de los botones para que las acciones del jugador (Comer, Ejercicio, Atacar) se disparen con el evento LV_EVENT_PRESSED (al pulsar), mientras que el resto de acciones siguen esperando a LV_EVENT_CLICKED (al soltar). Esto proporciona una respuesta más inmediata para las acciones principales.
 */
 #include "ui.h"
 #include "screens.h"

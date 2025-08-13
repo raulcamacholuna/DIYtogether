@@ -1,8 +1,8 @@
 /*
  * Fichero: ./components/diymon_ui/ui_action_animations.c
- * Fecha: 13/08/2025 - 07:34 
- * Último cambio: Reimplementado el búfer de animación compartido.
- * Descripción: Se restaura el uso de un único búfer de memoria compartido para todas las animaciones (idle y de acción). La memoria se reserva una vez al crear la UI y se libera al destruirla. Esto soluciona el error de memoria insuficiente que ocurría al intentar reservar un nuevo búfer para una animación de acción mientras el de la animación de reposo todavía estaba en uso.
+ * Fecha: 13/08/2025 - 07:54 
+ * Último cambio: Corregidos los prefijos de las animaciones de acción.
+ * Descripción: Se han actualizado los prefijos de las animaciones de acción para que coincidan con el nuevo esquema de nombres (ANIM_EAT_, ANIM_GYM_, ANIM_ATK_).
  */
 #include "ui_action_animations.h"
 #include "animation_loader.h"
@@ -136,9 +136,9 @@ static void animation_finished(void) {
 
 static const char* get_anim_prefix(diymon_action_id_t action_id) {
     switch(action_id) {
-        case ACTION_ID_COMER:     return "EAT_";
-        case ACTION_ID_EJERCICIO: return "GYM_";
-        case ACTION_ID_ATACAR:    return "ATK_";
+        case ACTION_ID_COMER:     return "ANIM_EAT_";
+        case ACTION_ID_EJERCICIO: return "ANIM_GYM_";
+        case ACTION_ID_ATACAR:    return "ANIM_ATK_";
         default:                  return "";
     }
 }

@@ -3161,11 +3161,9 @@ CONFIG_SEMIHOSTFS_MAX_MOUNT_POINTS=1
 
 /*
   Fichero: ./components/diymon_bsp/include/bsp_api.h
-  Fecha: 13/08/2025 - 12:06 
-  Último cambio: Limpieza de la API del IMU y añadido bsp_battery_init.
-  Descripción: Interfaz pública del BSP. Se eliminan las declaraciones de funciones
-               relacionadas con la interrupción del IMU y se añade la declaración
-               correcta para bsp_battery_init.
+  Fecha: 13/08/2025 - 05:00 
+  Último cambio: Añadida la declaración de bsp_wifi_init_sta para corregir un error de compilación.
+  Descripción: Interfaz pública del BSP. Se añade una nueva función para iniciar el WiFi en modo estación con credenciales pasadas como argumento.
 */
 #ifndef BSP_API_H
 #define BSP_API_H
@@ -3194,6 +3192,7 @@ esp_err_t bsp_battery_init(void);
 
 // --- FUNCIONES DE WIFI ---
 void bsp_wifi_init_stack(void);
+void bsp_wifi_init_sta(const char *ssid, const char *pass);
 void bsp_wifi_start_ap(void);
 void bsp_wifi_init_sta_from_nvs(void);
 bool bsp_wifi_wait_for_ip(uint32_t timeout_ms);
@@ -3220,6 +3219,7 @@ int bsp_get_display_vres(void);
 size_t bsp_get_display_buffer_size(void);
 
 #endif // BSP_API_H
+
 
 
 # =================================================================================================
@@ -4135,19 +4135,18 @@ i2c_master_bus_handle_t bsp_get_i2c_bus_handle(void)
 # =================================================================================================
 
 /*
- * Archivo: components/diymon_bsp/WS1.9TS/bsp_touch.h
- * Versión Corregida: Header privado para el módulo táctil.
+ * Fichero: ./components/diymon_bsp/WS1.9TS/bsp_i2c.h
+ * Fecha: 13/08/2025 - 05:00 
+ * Último cambio: Corregido el contenido del fichero.
+ * Descripción: Cabecera privada para el módulo I2C del BSP. Se ha corregido un error de copiado y pegado que contenía declaraciones incorrectas.
  */
-#ifndef BSP_TOUCH_H__
-#define BSP_TOUCH_H__
+#ifndef BSP_I2C_H__
+#define BSP_I2C_H__
 
-#include "driver/i2c_master.h"
-#include "esp_lcd_touch_axs5106.h"
+// Este es un header privado. Las declaraciones públicas están en bsp_api.h.
 
-// No se declaran funciones aquí porque todas las funciones públicas
-// están definidas en bsp_api.h.
+#endif // BSP_I2C_H__
 
-#endif // BSP_TOUCH_H__
 
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_bsp\WS1.9TS\bsp_qmi8658.c
@@ -4578,16 +4577,17 @@ esp_lcd_touch_handle_t bsp_get_touch_handle(void)
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_bsp\WS1.9TS\bsp_touch.h
 # =================================================================================================
 
-#ifndef __BSP_TOUCH_H__
-#define __BSP_TOUCH_H__
+/*
+ * Fichero: ./components/diymon_bsp/WS1.9TS/bsp_touch.h
+ * Fecha: 13/08/2025 - 05:00 
+ * Último cambio: Corregido el header del driver de touch.
+ * Descripción: Cabecera privada para el módulo táctil. Se ha corregido la inclusión de la cabecera del driver para que apunte a cst816s en lugar de axs5106 y se han eliminado defines no utilizados.
+ */
+#ifndef BSP_TOUCH_H__
+#define BSP_TOUCH_H__
 
 #include "driver/i2c_master.h"
-#include "esp_lcd_touch_axs5106.h"
-
-
-#define EXAMPLE_PIN_TP_INT GPIO_NUM_21
-#define EXAMPLE_PIN_TP_RST GPIO_NUM_20
-
+#include "esp_lcd_touch_cst816s.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -4597,8 +4597,8 @@ extern "C" {
 }
 #endif
 
+#endif // BSP_TOUCH_H__
 
-#endif
 
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_bsp\WS1.9TS\bsp_wifi.c
@@ -4606,9 +4606,9 @@ extern "C" {
 
 /*
   Fichero: ./components/diymon_bsp/WS1.9TS/bsp_wifi.c
-  Fecha: 12/08/2025 - 04:35 pm
-  Último cambio: Añadido log de depuración para mostrar la contraseña leída de NVS.
-  Descripción: Gestor de conexión WiFi. Se añade un log de advertencia para imprimir la contraseña real utilizada durante la conexión, facilitando la depuración de caracteres especiales.
+  Fecha: 13/08/2025 - 05:00 
+  Último cambio: Añadida la función bsp_wifi_init_sta para corregir error de compilación.
+  Descripción: Gestor de conexión WiFi. Se añade una nueva función para permitir la conexión a una red WiFi pasando el SSID y la contraseña directamente, sin depender de la NVS.
 */
 #include "bsp_api.h"
 #include <string.h>
@@ -4828,6 +4828,44 @@ void bsp_wifi_get_ip(char *ip) {
         sprintf(ip, IPSTR, IP2STR(&ip_info.ip));
     }
 }
+
+void bsp_wifi_init_sta(const char *ssid, const char *pass) {
+    esp_netif_create_default_wifi_sta();
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL, NULL));
+
+    s_ip_acquired_sem = xSemaphoreCreateBinary();
+
+    if (ssid && strlen(ssid) > 0) {
+        ESP_LOGI(TAG, "Configurando conexión: SSID:[%s]", ssid);
+
+        wifi_config_t wifi_config = {0};
+        strcpy((char *)wifi_config.sta.ssid, ssid);
+        if (pass) {
+             strcpy((char *)wifi_config.sta.password, pass);
+        }
+        wifi_config.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
+        wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK; // Default to WPA2 for compatibility
+        wifi_config.sta.pmf_cfg.capable = false;
+        wifi_config.sta.pmf_cfg.required = false;
+
+        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+        ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+        
+        ESP_LOGI(TAG, "Protocolos WiFi limitados a 802.11b/g/n para máxima compatibilidad.");
+        ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N));
+        
+        ESP_ERROR_CHECK(esp_wifi_start());
+        ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
+
+        ESP_LOGI(TAG, "Iniciando conexión a la red: %s", ssid);
+    } else {
+        ESP_LOGW(TAG, "SSID inválido para conectar.");
+    }
+}
+
 
 
 # =================================================================================================
@@ -6511,98 +6549,6 @@ const lv_image_dsc_t BTN_8 = {
 
 
 # =================================================================================================
-# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\assets\BTN_9_mask.c
-# =================================================================================================
-
-
-#if defined(LV_LVGL_H_INCLUDE_SIMPLE)
-#include "lvgl.h"
-#elif defined(LV_BUILD_TEST)
-#include "../lvgl.h"
-#else
-#include "lvgl/lvgl.h"
-#endif
-
-
-#ifndef LV_ATTRIBUTE_MEM_ALIGN
-#define LV_ATTRIBUTE_MEM_ALIGN
-#endif
-
-#ifndef LV_ATTRIBUTE_IMG_DUST
-#define LV_ATTRIBUTE_IMG_DUST
-#endif
-
-static const
-LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_DUST
-uint8_t BTN_9_mask_map[] = {
-
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x12,0x23,0x0b,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x08,0x22,0x2f,0x37,0x39,0x38,0x39,0x38,0x35,0x33,0x26,0x13,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x04,0x29,0x37,0x46,0x60,0x6f,0x78,0x7d,0x81,0x77,0x78,0x65,0x4e,0x36,0x2f,0x14,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x1e,0x38,0x4d,0x75,0x87,0x88,0x88,0x89,0x89,0x8a,0x88,0x86,0x83,0x82,0x7a,0x58,0x35,0x27,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x2a,0x39,0x6a,0x87,0x8a,0x8b,0x8b,0x8a,0x7d,0x84,0x8b,0x8b,0x86,0x81,0x79,0x7f,0x7a,0x68,0x38,0x2c,0x06,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x2b,0x46,0x7c,0x8a,0x8d,0x98,0x90,0x8f,0x8f,0x8d,0x8e,0x8e,0x8d,0x8b,0x89,0x7b,0x80,0x7a,0x73,0x66,0x35,0x26,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x2a,0x45,0x80,0x8b,0x90,0xac,0xb8,0x9f,0x90,0x90,0x91,0x90,0x90,0x8c,0x8d,0x8a,0x88,0x82,0x7d,0x77,0x6e,0x64,0x31,0x1f,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x26,0x3e,0x81,0x8b,0x92,0xb3,0xb7,0xaf,0x93,0x92,0x91,0x90,0x90,0x90,0x90,0x8c,0x88,0x87,0x83,0x7e,0x79,0x6c,0x65,0x52,0x31,0x07,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x11,0x3b,0x71,0x8c,0x91,0xae,0xb9,0xac,0x95,0x92,0x93,0x93,0x92,0x92,0x8e,0x8e,0x8e,0x8a,0x87,0x82,0x7f,0x7a,0x6f,0x64,0x62,0x37,0x22,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x31,0x5b,0x8b,0x8f,0x93,0xaf,0xa8,0x92,0x91,0x93,0x91,0x92,0x92,0x91,0x8f,0x8b,0x8a,0x88,0x85,0x82,0x7d,0x77,0x70,0x61,0x63,0x4b,0x31,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x1b,0x39,0x83,0x8c,0x91,0x94,0x94,0x93,0x92,0x92,0x92,0x8f,0x90,0x8f,0x8e,0x8f,0x8c,0x89,0x87,0x85,0x81,0x7e,0x72,0x6f,0x63,0x60,0x57,0x32,0x09,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x31,0x63,0x87,0x8f,0x92,0x93,0x94,0x93,0x8f,0x90,0x8f,0x8e,0x8f,0x8e,0x8d,0x8d,0x8c,0x88,0x87,0x85,0x81,0x7c,0x69,0x6e,0x5f,0x5e,0x63,0x31,0x16,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x18,0x3c,0x7f,0x8a,0x84,0x8e,0x91,0x92,0x90,0x86,0x8b,0x8d,0x8c,0x8a,0x8a,0x89,0x89,0x86,0x86,0x85,0x84,0x80,0x7c,0x74,0x6a,0x60,0x5e,0x5f,0x32,0x23,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x2c,0x4d,0x80,0x8a,0x7e,0x8d,0x8d,0x8d,0x8e,0x8c,0x8b,0x8a,0x8a,0x87,0x88,0x87,0x87,0x84,0x83,0x84,0x81,0x7e,0x79,0x75,0x66,0x5e,0x5c,0x5f,0x2f,0x21,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x34,0x67,0x81,0x84,0x89,0x8b,0x8c,0x8a,0x8a,0x89,0x89,0x89,0x87,0x86,0x87,0x85,0x83,0x7b,0x82,0x81,0x81,0x7c,0x77,0x72,0x61,0x5f,0x5c,0x5f,0x30,0x25,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x13,0x3a,0x71,0x80,0x86,0x89,0x88,0x89,0x89,0x88,0x86,0x86,0x86,0x85,0x83,0x82,0x82,0x81,0x71,0x7e,0x7e,0x7d,0x7a,0x77,0x6c,0x5f,0x5d,0x5b,0x62,0x32,0x1c,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x1d,0x37,0x7c,0x7e,0x83,0x86,0x85,0x87,0x86,0x86,0x84,0x84,0x82,0x81,0x81,0x81,0x80,0x7e,0x7b,0x7d,0x7c,0x78,0x76,0x6f,0x60,0x5c,0x51,0x5c,0x57,0x33,0x15,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x25,0x50,0x78,0x7f,0x83,0x82,0x84,0x82,0x83,0x82,0x81,0x7c,0x7b,0x7e,0x7d,0x7f,0x7d,0x7c,0x7b,0x7b,0x79,0x74,0x72,0x68,0x5e,0x5b,0x52,0x5b,0x51,0x34,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x2b,0x56,0x7b,0x7f,0x7f,0x7f,0x80,0x80,0x81,0x80,0x72,0x6c,0x7b,0x79,0x7c,0x7b,0x7c,0x79,0x78,0x77,0x74,0x71,0x6a,0x60,0x5c,0x5b,0x59,0x5d,0x3c,0x28,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x36,0x61,0x7c,0x7d,0x7d,0x70,0x7f,0x7e,0x7f,0x7e,0x7d,0x7d,0x7c,0x7a,0x78,0x79,0x79,0x77,0x77,0x75,0x72,0x68,0x5f,0x5c,0x5b,0x5b,0x5a,0x5a,0x33,0x19,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x10,0x38,0x74,0x7c,0x7f,0x7a,0x77,0x7f,0x7d,0x7b,0x7b,0x7c,0x7b,0x79,0x76,0x77,0x75,0x75,0x77,0x73,0x72,0x65,0x5d,0x5b,0x5a,0x5a,0x5b,0x61,0x44,0x2c,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x26,0x45,0x7a,0x7d,0x7c,0x7c,0x7b,0x7a,0x79,0x7b,0x79,0x79,0x78,0x77,0x73,0x74,0x71,0x73,0x70,0x6b,0x61,0x5d,0x5c,0x59,0x59,0x5b,0x65,0x56,0x32,0x19,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x0e,0x36,0x69,0x7c,0x7d,0x7d,0x7c,0x7b,0x78,0x77,0x76,0x76,0x76,0x75,0x72,0x73,0x6f,0x64,0x69,0x62,0x5d,0x5c,0x59,0x57,0x58,0x5b,0x65,0x60,0x39,0x23,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x2f,0x4d,0x79,0x78,0x7c,0x79,0x77,0x76,0x74,0x74,0x74,0x72,0x71,0x6f,0x6b,0x64,0x5d,0x59,0x5c,0x5c,0x5a,0x5b,0x54,0x50,0x59,0x65,0x62,0x35,0x2b,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x25,0x3b,0x71,0x77,0x77,0x78,0x76,0x77,0x76,0x6f,0x69,0x70,0x6b,0x65,0x61,0x5d,0x5d,0x5b,0x5d,0x5c,0x5c,0x5b,0x5a,0x59,0x5d,0x65,0x60,0x37,0x2e,0x0d,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x25,0x4c,0x71,0x64,0x69,0x71,0x74,0x74,0x74,0x6c,0x6b,0x62,0x5e,0x5f,0x5d,0x5c,0x5b,0x59,0x5a,0x5b,0x5b,0x5a,0x5a,0x60,0x68,0x5a,0x3b,0x2b,0x08,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x0b,0x34,0x36,0x3c,0x58,0x63,0x71,0x71,0x70,0x65,0x5d,0x5b,0x5c,0x5a,0x5a,0x5b,0x59,0x5a,0x5a,0x59,0x5a,0x5e,0x65,0x63,0x48,0x32,0x24,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x11,0x36,0x64,0x76,0x46,0x50,0x62,0x69,0x62,0x5b,0x5a,0x5b,0x51,0x53,0x5b,0x5c,0x5f,0x60,0x61,0x66,0x67,0x60,0x4e,0x33,0x32,0x14,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x24,0x42,0x8b,0xb7,0x9f,0x89,0x3b,0x53,0x5b,0x59,0x59,0x59,0x5a,0x5e,0x64,0x64,0x67,0x5b,0x5e,0x54,0x4e,0x3f,0x35,0x2d,0x20,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x0b,0x2f,0x3d,0x36,0x3e,0x4a,0x9d,0xc5,0xc5,0xbe,0x96,0x6e,0x3b,0x5a,0x58,0x5a,0x5b,0x64,0x5f,0x4c,0x3a,0x34,0x35,0x34,0x32,0x29,0x23,0x0f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x16,0x44,0x6f,0x9e,0xa5,0xa1,0xc3,0xca,0xc8,0xc7,0xc0,0x9d,0x8a,0x34,0x50,0x57,0x60,0x62,0x48,0x35,0x2b,0x1d,0x17,0x08,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x42,0x89,0xcd,0xd6,0xca,0xca,0xca,0xca,0xca,0xc7,0xaf,0x99,0x60,0x34,0x4b,0x58,0x58,0x3a,0x2f,0x14,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x16,0x48,0xba,0xd1,0xd6,0xc9,0xc9,0xc8,0xca,0xca,0xc0,0xa1,0x78,0x38,0x28,0x36,0x35,0x36,0x24,0x06,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x1e,0x4a,0xb8,0xc2,0xc7,0xc8,0xc6,0xc9,0xca,0xc7,0xaf,0x92,0x41,0x1a,0x00,0x00,0x17,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x13,0x44,0x8f,0xb1,0xb2,0xb4,0xba,0xc8,0xc8,0xc8,0xa5,0x71,0x30,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x37,0x5a,0x8c,0xa8,0x8f,0xb4,0xc7,0xc7,0xc5,0xa5,0x50,0x2a,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x0c,0x37,0x43,0x43,0x46,0xaf,0xc6,0xc8,0xc0,0xa4,0x73,0x2e,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x0f,0x2d,0x43,0xa1,0xb1,0xbd,0xab,0xa1,0x61,0x2b,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x06,0x3d,0x88,0x9d,0xa1,0xa2,0x8f,0x47,0x11,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x24,0x41,0x61,0x8d,0x65,0x44,0x28,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x12,0x30,0x3f,0x32,0x1c,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-
-};
-
-const lv_image_dsc_t BTN_9_mask = {
-  .header.magic = LV_IMAGE_HEADER_MAGIC,
-  .header.cf = LV_COLOR_FORMAT_L8,
-  .header.flags = 0,
-  .header.w = 50,
-  .header.h = 50,
-  .header.stride = 50,
-  .data_size = sizeof(BTN_9_mask_map),
-  .data = BTN_9_mask_map,
-};
-
-
-
-# =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\assets\BTN_9.c
 # =================================================================================================
 
@@ -7759,9 +7705,9 @@ void execute_diymon_action(diymon_action_id_t action_id);
 
 /*
  * Fichero: ./components/diymon_ui/animation_loader.c
- * Fecha: 13/08/2025 - 10:01 
- * Último cambio: Corregido el acceso a miembros de un puntero.
- * Descripción: Se ha corregido un error de sintaxis en nimation_loader_load_frame donde se usaba el operador '.' en lugar de '->' para acceder a los datos de la animación a través de un puntero, lo que causaba un fallo de compilación.
+ * Fecha: 13/08/2025 - 06:06 
+ * Último cambio: Revertido a un búfer no compartido y corregido el cálculo del tamaño para RGB565A8.
+ * Descripción: Se ha corregido el cálculo del tamaño del búfer para el formato RGB565A8 (3 bytes/píxel) y se ha vuelto a un modelo donde cada animación gestiona su propia memoria. El problema de memoria anterior se resolvió moviendo el fondo al firmware, liberando suficiente RAM.
  */
 #include "animation_loader.h"
 #include "esp_log.h"
@@ -7773,14 +7719,6 @@ void execute_diymon_action(diymon_action_id_t action_id);
 static const char *TAG = "ANIM_LOADER";
 #define LVGL_BIN_HEADER_SIZE 12
 
-static void swap_bytes_for_rgb565(uint8_t *data, size_t size) {
-    for (size_t i = 0; i < size; i += 2) {
-        uint8_t temp = data[i];
-        data[i] = data[i + 1];
-        data[i + 1] = temp;
-    }
-}
-
 animation_t animation_loader_init(const char *path, uint16_t width, uint16_t height, uint16_t num_frames) {
     animation_t anim = { 0 };
     anim.base_path = path ? strdup(path) : NULL;
@@ -7788,41 +7726,40 @@ animation_t animation_loader_init(const char *path, uint16_t width, uint16_t hei
     anim.width = width;
     anim.height = height;
     
-    uint32_t line_bytes = width * 2;
-    uint32_t stride = (line_bytes + 3) & ~3;
-    size_t buffer_size = stride * height;
+    // Para RGB565A8, el stride de la parte de color es width * 2.
+    // El tamaño total del buffer es el plano de color (width * height * 2) más el plano alfa (width * height * 1).
+    uint32_t rgb_stride = width * 2; 
+    size_t buffer_size = (size_t)width * height * 3; // Cálculo correcto para 3 bytes por píxel
 
     anim.img_dsc.data = (uint8_t *)malloc(buffer_size);
     if (!anim.img_dsc.data) { 
-        ESP_LOGE(TAG, "Fallo al reservar buffer de animación!");
+        ESP_LOGE(TAG, "Fallo al reservar buffer de animación de tamaño %u!", (unsigned int)buffer_size);
         animation_loader_free(&anim); 
         return anim; 
     }
     
     anim.img_dsc.header.w = width;
     anim.img_dsc.header.h = height;
-    anim.img_dsc.header.stride = stride;
-    anim.img_dsc.header.cf = LV_COLOR_FORMAT_RGB565;
+    anim.img_dsc.header.stride = rgb_stride;
+    anim.img_dsc.header.cf = LV_COLOR_FORMAT_RGB565A8;
     anim.img_dsc.data_size = buffer_size;
     
-    ESP_LOGI(TAG, "Gestor de animación inicializado. Buffer de %d bytes.", (int)buffer_size);
+    ESP_LOGI(TAG, "Gestor de animación inicializado. Buffer de %u bytes.", (unsigned int)buffer_size);
     return anim;
 }
 
 bool animation_loader_load_frame(animation_t *anim, uint16_t frame_index, const char *prefix) {
-    if (!anim || !anim->base_path) return false;
+    if (!anim || !anim->base_path || !anim->img_dsc.data) return false;
     char full_path[128];
     snprintf(full_path, sizeof(full_path), "%s/%s%d.bin", anim->base_path, prefix, frame_index + 1);
 
     FILE *f = fopen(full_path, "rb");
-    if (!f) { return false; } // No logueamos aquí para no spamear durante el conteo.
+    if (!f) { return false; } 
     
     fseek(f, LVGL_BIN_HEADER_SIZE, SEEK_SET);
-    // [CORRECCIÓN] Se usa '->' en lugar de '.' porque 'anim' es un puntero.
     fread((void *)anim->img_dsc.data, 1, anim->img_dsc.data_size, f);
     fclose(f);
 
-    // swap_bytes_for_rgb565((uint8_t *)anim->img_dsc.data, anim->img_dsc.data_size);
     return true;
 }
 
@@ -7839,9 +7776,6 @@ void animation_loader_free(animation_t *anim) {
     anim->frame_count = 0;
 }
 
-/**
- * @brief [IMPLEMENTACIÓN AÑADIDA] Cuenta los ficheros de una animación en un directorio.
- */
 uint16_t animation_loader_count_frames(const char *path, const char *prefix) {
     if (!path || !prefix) {
         return 0;
@@ -7941,9 +7875,9 @@ const lv_img_dsc_t bg_0 = {
 
 /*
  * Fichero: ./components/diymon_ui/BG.h
- * Fecha: 13/08/2025 - 10:50 
+ * Fecha: 13/08/2025 - 05:59 
  * Último cambio: Creación del fichero.
- * Descripción: Declara el descriptor de la imagen de fondo g_0 que está
+ * Descripción: Declara el descriptor de la imagen de fondo `bg_0` que está
  *              definida en BG.c para que sea accesible desde otros módulos.
  */
 #ifndef BG_H
@@ -7995,11 +7929,9 @@ idf_component_register(
 
 /*
  * Fichero: ./components/diymon_ui/diymon_ui_helpers.c
- * Fecha: 13/08/2025 - 11:45 
- * Último cambio: Corregido el tipo de la cabecera de imagen de LVGL.
- * Descripción: Se ha corregido el nombre del tipo de la cabecera de imagen
- *              de 'lv_img_header_t' a 'lv_image_header_t' para que coincida
- *              con la API de LVGL y solucionar el error de compilación.
+ * Fecha: 13/08/2025 - 05:59 
+ * Último cambio: Modificado para usar el fondo de pantalla desde el firmware.
+ * Descripción: Se ha reescrito la función `ui_helpers_load_background` para que utilice el asset `bg_0` compilado en el firmware en lugar de cargarlo desde la tarjeta SD. Se crea un objeto de imagen que se mueve al fondo de la pantalla.
  */
 #include "diymon_ui_helpers.h"
 #include "diymon_evolution.h"
@@ -8008,13 +7940,10 @@ idf_component_register(
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include "BG.h" // Incluir el nuevo asset de fondo
 
 #define SD_MOUNT_POINT "/sdcard"
 static const char* TAG_HELPERS = "UI_HELPERS";
-
-// Buffer global para la imagen de fondo cargada desde la SD
-static uint8_t* g_bg_buffer = NULL;
-static lv_img_dsc_t g_bg_dsc;
 
 // Función interna para obtener el nombre del directorio de evolución (ej: "1.1.1" -> "111")
 static void get_evolution_dir_name(char* dir_name_buffer, size_t buffer_size) {
@@ -8028,72 +7957,25 @@ static void get_evolution_dir_name(char* dir_name_buffer, size_t buffer_size) {
     }
 }
 
-// Construye la ruta a un asset, corrigiendo el caso por defecto.
+// Construye la ruta a un asset de animación en la SD.
 void ui_helpers_build_asset_path(char* buffer, size_t buffer_size, const char* asset_filename) {
     char dir_name[9];
     get_evolution_dir_name(dir_name, sizeof(dir_name));
-
-    if (strncmp(asset_filename, "BTN_", 4) == 0 ||
-        strncmp(asset_filename, "EVO_", 4) == 0) {
-        snprintf(buffer, buffer_size, "%s/buttons/%s", SD_MOUNT_POINT, asset_filename);
-    } else {
-        // Caso por defecto corregido: para todos los demás assets (BG, IDLE, etc.)
-        snprintf(buffer, buffer_size, "%s/DIYMON/%s/%s", SD_MOUNT_POINT, dir_name, asset_filename);
-    }
+    snprintf(buffer, buffer_size, "%s/DIYMON/%s/%s", SD_MOUNT_POINT, dir_name, asset_filename);
 }
 
-// Carga la imagen de fondo desde la SD.
+// Carga la imagen de fondo desde el firmware creando un objeto de imagen.
 void ui_helpers_load_background(lv_obj_t* parent) {
-    char path[128];
-    ui_helpers_build_asset_path(path, sizeof(path), "BG.bin");
-
-    FILE* f = fopen(path, "rb");
-    if (!f) {
-        ESP_LOGE(TAG_HELPERS, "No se pudo abrir el fondo: %s. Se usará fondo negro.", path);
-        lv_obj_set_style_bg_color(parent, lv_color_black(), 0);
-        return;
-    }
-
-    fseek(f, 0, SEEK_END);
-    long size = ftell(f);
-    fseek(f, 0, SEEK_SET);
-
-    if (size <= sizeof(lv_image_header_t)) {
-        ESP_LOGE(TAG_HELPERS, "El fichero de fondo es inválido o está vacío: %s", path);
-        fclose(f);
-        lv_obj_set_style_bg_color(parent, lv_color_black(), 0);
-        return;
-    }
-
-    ui_helpers_free_background_buffer(); // Liberar buffer anterior si existe
-
-    size_t data_size = size - sizeof(lv_image_header_t);
-    g_bg_buffer = (uint8_t*)malloc(data_size);
-    if (!g_bg_buffer) {
-        ESP_LOGE(TAG_HELPERS, "Fallo al reservar %d bytes para el fondo.", (int)data_size);
-        fclose(f);
-        return;
-    }
-
-    fread(&g_bg_dsc.header, 1, sizeof(lv_image_header_t), f);
-    fread(g_bg_buffer, 1, data_size, f);
-    fclose(f);
-
-    g_bg_dsc.data_size = data_size;
-    g_bg_dsc.data = g_bg_buffer;
-    
-    lv_obj_set_style_bg_img_src(parent, &g_bg_dsc, 0);
-    lv_obj_set_style_bg_opa(parent, LV_OPA_COVER, 0);
-    ESP_LOGI(TAG_HELPERS, "Fondo cargado desde %s", path);
+    ESP_LOGI(TAG_HELPERS, "Creando objeto de imagen para el fondo desde firmware.");
+    lv_obj_t *bg_img = lv_image_create(parent);
+    lv_image_set_src(bg_img, &bg_0);
+    lv_obj_set_pos(bg_img, 0, 0); 
+    lv_obj_move_background(bg_img); 
 }
 
-// Libera la memoria del buffer de fondo.
+// La función para liberar el buffer de fondo ya no es necesaria.
 void ui_helpers_free_background_buffer() {
-    if (g_bg_buffer) {
-        free(g_bg_buffer);
-        g_bg_buffer = NULL;
-        ESP_LOGI(TAG_HELPERS, "Buffer de fondo liberado.");
-    }
+    ESP_LOGD(TAG_HELPERS, "ui_helpers_free_background_buffer ya no es necesaria y ha sido ignorada.");
 }
 
 // Implementaciones placeholder para que compile
@@ -8107,10 +7989,9 @@ void ui_helpers_free_gif_buffer() {}
 
 /*
  * Fichero: ./components/diymon_ui/diymon_ui_helpers.h
- * Fecha: 13/08/2025 - 11:39 
- * Último cambio: Limpieza de includes.
- * Descripción: Funciones de ayuda para la interfaz de usuario. Se elimina
- *              el include a 'images.h' que ya no existe.
+ * Fecha: 13/08/2025 - 05:41 
+ * Último cambio: Eliminada la declaración de la función para liberar el buffer de fondo.
+ * Descripción: Funciones de ayuda para la interfaz de usuario. Se elimina la declaración de `ui_helpers_free_background_buffer` ya que el fondo se carga ahora desde el firmware y no requiere un buffer dinámico.
  */
 #ifndef DIYMON_UI_HELPERS_H
 #define DIYMON_UI_HELPERS_H
@@ -8146,22 +8027,6 @@ extern "C" {
 #endif
 
 #endif /*EEZ_LVGL_UI_FONTS_H*/
-
-# =================================================================================================
-# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\images.c
-# =================================================================================================
-
-/*
- * Fichero: ./components/diymon_ui/images.c
- * Fecha: 14/08/2025 - 13:15
- * Descripción: Fichero de anclaje para los assets binarios.
- *              La presencia de este fichero en la lista de fuentes asegura
- *              que el sistema de compilación de ESP-IDF procese
- *              correctamente la variable COMPONENT_EMBED_FILES
- *              y genere los símbolos correspondientes.
- */
-
-// No se necesita código aquí.
 
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\images.h
@@ -8219,11 +8084,9 @@ extern const lv_img_dsc_t EVO_5;
 
 /*
   Fichero: ./components/diymon_ui/screens.c
-  Fecha: 13/08/2025 - 11:45 
-  Último cambio: Simplificada la llamada a ui_idle_animation_start.
-  Descripción: Se actualiza la llamada a la función de inicio de la animación
-               de reposo para que coincida con la nueva firma, que ahora requiere
-               el objeto padre como argumento.
+  Fecha: 13/08/2025 - 06:14 
+  Último cambio: Añadido un retardo de 500ms para reanudar la animación de reposo.
+  Descripción: Se ha implementado un temporizador que espera 500ms después de que el usuario levanta el dedo de la pantalla (LV_EVENT_RELEASED) antes de reanudar la animación de reposo. Cualquier nueva pulsación cancela este temporizador, mejorando la experiencia de usuario durante interacciones rápidas.
 */
 #include "screens.h"
 #include "ui_idle_animation.h"
@@ -8239,6 +8102,7 @@ static const char *TAG = "SCREENS";
 
 static uint8_t g_click_count = 0;
 static lv_timer_t *g_double_click_timer = NULL;
+static lv_timer_t *s_resume_idle_timer = NULL; // Temporizador para reanudar el idle
 
 lv_obj_t *g_idle_animation_obj = NULL;
 lv_obj_t *g_main_screen_obj = NULL;
@@ -8251,6 +8115,12 @@ static void main_screen_event_cb(lv_event_t *e);
 static void double_click_timer_cb(lv_timer_t *timer) {
     g_click_count = 0;
     g_double_click_timer = NULL;
+}
+
+static void resume_idle_timer_cb(lv_timer_t *timer) {
+    ESP_LOGD(TAG, "Temporizador de reanudación de idle disparado.");
+    ui_idle_animation_resume();
+    s_resume_idle_timer = NULL; // El temporizador se auto-elimina (repeat_count=1)
 }
 
 void create_screen_main(void) {
@@ -8276,6 +8146,12 @@ static void main_screen_event_cb(lv_event_t *e) {
 
     switch(code) {
         case LV_EVENT_PRESSED: {
+            // Si hay un temporizador para reanudar el idle, lo cancelamos.
+            if (s_resume_idle_timer) {
+                lv_timer_del(s_resume_idle_timer);
+                s_resume_idle_timer = NULL;
+            }
+
             lv_point_t p;
             lv_indev_get_point(indev, &p);
             touch_start_x = p.x;
@@ -8286,10 +8162,18 @@ static void main_screen_event_cb(lv_event_t *e) {
             }
             break;
         }
-        case LV_EVENT_RELEASED:
+        case LV_EVENT_RELEASED: {
             touch_start_x = -1;
             touch_start_y = -1;
+            
+            // Si la pantalla está encendida y no hay ya un temporizador, creamos uno.
+            if (!screen_manager_is_off() && s_resume_idle_timer == NULL) {
+                 ESP_LOGD(TAG, "Touch released. Starting 500ms timer to resume idle animation.");
+                s_resume_idle_timer = lv_timer_create(resume_idle_timer_cb, 500, NULL);
+                lv_timer_set_repeat_count(s_resume_idle_timer, 1);
+            }
             break;
+        }
         case LV_EVENT_GESTURE: {
             if (!screen_manager_is_off()) { 
                 lv_dir_t dir = lv_indev_get_gesture_dir(indev);
@@ -8312,9 +8196,6 @@ static void main_screen_event_cb(lv_event_t *e) {
                     screen_manager_turn_on();
                     g_click_count = 0;
                 }
-            } else {
-                ESP_LOGD(TAG, "Simple click detected, resuming idle animation.");
-                ui_idle_animation_resume();
             }
             break;
         }
@@ -8332,7 +8213,6 @@ void delete_screen_main(void) {
     ui_idle_animation_stop();
     ui_action_animations_destroy();
     ui_telemetry_destroy();
-    ui_helpers_free_background_buffer();
 }
 
 void create_screens(void) {
@@ -8444,9 +8324,9 @@ extern "C" {
 
 /*
  * Fichero: ./components/diymon_ui/ui_action_animations.c
- * Fecha: 13/08/2025 - 10:04 
- * Último cambio: Ajustada la resolución del búfer de animación a 150x230.
- * Descripción: Gestión de las animaciones de acción. Se ha corregido el tamaño del búfer de animación compartido a 150x230 para que coincida con las dimensiones de los assets de animación, solucionando problemas de visualización y liberando RAM adicional.
+ * Fecha: 13/08/2025 - 07:34 
+ * Último cambio: Reimplementado el búfer de animación compartido.
+ * Descripción: Se restaura el uso de un único búfer de memoria compartido para todas las animaciones (idle y de acción). La memoria se reserva una vez al crear la UI y se libera al destruirla. Esto soluciona el error de memoria insuficiente que ocurría al intentar reservar un nuevo búfer para una animación de acción mientras el de la animación de reposo todavía estaba en uso.
  */
 #include "ui_action_animations.h"
 #include "animation_loader.h"
@@ -8460,7 +8340,7 @@ static const char *TAG = "UI_ACTION_ANIM";
 
 // --- Variables Globales y Estáticas ---
 lv_obj_t *g_animation_img_obj;
-animation_t g_animation_player;
+animation_t g_animation_player; // Player global que contiene el búfer compartido
 
 static lv_timer_t *s_anim_timer;
 static bool s_is_action_in_progress = false;
@@ -8476,7 +8356,7 @@ static const char* get_anim_prefix(diymon_action_id_t action_id);
 // --- Implementación de Funciones Públicas ---
 
 void ui_action_animations_create(lv_obj_t *parent) {
-    // [SOLUCIÓN] Ajustar el tamaño del búfer a la resolución real de la animación.
+    // Reservar el búfer de animación compartido UNA SOLA VEZ.
     g_animation_player = animation_loader_init(NULL, 150, 230, 0);
     if (g_animation_player.img_dsc.data == NULL) {
         ESP_LOGE(TAG, "FALLO CRÍTICO: No se pudo reservar memoria para el búfer de animación compartido.");
@@ -8484,11 +8364,11 @@ void ui_action_animations_create(lv_obj_t *parent) {
     }
     ESP_LOGI(TAG, "Búfer de animación compartido (150x230) pre-reservado correctamente.");
 
-    g_animation_img_obj = lv_img_create(parent);
-    lv_img_set_src(g_animation_img_obj, &g_animation_player.img_dsc);
+    g_animation_img_obj = lv_image_create(parent);
+    lv_image_set_src(g_animation_img_obj, &g_animation_player.img_dsc);
     
     lv_obj_set_style_bg_opa(g_animation_img_obj, LV_OPA_TRANSP, 0);
-    lv_obj_align(g_animation_img_obj, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_align(g_animation_img_obj, LV_ALIGN_BOTTOM_MID, 0, -30);
 }
 
 void ui_action_animations_play(diymon_action_id_t action_id) {
@@ -8517,6 +8397,7 @@ void ui_action_animations_play(diymon_action_id_t action_id) {
     
     ESP_LOGI(TAG, "Reproduciendo animación '%s' (%d fotogramas) a %dms/frame.", prefix, frame_count, FRAME_INTERVAL_MS);
 
+    // Reutilizar el reproductor global, solo actualizar sus propiedades.
     if (g_animation_player.base_path) free(g_animation_player.base_path);
     g_animation_player.base_path = strdup(path_buffer);
     g_animation_player.frame_count = frame_count;
@@ -8564,6 +8445,7 @@ static void animation_finished(void) {
         s_anim_timer = NULL;
     }
     
+    // No liberar el reproductor completo, solo la ruta. El búfer de datos persiste.
     if (g_animation_player.base_path) {
         free(g_animation_player.base_path);
         g_animation_player.base_path = NULL;
@@ -8592,9 +8474,9 @@ static const char* get_anim_prefix(diymon_action_id_t action_id) {
 
 /*
  * Fichero: ./components/diymon_ui/ui_action_animations.h
- * Fecha: 14/08/2025 - 10:00 am
- * Último cambio: Refactorizado para arquitectura de animación compartida.
- * Descripción: Interfaz pública para el módulo de animaciones de acción. Expone el objeto de imagen global y adapta las funciones para operar sobre un búfer de animación compartido.
+ * Fecha: 13/08/2025 - 07:34 
+ * Último cambio: Reintroducida la función para obtener el reproductor de animación compartido.
+ * Descripción: Interfaz pública para el módulo de animaciones de acción. Se vuelve a exponer la función 'ui_action_animations_get_player' para permitir que otros módulos (como el de la animación de reposo) accedan al búfer de animación compartido.
  */
 #ifndef UI_ACTION_ANIMATIONS_H
 #define UI_ACTION_ANIMATIONS_H
@@ -8608,39 +8490,12 @@ extern "C" {
 #endif
 
 // --- OBJETO GLOBAL COMPARTIDO ---
-/**
- * @brief Puntero al objeto de imagen que servirá como "lienzo" para todas las animaciones.
- *        Se define en ui_action_animations.c y se declara aquí para ser accesible
- *        por otros módulos de la UI que necesiten invalidarlo.
- */
 extern lv_obj_t *g_animation_img_obj;
 
-
 // --- FUNCIONES PÚBLICAS ---
-
-/**
- * @brief Crea el objeto de imagen de animación y pre-reserva el búfer de memoria compartido.
- * @param parent El objeto padre sobre el que se creará la imagen.
- */
 void ui_action_animations_create(lv_obj_t *parent);
-
-/**
- * @brief Reproduce una animación de acción, tomando control del búfer compartido.
- * @param action_id El ID de la acción a reproducir (COMER, EJERCICIO, ATACAR).
- */
 void ui_action_animations_play(diymon_action_id_t action_id);
-
-/**
- * @brief Libera el búfer de memoria compartido y otros recursos.
- *        Debe llamarse cuando la pantalla se destruye para evitar fugas de memoria.
- */
 void ui_action_animations_destroy(void);
-
-/**
- * @brief Obtiene un puntero al reproductor de animación que contiene el búfer compartido.
- *        Necesario para que el módulo de animación de reposo (idle) pueda usar el mismo búfer.
- * @return Puntero a la estructura de animación compartida.
- */
 animation_t* ui_action_animations_get_player(void);
 
 #ifdef __cplusplus
@@ -8649,17 +8504,16 @@ animation_t* ui_action_animations_get_player(void);
 
 #endif // UI_ACTION_ANIMATIONS_H
 
+
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_actions_panel.c
 # =================================================================================================
 
 /*
   Fichero: ./components/diymon_ui/ui_actions_panel.c
-  Fecha: 13/08/2025 - 08:30 
-  Último cambio: Corregidas las funciones de chroma key a la API de LVGL v9.
-  Descripción: Se ha modificado la creación de botones para asegurar que su fondo sea
-               completamente transparente. Se habilita la transparencia por chroma key para el asset 
-               ASSET_ICON_CONFIG_PLACEHOLDER, usando las funciones correctas de LVGL v9 (lv_obj_set_style_img_chroma_keyed).
+  Fecha: 13/08/2025 - 06:17 
+  Último cambio: Implementada la navegación circular de paneles.
+  Descripción: Se ha añadido lógica para que, al hacer un gesto de deslizar hacia abajo en el último panel (Configuración), se oculte este y se muestre el primer panel (Jugador), creando un bucle de navegación.
 */
 #include "ui_actions_panel.h"
 #include "ui_asset_loader.h"
@@ -8714,7 +8568,6 @@ static lv_obj_t* create_top_action_button(lv_obj_t *parent, ui_asset_id_t asset_
     lv_obj_remove_style_all(btn); // Eliminar estilos por defecto
     lv_obj_set_size(btn, BUTTON_SIZE, BUTTON_SIZE);
     
-    // Forzar transparencia total para el fondo, borde y sombra en todos los estados.
     lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, LV_STATE_ANY);
     lv_obj_set_style_border_width(btn, 0, LV_STATE_ANY);
     lv_obj_set_style_shadow_width(btn, 0, LV_STATE_ANY);
@@ -8734,7 +8587,6 @@ static lv_obj_t* create_side_action_button(lv_obj_t *parent, ui_asset_id_t asset
     lv_obj_remove_style_all(btn); // Eliminar estilos por defecto
     lv_obj_set_size(btn, BUTTON_SIZE, BUTTON_SIZE);
 
-    // Forzar transparencia total para el fondo, borde y sombra en todos los estados.
     lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, LV_STATE_ANY);
     lv_obj_set_style_border_width(btn, 0, LV_STATE_ANY);
     lv_obj_set_style_shadow_width(btn, 0, LV_STATE_ANY);
@@ -8970,7 +8822,11 @@ void ui_actions_panel_handle_gesture(lv_dir_t dir, lv_coord_t start_x, lv_coord_
             break;
             
         case PANEL_STATE_CONFIG_VISIBLE:
-            if (dir == LV_DIR_TOP) {
+             if (dir == LV_DIR_BOTTOM) { // Navegación circular
+                animate_panel_out_top(s_config_btns);
+                animate_panel_in_top(s_player_btns);
+                s_panel_state = PANEL_STATE_PLAYER_VISIBLE;
+            } else if (dir == LV_DIR_TOP) {
                 animate_panel_out_top(s_config_btns);
                 s_panel_state = PANEL_STATE_HIDDEN;
                 ui_idle_animation_resume();
@@ -9167,15 +9023,12 @@ const lv_img_dsc_t* ui_assets_get_icon(ui_asset_id_t asset_id);
 
 /*
  * Fichero: ./components/diymon_ui/ui_idle_animation.c
- * Fecha: 13/08/2025 - 01:49 
- * Último cambio: Cambiado el prefijo de la animación de idle a 'ANIM_IDLE_'.
- * Descripción: Implementación de la animación de reposo. Se corrige la firma de
- *              la función 'ui_idle_animation_start' para que coincida con su
- *              declaración, aceptando un objeto padre y devolviendo el objeto
- *              de animación creado, resolviendo así el error de compilación.
+ * Fecha: 13/08/2025 - 07:39 
+ * Último cambio: Eliminada la llamada que movía la animación al fondo.
+ * Descripción: Se ha eliminado la llamada a lv_obj_move_background para el objeto de animación. Esta llamada estaba causando que la animación se renderizara detrás de la imagen de fondo opaca, haciéndola invisible. El orden de creación correcto ya asegura que la animación esté en la capa correcta.
  */
 #include "ui_idle_animation.h"
-#include "ui_action_animations.h" // Necesario para obtener el reproductor compartido
+#include "ui_action_animations.h" 
 #include "animation_loader.h"
 #include "diymon_ui_helpers.h"
 #include "esp_log.h"
@@ -9188,19 +9041,19 @@ static const char *TAG = "UI_IDLE_ANIM";
 #define IDLE_ANIM_FRAME_COUNT 3
 #define IDLE_FRAME_INTERVAL 1500
 
-// Variables estáticas para la gestión de la animación de reposo
 static lv_timer_t *g_anim_timer;
-static animation_t g_idle_animation_player; // Player local que usa el búfer compartido
+static animation_t s_idle_animation_player; // Player local, pero usará un búfer compartido
 static int g_current_frame_index = -1;
+static bool g_is_idle_running = false;
 
 static void idle_animation_timer_cb(lv_timer_t *timer) {
-    if (g_idle_animation_player.frame_count == 0) return;
+    if (!g_is_idle_running || s_idle_animation_player.frame_count == 0) return;
     
-    g_current_frame_index = (g_current_frame_index + 1) % g_idle_animation_player.frame_count;
+    g_current_frame_index = (g_current_frame_index + 1) % s_idle_animation_player.frame_count;
     
-    if (animation_loader_load_frame(&g_idle_animation_player, g_current_frame_index, "ANIM_IDLE_")) {
-        // g_animation_img_obj es el objeto global declarado en ui_action_animations.h
+    if (animation_loader_load_frame(&s_idle_animation_player, g_current_frame_index, "ANIM_IDLE_")) {
         if (g_animation_img_obj) {
+            lv_image_set_src(g_animation_img_obj, &s_idle_animation_player.img_dsc);
             lv_obj_invalidate(g_animation_img_obj);
         }
     }
@@ -9213,53 +9066,64 @@ lv_obj_t* ui_idle_animation_start(lv_obj_t *parent) {
         return NULL;
     }
 
-    g_idle_animation_player.img_dsc = shared_player->img_dsc;
+    // Copiar el descriptor, que incluye el puntero al búfer compartido.
+    s_idle_animation_player.img_dsc = shared_player->img_dsc;
 
     char anim_path[128];
     ui_helpers_build_asset_path(anim_path, sizeof(anim_path), "");
     size_t len = strlen(anim_path);
     if (len > 0 && anim_path[len - 1] == '/') anim_path[len - 1] = '\0';
     
-    g_idle_animation_player.base_path = strdup(anim_path);
-    g_idle_animation_player.frame_count = IDLE_ANIM_FRAME_COUNT;
+    s_idle_animation_player.base_path = strdup(anim_path);
+    s_idle_animation_player.frame_count = IDLE_ANIM_FRAME_COUNT;
 
-    // g_animation_img_obj es el objeto de imagen compartido. Lo usamos para mostrar la animación.
-    // Ya fue creado en ui_action_animations_create, así que no lo creamos de nuevo.
-    // Solo nos aseguramos de que sea visible y esté en el fondo.
+    // El objeto de imagen ya existe, solo nos aseguramos de que apunte a nuestros datos.
     if(g_animation_img_obj) {
-        lv_obj_move_background(g_animation_img_obj);
+        lv_image_set_src(g_animation_img_obj, &s_idle_animation_player.img_dsc);
     }
     
+    g_is_idle_running = true;
     g_anim_timer = lv_timer_create(idle_animation_timer_cb, IDLE_FRAME_INTERVAL, NULL);
     lv_timer_ready(g_anim_timer);
     
     ESP_LOGI(TAG, "Animación de Idle iniciada desde %s (usando búfer compartido).", anim_path);
-    return g_animation_img_obj; // Devolvemos el puntero al objeto de imagen compartido
+    return g_animation_img_obj;
 }
 
 void ui_idle_animation_stop(void) {
     ESP_LOGI(TAG, "Deteniendo y limpiando animación de idle.");
+    g_is_idle_running = false;
     if (g_anim_timer) {
         lv_timer_del(g_anim_timer);
         g_anim_timer = NULL;
     }
-    if (g_idle_animation_player.base_path) {
-        free(g_idle_animation_player.base_path);
-        g_idle_animation_player.base_path = NULL;
+    // Solo liberar la ruta, no el búfer de datos que es compartido.
+    if (s_idle_animation_player.base_path) {
+        free(s_idle_animation_player.base_path);
+        s_idle_animation_player.base_path = NULL;
     }
     g_current_frame_index = -1;
 }
 
 void ui_idle_animation_pause(void) {
-    if (g_anim_timer) {
+    if (g_anim_timer && g_is_idle_running) {
         lv_timer_pause(g_anim_timer);
+        g_is_idle_running = false;
         ESP_LOGI(TAG, "Animación de Idle PAUSADA.");
     }
 }
 
 void ui_idle_animation_resume(void) {
-    if (g_anim_timer) {
+    if (g_anim_timer && !g_is_idle_running) {
+        // Asegurarse de que el objeto de imagen apunta al descriptor de la animación de reposo
+        if (g_animation_img_obj) {
+             lv_image_set_src(g_animation_img_obj, &s_idle_animation_player.img_dsc);
+        }
+        
+        g_is_idle_running = true;
         lv_timer_resume(g_anim_timer);
+        // Forzar una actualización inmediata para mostrar el idle en lugar del último frame de la acción
+        idle_animation_timer_cb(g_anim_timer);
         ESP_LOGI(TAG, "Animación de Idle REANUDADA.");
     }
 }
@@ -9376,12 +9240,9 @@ extern objects_t objects;
 
 /*
   Fichero: ./components/diymon_ui/ui_telemetry.c
-  Fecha: 13/08/2025 - 12:19 
-  Último cambio: Invertidos los colores y movidos los labels a la esquina inferior.
-  Descripción: Se ha modificado el estilo de los labels de telemetría para que tengan
-               texto negro sobre fondo blanco semitransparente. Además, se han realineado
-               todos los elementos en la esquina inferior izquierda de la pantalla para
-               mejorar la visibilidad de la animación principal.
+  Fecha: 13/08/2025 - 06:30 
+  Último cambio: Simplificado para mostrar únicamente el nivel de batería.
+  Descripción: Se ha refactorizado el módulo de telemetría para eliminar la lectura y visualización de los datos del acelerómetro y giroscopio. Ahora, solo se actualiza el indicador de batería, reduciendo la carga de procesamiento y la frecuencia de redibujado de la pantalla.
 */
 #include "ui_telemetry.h"
 #include "bsp_api.h"
@@ -9394,87 +9255,55 @@ static const char *TAG = "UI_TELEMETRY";
 
 // --- Constantes de configuración ---
 #define TELEMETRY_UPDATE_INTERVAL_MS 10000
-#define SHAKE_THRESHOLD_G            2.5f
 #define MIN_BAT_V                    3.0f
 #define MAX_BAT_V                    4.2f
 
 // --- Variables estáticas del módulo ---
 static lv_obj_t *s_battery_label;
-static lv_obj_t *s_orientation_label;
-static lv_obj_t *s_accel_label;
 static lv_timer_t *s_telemetry_timer;
 
 /**
  * @brief Callback del temporizador que actualiza los datos de telemetría en la pantalla.
  */
 static void telemetry_update_timer_cb(lv_timer_t *timer) {
-    float acc[3], gyro[3];
     float voltage;
 
     // Proteger el acceso I2C con el mutex de LVGL
     if (lvgl_port_lock(0)) {
-        bsp_imu_read(acc, gyro);
         bsp_battery_get_voltage(&voltage, NULL);
         lvgl_port_unlock();
     } else {
         return; // No se pudo obtener el mutex, reintentar en el próximo ciclo
     }
 
-    // 1. Procesar y mostrar datos de batería
+    // Procesar y mostrar datos de batería
     float percentage = 100.0f * (voltage - MIN_BAT_V) / (MAX_BAT_V - MIN_BAT_V);
     if (percentage > 100.0f) percentage = 100.0f;
     if (percentage < 0.0f) percentage = 0.0f;
     lv_label_set_text_fmt(s_battery_label, LV_SYMBOL_BATTERY_FULL " %d%%", (int)percentage);
-
-    // 2. Procesar y mostrar datos de aceleración
-    float magnitude = sqrt(acc[0] * acc[0] + acc[1] * acc[1] + acc[2] * acc[2]);
-    lv_label_set_text_fmt(s_accel_label, LV_SYMBOL_CHARGE " %.2f m/s2", magnitude);
-
-    // 3. Procesar y mostrar datos de orientación
-    float roll = atan2(acc[1], acc[2]) * 180.0 / M_PI;
-    float pitch = atan2(-acc[0], sqrt(acc[1] * acc[1] + acc[2] * acc[2])) * 180.0 / M_PI;
-    lv_label_set_text_fmt(s_orientation_label, LV_SYMBOL_SETTINGS " R:%.0f P:%.0f", roll, pitch);
-
-    // 4. Lógica de 'shake-to-wake'
-    if (screen_manager_is_off() && (magnitude > (SHAKE_THRESHOLD_G * 9.81f))) {
-        ESP_LOGI(TAG, "Shake detectado por sondeo (magnitud: %.2f > %.2f). Encendiendo pantalla.", magnitude, SHAKE_THRESHOLD_G * 9.81f);
-        if (lvgl_port_lock(0)) {
-            screen_manager_turn_on();
-            lvgl_port_unlock();
-        }
-    }
 }
 
 void ui_telemetry_create(lv_obj_t *parent) {
-    // Estilo para los labels de telemetría (colores invertidos)
+    // Estilo para el label de telemetría
     static lv_style_t style_telemetry;
     lv_style_init(&style_telemetry);
     lv_style_set_text_color(&style_telemetry, lv_color_black());
     lv_style_set_text_font(&style_telemetry, &lv_font_montserrat_14);
     lv_style_set_bg_color(&style_telemetry, lv_color_white());
-    lv_style_set_bg_opa(&style_telemetry, LV_OPA_70); // Un poco más opaco para legibilidad
+    lv_style_set_bg_opa(&style_telemetry, LV_OPA_70);
     lv_style_set_radius(&style_telemetry, 5);
     lv_style_set_pad_all(&style_telemetry, 5);
 
-    // Crear los tres labels en la esquina inferior
-    s_orientation_label = lv_label_create(parent);
-    lv_obj_add_style(s_orientation_label, &style_telemetry, 0);
-    lv_obj_align(s_orientation_label, LV_ALIGN_BOTTOM_LEFT, 5, -5);
-    lv_label_set_text(s_orientation_label, LV_SYMBOL_SETTINGS " R:-- P:--");
-
+    // Crear únicamente el label de la batería
     s_battery_label = lv_label_create(parent);
     lv_obj_add_style(s_battery_label, &style_telemetry, 0);
-    lv_obj_align_to(s_battery_label, s_orientation_label, LV_ALIGN_OUT_TOP_LEFT, 0, -5);
+    lv_obj_align(s_battery_label, LV_ALIGN_BOTTOM_LEFT, 5, -5);
     lv_label_set_text(s_battery_label, LV_SYMBOL_BATTERY_FULL " --%");
-
-    s_accel_label = lv_label_create(parent);
-    lv_obj_add_style(s_accel_label, &style_telemetry, 0);
-    lv_obj_align_to(s_accel_label, s_battery_label, LV_ALIGN_OUT_RIGHT_MID, 10, 0);
-    lv_label_set_text(s_accel_label, LV_SYMBOL_CHARGE " -- m/s2");
     
     // Crear y lanzar el temporizador
     s_telemetry_timer = lv_timer_create(telemetry_update_timer_cb, TELEMETRY_UPDATE_INTERVAL_MS, NULL);
-    ESP_LOGI(TAG, "Módulo de telemetría de UI creado.");
+    telemetry_update_timer_cb(s_telemetry_timer); // Llamada inicial para poblar el campo
+    ESP_LOGI(TAG, "Módulo de telemetría de UI (solo batería) creado.");
 }
 
 void ui_telemetry_destroy(void) {
@@ -9531,12 +9360,9 @@ void ui_telemetry_destroy(void);
 
 /*
   Fichero: ./components/diymon_ui/ui.c
-  Fecha: 12/08/2025 - 14:00
-  Último cambio: Corregida la llamada para registrar el evento del botón de modo configuración.
-  Descripción: Orquestador principal de la UI. Se actualiza la función 
-               `ui_connect_actions` para usar el nuevo nombre de la función `get`
-               y el nuevo ID de acción, completando la refactorización del modo
-               FTP a modo de configuración web.
+  Fecha: $timestamp
+  Último cambio: Modificado el evento de activación de los botones de acción del jugador.
+  Descripción: Se ha modificado el callback de los botones para que las acciones del jugador (Comer, Ejercicio, Atacar) se disparen con el evento `LV_EVENT_PRESSED` (al pulsar), mientras que el resto de acciones siguen esperando a `LV_EVENT_CLICKED` (al soltar). Esto proporciona una respuesta más inmediata para las acciones principales.
 */
 #include "ui.h"
 #include "screens.h"
@@ -9553,9 +9379,20 @@ static void button_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     diymon_action_id_t action_id = (diymon_action_id_t)(intptr_t)lv_event_get_user_data(e);
     
-    if (code == LV_EVENT_CLICKED || code == LV_EVENT_LONG_PRESSED) {
-        ESP_LOGI(TAG, "Evento de botón detectado para la acción ID: %d", action_id);
-        execute_diymon_action(action_id);
+    bool is_player_action = (action_id >= ACTION_ID_COMER && action_id <= ACTION_ID_ATACAR);
+
+    // Acciones del jugador se ejecutan al presionar para una respuesta inmediata.
+    if (is_player_action) {
+        if (code == LV_EVENT_PRESSED) {
+            ESP_LOGI(TAG, "Evento de botón PRESSED para la acción de jugador ID: %d", action_id);
+            execute_diymon_action(action_id);
+        }
+    // El resto de acciones esperan al clic completo para evitar activaciones accidentales.
+    } else {
+        if (code == LV_EVENT_CLICKED || code == LV_EVENT_LONG_PRESSED) {
+            ESP_LOGI(TAG, "Evento de botón CLICK/LONG_PRESS para la acción ID: %d", action_id);
+            execute_diymon_action(action_id);
+        }
     }
 }
 
@@ -14071,10 +13908,9 @@ void wifi_portal_erase_credentials(void);
 # =================================================================================================
 
 # Fichero: ./main/CMakeLists.txt
-# Fecha: 12/08/2025 - 13:00
-# Último cambio: Actualizadas las dependencias para usar el nuevo servidor web.
-# Descripción: Se elimina la dependencia del componente `ftp_server` y se añade
-#              la dependencia del nuevo componente `web_server`.
+# Fecha: 13/08/2025 - 05:44 
+# Último cambio: Eliminada la dependencia de iot_button.
+# Descripción: Se ha eliminado la dependencia del componente iot_button que ya no es necesario después de limpiar el código de ejemplo de main.c.
 
 idf_component_register(
     SRCS 
@@ -14097,15 +13933,16 @@ idf_component_register(
         driver
 )
 
+
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\main\hardware_manager.c
 # =================================================================================================
 
 /*
  * Fichero: ./main/hardware_manager.c
- * Fecha: 13/08/2025 - 08:03 
- * Último cambio: Habilitado el intercambio de bytes en el port de LVGL.
- * Descripción: Orquestador de hardware. Se habilita el flag 'swap_bytes' en la configuración de LVGL para corregir el orden de los bytes de color en la pantalla. Esto soluciona problemas visuales con colores incorrectos en todos los elementos de la UI.
+ * Fecha: 13/08/2025 - 05:33 
+ * Último cambio: Establecido el formato de color del display a RGB565.
+ * Descripción: Orquestador de hardware. Se ha añadido la llamada lv_display_set_color_format para configurar explícitamente el display en modo RGB565. Esto es crucial para que LVGL v9 realice correctamente la mezcla de canales alfa de las imágenes RGB565A8.
  */
 #include "hardware_manager.h"
 #include "esp_log.h"
@@ -14134,6 +13971,9 @@ esp_err_t hardware_manager_init(void) {
         }
     };
     lv_disp_t * disp = lvgl_port_add_disp(&disp_cfg);
+
+    // Configura el formato de color del framebuffer para la correcta mezcla de alpha.
+    lv_display_set_color_format(disp, LV_COLOR_FORMAT_RGB565);
 
     /*
      * Configuración de la orientación del panel táctil.
@@ -14208,9 +14048,9 @@ esp_err_t hardware_manager_init(void);
 
 /*
  * Fichero: ./main/main.c
- * Fecha: 13/08/2025 - 01:52 
- * Último cambio: Eliminada la llamada a la función lv_fs_fatfs_init no definida.
- * Descripción: Fichero principal de la aplicación DIYMON. Se ha eliminado la llamada a lv_fs_fatfs_init() y su prototipo. El acceso a la SD para cargar recursos se gestionará con funciones estándar de C, volviendo a un enfoque más estable que no depende de la integración directa de LVGL con FatFS.
+ * Fecha: 13/08/2025 - 05:44 
+ * Último cambio: Refactorizado para eliminar código de ejemplo obsoleto.
+ * Descripción: Fichero principal de la aplicación DIYMON. Se ha eliminado todo el código de ejemplo relacionado con lv_demos, 	ouch_test y la inicialización manual de periféricos en pp_main. La lógica ahora está centralizada en los modos de operación (aplicación principal, portal wifi, servidor de configuración) y los gestores de hardware y UI. Esto resuelve el error de compilación utton_gpio.h: No such file or directory.
 */
 #include <stdio.h>
 #include <string.h>
@@ -14233,6 +14073,9 @@ esp_err_t hardware_manager_init(void);
 #include "web_server.h"
 #include "screen_manager.h"
 #include "service_screen.h"
+
+#include "esp_err.h"
+#include "esp_check.h"
 
 static const char *TAG = "DIYMON_MAIN";
 
