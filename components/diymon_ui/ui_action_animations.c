@@ -1,8 +1,8 @@
 /*
  * Fichero: ./components/diymon_ui/ui_action_animations.c
- * Fecha: 13/08/2025 - 06:21 
- * Último cambio: Desplazada la animación 30 píxeles hacia arriba.
- * Descripción: Se ha modificado el alineamiento del objeto de imagen de la animación para desplazarlo 30 píxeles hacia arriba, mejorando su posición en la pantalla.
+ * Fecha: 13/08/2025 - 07:34 
+ * Último cambio: Reimplementado el búfer de animación compartido.
+ * Descripción: Se restaura el uso de un único búfer de memoria compartido para todas las animaciones (idle y de acción). La memoria se reserva una vez al crear la UI y se libera al destruirla. Esto soluciona el error de memoria insuficiente que ocurría al intentar reservar un nuevo búfer para una animación de acción mientras el de la animación de reposo todavía estaba en uso.
  */
 #include "ui_action_animations.h"
 #include "animation_loader.h"
@@ -16,7 +16,7 @@ static const char *TAG = "UI_ACTION_ANIM";
 
 // --- Variables Globales y Estáticas ---
 lv_obj_t *g_animation_img_obj;
-static animation_t s_animation_player; // Player local para esta animación
+animation_t g_animation_player; // Player global que contiene el búfer compartido
 
 static lv_timer_t *s_anim_timer;
 static bool s_is_action_in_progress = false;
@@ -32,14 +32,27 @@ static const char* get_anim_prefix(diymon_action_id_t action_id);
 // --- Implementación de Funciones Públicas ---
 
 void ui_action_animations_create(lv_obj_t *parent) {
-    // Solo crea el objeto de imagen. El buffer se gestionará por animación.
+    // Reservar el búfer de animación compartido UNA SOLA VEZ.
+    g_animation_player = animation_loader_init(NULL, 150, 230, 0);
+    if (g_animation_player.img_dsc.data == NULL) {
+        ESP_LOGE(TAG, "FALLO CRÍTICO: No se pudo reservar memoria para el búfer de animación compartido.");
+        return;
+    }
+    ESP_LOGI(TAG, "Búfer de animación compartido (150x230) pre-reservado correctamente.");
+
     g_animation_img_obj = lv_image_create(parent);
+    lv_image_set_src(g_animation_img_obj, &g_animation_player.img_dsc);
+    
     lv_obj_set_style_bg_opa(g_animation_img_obj, LV_OPA_TRANSP, 0);
     lv_obj_align(g_animation_img_obj, LV_ALIGN_BOTTOM_MID, 0, -30);
 }
 
 void ui_action_animations_play(diymon_action_id_t action_id) {
     if (s_is_action_in_progress || action_id >= ACTION_ID_COUNT) return;
+    if (g_animation_player.img_dsc.data == NULL) {
+        ESP_LOGE(TAG, "No se puede iniciar la animación: el búfer compartido no está disponible.");
+        return;
+    }
 
     s_is_action_in_progress = true;
     
@@ -60,17 +73,13 @@ void ui_action_animations_play(diymon_action_id_t action_id) {
     
     ESP_LOGI(TAG, "Reproduciendo animación '%s' (%d fotogramas) a %dms/frame.", prefix, frame_count, FRAME_INTERVAL_MS);
 
-    s_animation_player = animation_loader_init(path_buffer, 150, 230, frame_count);
-    if(s_animation_player.img_dsc.data == NULL) {
-        ESP_LOGE(TAG, "No se pudo crear el reproductor para la animación de acción.");
-        animation_finished();
-        return;
-    }
-    
-    lv_image_set_src(g_animation_img_obj, &s_animation_player.img_dsc);
+    // Reutilizar el reproductor global, solo actualizar sus propiedades.
+    if (g_animation_player.base_path) free(g_animation_player.base_path);
+    g_animation_player.base_path = strdup(path_buffer);
+    g_animation_player.frame_count = frame_count;
 
     s_current_frame_index = 0;
-    if (animation_loader_load_frame(&s_animation_player, s_current_frame_index, prefix)) {
+    if (animation_loader_load_frame(&g_animation_player, s_current_frame_index, prefix)) {
         lv_obj_invalidate(g_animation_img_obj);
         s_anim_timer = lv_timer_create(animation_timer_cb, FRAME_INTERVAL_MS, (void*)(intptr_t)action_id);
     } else {
@@ -80,12 +89,17 @@ void ui_action_animations_play(diymon_action_id_t action_id) {
 }
 
 void ui_action_animations_destroy(void) {
-    // La limpieza se hace en animation_finished al terminar cada animación
+    ESP_LOGI(TAG, "Liberando búfer de animación compartido.");
+    animation_loader_free(&g_animation_player);
+}
+
+animation_t* ui_action_animations_get_player(void) {
+    return &g_animation_player;
 }
 
 static void animation_timer_cb(lv_timer_t *timer) {
     s_current_frame_index++;
-    if (s_current_frame_index >= s_animation_player.frame_count) {
+    if (s_current_frame_index >= g_animation_player.frame_count) {
         animation_finished();
         return;
     }
@@ -93,7 +107,7 @@ static void animation_timer_cb(lv_timer_t *timer) {
     diymon_action_id_t action_id = (diymon_action_id_t)(intptr_t)timer->user_data;
     const char *prefix = get_anim_prefix(action_id);
 
-    if (animation_loader_load_frame(&s_animation_player, s_current_frame_index, prefix)) {
+    if (animation_loader_load_frame(&g_animation_player, s_current_frame_index, prefix)) {
         lv_obj_invalidate(g_animation_img_obj);
     } else {
         ESP_LOGW(TAG, "No se pudo cargar el fotograma %d para %s. Finalizando animación.", s_current_frame_index + 1, prefix);
@@ -107,7 +121,12 @@ static void animation_finished(void) {
         s_anim_timer = NULL;
     }
     
-    animation_loader_free(&s_animation_player);
+    // No liberar el reproductor completo, solo la ruta. El búfer de datos persiste.
+    if (g_animation_player.base_path) {
+        free(g_animation_player.base_path);
+        g_animation_player.base_path = NULL;
+    }
+    g_animation_player.frame_count = 0;
     
     ui_idle_animation_resume();
     

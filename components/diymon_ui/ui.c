@@ -1,11 +1,8 @@
 /*
   Fichero: ./components/diymon_ui/ui.c
-  Fecha: 12/08/2025 - 14:00
-  Último cambio: Corregida la llamada para registrar el evento del botón de modo configuración.
-  Descripción: Orquestador principal de la UI. Se actualiza la función 
-               `ui_connect_actions` para usar el nuevo nombre de la función `get`
-               y el nuevo ID de acción, completando la refactorización del modo
-               FTP a modo de configuración web.
+  Fecha: 13/08/2025 - 07:34 
+  Último cambio: Modificado el evento de activación de los botones de acción del jugador.
+  Descripción: Se ha modificado el callback de los botones para que las acciones del jugador (Comer, Ejercicio, Atacar) se disparen con el evento 'LV_EVENT_PRESSED' (al pulsar), mientras que el resto de acciones siguen esperando a 'LV_EVENT_CLICKED' (al soltar). Esto proporciona una respuesta más inmediata para las acciones principales.
 */
 #include "ui.h"
 #include "screens.h"
@@ -22,9 +19,20 @@ static void button_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     diymon_action_id_t action_id = (diymon_action_id_t)(intptr_t)lv_event_get_user_data(e);
     
-    if (code == LV_EVENT_CLICKED || code == LV_EVENT_LONG_PRESSED) {
-        ESP_LOGI(TAG, "Evento de botón detectado para la acción ID: %d", action_id);
-        execute_diymon_action(action_id);
+    bool is_player_action = (action_id >= ACTION_ID_COMER && action_id <= ACTION_ID_ATACAR);
+
+    // Acciones del jugador se ejecutan al presionar para una respuesta inmediata.
+    if (is_player_action) {
+        if (code == LV_EVENT_PRESSED) {
+            ESP_LOGI(TAG, "Evento de botón PRESSED para la acción de jugador ID: %d", action_id);
+            execute_diymon_action(action_id);
+        }
+    // El resto de acciones esperan al clic completo para evitar activaciones accidentales.
+    } else {
+        if (code == LV_EVENT_CLICKED || code == LV_EVENT_LONG_PRESSED) {
+            ESP_LOGI(TAG, "Evento de botón CLICK/LONG_PRESS para la acción ID: %d", action_id);
+            execute_diymon_action(action_id);
+        }
     }
 }
 
