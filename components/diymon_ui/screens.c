@@ -1,14 +1,16 @@
 /*
   Fichero: ./components/diymon_ui/screens.c
-  Fecha: 13/08/2025 - 09:47 
-  Último cambio: Reordenada la inicialización para priorizar la reserva del búfer de animación.
-  Descripción: Se ha cambiado el orden de las llamadas en create_screen_main. Ahora se crea primero el búfer de animación compartido y LUEGO se carga el fondo. Esto asegura que la memoria más crítica (la de animación) se reserve primero, solucionando el fallo de malloc.
+  Fecha: 13/08/2025 - 11:45 
+  Último cambio: Simplificada la llamada a ui_idle_animation_start.
+  Descripción: Se actualiza la llamada a la función de inicio de la animación
+               de reposo para que coincida con la nueva firma, que ahora requiere
+               el objeto padre como argumento.
 */
 #include "screens.h"
 #include "ui_idle_animation.h"
 #include "ui_actions_panel.h"
 #include "ui_action_animations.h"
-#include "ui_telemetry.h" 
+#include "ui_telemetry.h"
 #include "diymon_ui_helpers.h"
 #include "esp_log.h"
 #include "bsp_api.h"
@@ -16,10 +18,10 @@
 
 static const char *TAG = "SCREENS";
 
-// --- Variables para la detección manual de doble toque ---
 static uint8_t g_click_count = 0;
 static lv_timer_t *g_double_click_timer = NULL;
 
+lv_obj_t *g_idle_animation_obj = NULL;
 lv_obj_t *g_main_screen_obj = NULL;
 
 static lv_coord_t touch_start_x = -1;
@@ -39,16 +41,12 @@ void create_screen_main(void) {
     lv_obj_add_flag(g_main_screen_obj, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(g_main_screen_obj, main_screen_event_cb, LV_EVENT_ALL, NULL);
 
-    // [CORRECCIÓN] 1. Reservar el búfer de animación persistente PRIMERO.
-    ui_action_animations_create(g_main_screen_obj);
-    
-    // 2. Cargar el fondo (que usa un búfer temporal y lo libera).
     ui_helpers_load_background(g_main_screen_obj);
-    
-    // 3. Crear el resto de elementos que usarán el búfer de animación ya reservado.
-    ui_idle_animation_start();
+
+    ui_action_animations_create(g_main_screen_obj);
+    g_idle_animation_obj = ui_idle_animation_start(g_main_screen_obj);
     ui_actions_panel_create(g_main_screen_obj);
-    ui_telemetry_create(g_main_screen_obj); 
+    ui_telemetry_create(g_main_screen_obj);
 
     ESP_LOGI(TAG, "Pantalla principal creada delegando en módulos.");
 }
@@ -110,10 +108,11 @@ void delete_screen_main(void) {
     if (g_main_screen_obj) {
         lv_obj_del(g_main_screen_obj);
         g_main_screen_obj = NULL;
+        g_idle_animation_obj = NULL;
     }
     ui_idle_animation_stop();
     ui_action_animations_destroy();
-    ui_telemetry_destroy(); 
+    ui_telemetry_destroy();
     ui_helpers_free_background_buffer();
 }
 

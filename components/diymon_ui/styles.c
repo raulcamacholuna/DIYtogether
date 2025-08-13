@@ -1,9 +1,8 @@
 /*
  * Fichero: ./components/diymon_ui/styles.c
- * Fecha: 13/08/2025 - 11:27 
- * Último cambio: Eliminado el include obsoleto a images.h.
- * Descripción: Limpieza del fichero de estilos. Se elimina un comentario
- *              que hacía referencia a un fichero de imágenes inexistente.
+ * Fecha: 13/08/2025 - 11:39 
+ * Último cambio: Limpieza de comentarios.
+ * Descripción: Fichero para la inicialización de estilos de LVGL.
  */
 #include "styles.h"
 #include "lvgl.h"

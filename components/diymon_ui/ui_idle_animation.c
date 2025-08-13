@@ -1,11 +1,14 @@
 /*
  * Fichero: ./components/diymon_ui/ui_idle_animation.c
- * Fecha: 13/08/2025 - 09:34 
- * Último cambio: Refactorizado para usar el objeto de imagen y búfer compartidos.
- * Descripción: La animación de reposo ya no crea su propio objeto de imagen. En su lugar, utiliza el g_animation_img_obj global creado por el módulo de animaciones de acción. Esto soluciona conflictos de renderizado y asegura el uso de un único búfer de memoria.
+ * Fecha: 13/08/2025 - 11:45 
+ * Último cambio: Corregida la firma de la función de inicio.
+ * Descripción: Implementación de la animación de reposo. Se corrige la firma de
+ *              la función 'ui_idle_animation_start' para que coincida con su
+ *              declaración, aceptando un objeto padre y devolviendo el objeto
+ *              de animación creado, resolviendo así el error de compilación.
  */
 #include "ui_idle_animation.h"
-#include "ui_action_animations.h" // Necesario para obtener el reproductor y el objeto de imagen compartidos
+#include "ui_action_animations.h" // Necesario para obtener el reproductor compartido
 #include "animation_loader.h"
 #include "diymon_ui_helpers.h"
 #include "esp_log.h"
@@ -15,6 +18,7 @@
 
 static const char *TAG = "UI_IDLE_ANIM";
 
+#define IDLE_ANIM_FRAME_COUNT 3
 #define IDLE_FRAME_INTERVAL 1500
 
 // Variables estáticas para la gestión de la animación de reposo
@@ -27,19 +31,21 @@ static void idle_animation_timer_cb(lv_timer_t *timer) {
     
     g_current_frame_index = (g_current_frame_index + 1) % g_idle_animation_player.frame_count;
     
-    if (animation_loader_load_frame(&g_idle_animation_player, g_current_frame_index, "ANIM_IDLE_")) {
-        lv_obj_invalidate(g_animation_img_obj); // Invalida el objeto de imagen compartido
+    if (animation_loader_load_frame(&g_idle_animation_player, g_current_frame_index, "IDLE_")) {
+        // g_animation_img_obj es el objeto global declarado en ui_action_animations.h
+        if (g_animation_img_obj) {
+            lv_obj_invalidate(g_animation_img_obj);
+        }
     }
 }
 
-void ui_idle_animation_start(void) {
+lv_obj_t* ui_idle_animation_start(lv_obj_t *parent) {
     animation_t* shared_player = ui_action_animations_get_player();
     if (shared_player == NULL || shared_player->img_dsc.data == NULL) {
         ESP_LOGE(TAG, "No se puede iniciar la animación idle: el búfer compartido no es válido.");
-        return;
+        return NULL;
     }
 
-    // Apuntar al búfer de datos del descriptor de imagen compartido
     g_idle_animation_player.img_dsc = shared_player->img_dsc;
 
     char anim_path[128];
@@ -48,18 +54,20 @@ void ui_idle_animation_start(void) {
     if (len > 0 && anim_path[len - 1] == '/') anim_path[len - 1] = '\0';
     
     g_idle_animation_player.base_path = strdup(anim_path);
-    g_idle_animation_player.frame_count = animation_loader_count_frames(anim_path, "ANIM_IDLE_");
-    
-    if(g_idle_animation_player.frame_count == 0) {
-        ESP_LOGW(TAG, "No se encontraron fotogramas para 'ANIM_IDLE_' en %s.", anim_path);
+    g_idle_animation_player.frame_count = IDLE_ANIM_FRAME_COUNT;
+
+    // g_animation_img_obj es el objeto de imagen compartido. Lo usamos para mostrar la animación.
+    // Ya fue creado en ui_action_animations_create, así que no lo creamos de nuevo.
+    // Solo nos aseguramos de que sea visible y esté en el fondo.
+    if(g_animation_img_obj) {
+        lv_obj_move_background(g_animation_img_obj);
     }
     
-    // El objeto de imagen ya existe, no se crea uno nuevo.
-    // Se crea el temporizador que cargará los fotogramas y los dibujará.
     g_anim_timer = lv_timer_create(idle_animation_timer_cb, IDLE_FRAME_INTERVAL, NULL);
-    lv_timer_ready(g_anim_timer); // Ejecuta el primer ciclo inmediatamente para cargar el frame inicial
+    lv_timer_ready(g_anim_timer);
     
-    ESP_LOGI(TAG, "Animación de Idle iniciada desde %s con %d fotogramas (usando búfer compartido).", anim_path, g_idle_animation_player.frame_count);
+    ESP_LOGI(TAG, "Animación de Idle iniciada desde %s (usando búfer compartido).", anim_path);
+    return g_animation_img_obj; // Devolvemos el puntero al objeto de imagen compartido
 }
 
 void ui_idle_animation_stop(void) {

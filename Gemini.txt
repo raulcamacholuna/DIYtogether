@@ -10566,9 +10566,9 @@ void bsp_battery_get_voltage(float *voltage, uint16_t *adc_value);
 
 /*
  * Fichero: ./components/diymon_bsp/WS1.9TS/bsp_display.c
- * Fecha: 12/08/2025 - 02:10 pm
- * Último cambio: Corregido el formato de los comentarios del encabezado a C-style.
- * Descripción: Driver del display. Ahora guarda el nivel de brillo en la memoria no volátil (NVS) cada vez que se cambia, y lo restaura al iniciar el dispositivo.
+ * Fecha: 13/08/2025 - 08:03 
+ * Último cambio: Eliminado 'swap_color_bytes' obsoleto para compatibilidad con ESP-IDF 5.x.
+ * Descripción: Driver del display. Se elimina la propiedad 'swap_color_bytes' de la configuración del panel IO SPI, ya que es obsoleta en la versión actual de ESP-IDF. La inversión de bytes se gestionará en una capa superior (LVGL port).
  */
 #include "bsp_api.h"
 #include "esp_log.h"
@@ -10634,7 +10634,7 @@ esp_err_t bsp_display_init(void) {
     esp_lcd_panel_io_spi_config_t io_config = {
         .cs_gpio_num = PIN_NUM_LCD_CS, .dc_gpio_num = PIN_NUM_LCD_DC,
         .spi_mode = 0, .pclk_hz = 40 * 1000 * 1000, .trans_queue_depth = 10,
-        .lcd_cmd_bits = 8, .lcd_param_bits = 8, .swap_color_bytes = 1
+        .lcd_cmd_bits = 8, .lcd_param_bits = 8
     };
     ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)BSP_SPI_HOST, &io_config, &g_io_handle));
 
@@ -12252,11 +12252,9 @@ void execute_diymon_action(diymon_action_id_t action_id);
 
 /*
  * Fichero: ./components/diymon_ui/animation_loader.c
- * Fecha: 11/08/2025 - 12:00
- * Último cambio: Añadida la implementación de `animation_loader_count_frames`.
- * Descripción: Se añade el cuerpo de la función que cuenta dinámicamente los
- *              ficheros de animación en un directorio, solucionando el error
- *              de "undefined reference" durante el enlazado.
+ * Fecha: 13/08/2025 - 10:01 
+ * Último cambio: Corregido el acceso a miembros de un puntero.
+ * Descripción: Se ha corregido un error de sintaxis en nimation_loader_load_frame donde se usaba el operador '.' en lugar de '->' para acceder a los datos de la animación a través de un puntero, lo que causaba un fallo de compilación.
  */
 #include "animation_loader.h"
 #include "esp_log.h"
@@ -12313,6 +12311,7 @@ bool animation_loader_load_frame(animation_t *anim, uint16_t frame_index, const 
     if (!f) { return false; } // No logueamos aquí para no spamear durante el conteo.
     
     fseek(f, LVGL_BIN_HEADER_SIZE, SEEK_SET);
+    // [CORRECCIÓN] Se usa '->' en lugar de '.' porque 'anim' es un puntero.
     fread((void *)anim->img_dsc.data, 1, anim->img_dsc.data_size, f);
     fclose(f);
 
@@ -12361,6 +12360,7 @@ uint16_t animation_loader_count_frames(const char *path, const char *prefix) {
     return count;
 }
 
+
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\animation_loader.h
 # =================================================================================================
@@ -12394,15 +12394,71 @@ uint16_t animation_loader_count_frames(const char *path, const char *prefix);
 #endif // ANIMATION_LOADER_H
 
 # =================================================================================================
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\background.h
+# =================================================================================================
+
+/*
+ * Fichero: ./components/diymon_ui/background.h
+ * Fecha: 13/08/2025 - 10:40 
+ * Último cambio: Creación del fichero con el asset del fondo de pantalla.
+ * Descripción: Contiene el fondo de pantalla (BG.bin) como un array de C para ser compilado directamente en el firmware.
+ */
+#ifndef BACKGROUND_H
+#define BACKGROUND_H
+
+#include <lvgl.h>
+
+// Contenido del fichero BG.bin (evolución 0)
+static const uint8_t bg_0_map[] = {
+    // Aquí debería ir el contenido real del fichero BG.bin convertido a un array C.
+    // Por ahora, usamos datos de relleno para que compile.
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F
+};
+
+// Descriptor de imagen LVGL que apunta al array del fondo.
+const lv_img_dsc_t bg_0 = {
+    .header.cf = LV_COLOR_FORMAT_RGB565,
+    .header.w = 170,
+    .header.h = 320,
+    .header.stride = 170 * 2,
+    .data_size = sizeof(bg_0_map),
+    .data = bg_0_map,
+};
+
+#endif // BACKGROUND_H
+
+
+# =================================================================================================
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\BG.h
+# =================================================================================================
+
+/*
+ * Fichero: ./components/diymon_ui/BG.h
+ * Fecha: 13/08/2025 - 10:50 
+ * Último cambio: Creación del fichero.
+ * Descripción: Declara el descriptor de la imagen de fondo g_0 que está
+ *              definida en BG.c para que sea accesible desde otros módulos.
+ */
+#ifndef BG_H
+#define BG_H
+
+#include <lvgl.h>
+
+extern const lv_img_dsc_t bg_0;
+
+#endif // BG_H
+
+
+# =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\CMakeLists.txt
 # =================================================================================================
 
 # Fichero: ./components/diymon_ui/CMakeLists.txt
-# Fecha: 13/08/2025 - 12:08 
-# Último cambio: Corregida la sintaxis de la variable de CMake para las fuentes.
-# Descripción: Se corrige el error de sintaxis en idf_component_register que impedía
-#              la correcta expansión de la lista de ficheros fuente, solucionando el fallo
-#              de compilación.
+# Fecha: 14/08/2025 - 13:30
+# Último cambio: Usando COMPONENT_EMBED_SRCS, la variable correcta.
+# Descripción: Se utiliza la variable correcta de ESP-IDF para embeber
+#              ficheros como código fuente enlazable, solucionando el
+#              error final de "undefined reference".
 
 file(GLOB component_sources
     "*.c"
@@ -12412,11 +12468,30 @@ file(GLOB component_sources
     "ui_telemetry.c"
 )
 
+list(APPEND component_sources "images.c")
+
+# --- ESTA ES LA VARIABLE CORRECTA ---
+set(COMPONENT_EMBED_SRCS
+    assets/BTN_1.bin
+    assets/BTN_2.bin
+    assets/BTN_3.bin
+    assets/BTN_4.bin
+    assets/BTN_5.bin
+    assets/BTN_6.bin
+    assets/BTN_7.bin
+    assets/BTN_8.bin
+    assets/BTN_9.bin
+    assets/EVO_1.bin
+    assets/EVO_2.bin
+    assets/EVO_3.bin
+    assets/EVO_4.bin
+    assets/EVO_5.bin
+)
+
 idf_component_register(
     SRCS ${component_sources}
     INCLUDE_DIRS "."
     PRIV_INCLUDE_DIRS "."
-    
     REQUIRES 
         lvgl
         diymon_bsp
@@ -12425,16 +12500,17 @@ idf_component_register(
         wifi_portal
 )
 
-
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\diymon_ui_helpers.c
 # =================================================================================================
 
 /*
  * Fichero: ./components/diymon_ui/diymon_ui_helpers.c
- * Fecha: 14/08/2025 - 11:30 am
- * Último cambio: Añadido el prefijo "EVO_" a la lógica de búsqueda de iconos.
- * Descripción: Se ha corregido la función de construcción de rutas para que reconozca el prefijo "EVO_", permitiendo que los iconos del panel lateral se localicen correctamente en la carpeta `/buttons/`.
+ * Fecha: 13/08/2025 - 11:45 
+ * Último cambio: Corregido el tipo de la cabecera de imagen de LVGL.
+ * Descripción: Se ha corregido el nombre del tipo de la cabecera de imagen
+ *              de 'lv_img_header_t' a 'lv_image_header_t' para que coincida
+ *              con la API de LVGL y solucionar el error de compilación.
  */
 #include "diymon_ui_helpers.h"
 #include "diymon_evolution.h"
@@ -12445,8 +12521,13 @@ idf_component_register(
 #include <ctype.h>
 
 #define SD_MOUNT_POINT "/sdcard"
+static const char* TAG_HELPERS = "UI_HELPERS";
 
-// Función interna para obtener el nombre del directorio de evolución (ej: "111")
+// Buffer global para la imagen de fondo cargada desde la SD
+static uint8_t* g_bg_buffer = NULL;
+static lv_img_dsc_t g_bg_dsc;
+
+// Función interna para obtener el nombre del directorio de evolución (ej: "1.1.1" -> "111")
 static void get_evolution_dir_name(char* dir_name_buffer, size_t buffer_size) {
     const char* evo_code = diymon_get_current_code();
     memset(dir_name_buffer, 0, buffer_size);
@@ -12458,94 +12539,103 @@ static void get_evolution_dir_name(char* dir_name_buffer, size_t buffer_size) {
     }
 }
 
+// Construye la ruta a un asset, corrigiendo el caso por defecto.
 void ui_helpers_build_asset_path(char* buffer, size_t buffer_size, const char* asset_filename) {
     char dir_name[9];
     get_evolution_dir_name(dir_name, sizeof(dir_name));
 
-    // --- LA SOLUCIÓN ---
-    // Se añade la condición para el prefijo `EVO_`. Ahora, cualquier asset que
-    // comience por `BTN_` o `EVO_` se buscará en la carpeta `/buttons/`.
     if (strncmp(asset_filename, "BTN_", 4) == 0 ||
         strncmp(asset_filename, "EVO_", 4) == 0) {
         snprintf(buffer, buffer_size, "%s/buttons/%s", SD_MOUNT_POINT, asset_filename);
-    }
-    // Ruta para las animaciones de idle (ej: /sdcard/DIYMON/111/IDLE_1.bin)
-    else if (strncmp(asset_filename, "IDLE_", 5) == 0) {
-         snprintf(buffer, buffer_size, "%s/DIYMON/%s/%s", SD_MOUNT_POINT, dir_name, asset_filename);
-    }
-    // Ruta para animaciones de acción (ej: /sdcard/DIYMON/111/EAT_1.bin)
-    else if (strncmp(asset_filename, "EAT_", 4) == 0 || strncmp(asset_filename, "GYM_", 4) == 0 || strncmp(asset_filename, "ATK_", 4) == 0) {
-         snprintf(buffer, buffer_size, "%s/DIYMON/%s/%s", SD_MOUNT_POINT, dir_name, asset_filename);
-    }
-    // Caso por defecto: devuelve la ruta base de la evolución actual.
-    else {
-        snprintf(buffer, buffer_size, "%s/DIYMON/%s/", SD_MOUNT_POINT, dir_name);
+    } else {
+        // Caso por defecto corregido: para todos los demás assets (BG, IDLE, etc.)
+        snprintf(buffer, buffer_size, "%s/DIYMON/%s/%s", SD_MOUNT_POINT, dir_name, asset_filename);
     }
 }
+
+// Carga la imagen de fondo desde la SD.
+void ui_helpers_load_background(lv_obj_t* parent) {
+    char path[128];
+    ui_helpers_build_asset_path(path, sizeof(path), "BG.bin");
+
+    FILE* f = fopen(path, "rb");
+    if (!f) {
+        ESP_LOGE(TAG_HELPERS, "No se pudo abrir el fondo: %s. Se usará fondo negro.", path);
+        lv_obj_set_style_bg_color(parent, lv_color_black(), 0);
+        return;
+    }
+
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    if (size <= sizeof(lv_image_header_t)) {
+        ESP_LOGE(TAG_HELPERS, "El fichero de fondo es inválido o está vacío: %s", path);
+        fclose(f);
+        lv_obj_set_style_bg_color(parent, lv_color_black(), 0);
+        return;
+    }
+
+    ui_helpers_free_background_buffer(); // Liberar buffer anterior si existe
+
+    size_t data_size = size - sizeof(lv_image_header_t);
+    g_bg_buffer = (uint8_t*)malloc(data_size);
+    if (!g_bg_buffer) {
+        ESP_LOGE(TAG_HELPERS, "Fallo al reservar %d bytes para el fondo.", (int)data_size);
+        fclose(f);
+        return;
+    }
+
+    fread(&g_bg_dsc.header, 1, sizeof(lv_image_header_t), f);
+    fread(g_bg_buffer, 1, data_size, f);
+    fclose(f);
+
+    g_bg_dsc.data_size = data_size;
+    g_bg_dsc.data = g_bg_buffer;
+    
+    lv_obj_set_style_bg_img_src(parent, &g_bg_dsc, 0);
+    lv_obj_set_style_bg_opa(parent, LV_OPA_COVER, 0);
+    ESP_LOGI(TAG_HELPERS, "Fondo cargado desde %s", path);
+}
+
+// Libera la memoria del buffer de fondo.
+void ui_helpers_free_background_buffer() {
+    if (g_bg_buffer) {
+        free(g_bg_buffer);
+        g_bg_buffer = NULL;
+        ESP_LOGI(TAG_HELPERS, "Buffer de fondo liberado.");
+    }
+}
+
+// Implementaciones placeholder para que compile
+void ui_helpers_create_diymon_gif(lv_obj_t* parent) {}
+void ui_helpers_free_gif_buffer() {}
+
 
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\diymon_ui_helpers.h
 # =================================================================================================
 
 /*
- * Fichero: components/diymon_ui/diymon_ui_helpers.h
- * Descripción: Funciones de ayuda para la interfaz de usuario, como la carga
- *              de recursos dinámicos desde la tarjeta SD.
+ * Fichero: ./components/diymon_ui/diymon_ui_helpers.h
+ * Fecha: 13/08/2025 - 11:39 
+ * Último cambio: Limpieza de includes.
+ * Descripción: Funciones de ayuda para la interfaz de usuario. Se elimina
+ *              el include a 'images.h' que ya no existe.
  */
 #ifndef DIYMON_UI_HELPERS_H
 #define DIYMON_UI_HELPERS_H
 
 #include "lvgl.h"
 
-/**
- * @brief Construye la ruta completa a un recurso (asset) en la SD.
- * 
- * Esta función obtiene el código de evolución actual, lo convierte a un nombre
- * de directorio compatible con 8.3 (ej: "1.1.1" -> "111"), y construye la ruta
- * final a un fichero dentro de ese directorio.
- * 
- * @param buffer Puntero al buffer donde se guardará la ruta generada.
- * @param buffer_size Tamaño del buffer.
- * @param asset_filename Nombre del fichero del recurso (ej: "IDLE.GIF"). Debe ser compatible 8.3.
- */
 void ui_helpers_build_asset_path(char* buffer, size_t buffer_size, const char* asset_filename);
-
-/**
- * @brief Carga la imagen de fondo desde el fichero BG.BIN en la SD.
- * 
- * Utiliza la función de construcción de rutas para encontrar el fichero BG.BIN
- * correspondiente a la evolución actual y lo establece como fondo del objeto padre.
- * 
- * @param parent Puntero al objeto que recibirá la imagen de fondo (normalmente, la pantalla principal).
- */
 void ui_helpers_load_background(lv_obj_t* parent);
-
-/**
- * @brief Libera la memoria utilizada por el búfer de la imagen de fondo.
- * 
- * Debe llamarse cuando la pantalla se destruye para evitar fugas de memoria.
- */
 void ui_helpers_free_background_buffer();
-
-/**
- * @brief Crea y muestra el GIF animado del DIYMON en el centro de la pantalla.
- * 
- * Carga el fichero diymon.gif correspondiente a la evolución actual en un búfer
- * de memoria y lo muestra centrado en su objeto padre.
- * 
- * @param parent Puntero al objeto sobre el que se creará el GIF (la pantalla principal).
- */
 void ui_helpers_create_diymon_gif(lv_obj_t* parent);
-
-/**
- * @brief Libera la memoria utilizada por el búfer del GIF del DIYMON.
- * 
- * Debe llamarse cuando la pantalla se destruye para evitar fugas de memoria.
- */
 void ui_helpers_free_gif_buffer();
 
-
 #endif // DIYMON_UI_HELPERS_H
+
 
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\fonts.h
@@ -12576,29 +12666,89 @@ dependencies:
   lvgl/lvgl: "^9.3.0"
 
 # =================================================================================================
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\images.c
+# =================================================================================================
+
+/*
+ * Fichero: ./components/diymon_ui/images.c
+ * Fecha: 14/08/2025 - 13:15
+ * Descripción: Fichero de anclaje para los assets binarios.
+ *              La presencia de este fichero en la lista de fuentes asegura
+ *              que el sistema de compilación de ESP-IDF procese
+ *              correctamente la variable COMPONENT_EMBED_FILES
+ *              y genere los símbolos correspondientes.
+ */
+
+// No se necesita código aquí.
+
+# =================================================================================================
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\images.h
+# =================================================================================================
+
+#ifndef IMAGES_H
+#define IMAGES_H
+
+#include <lvgl.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// --- SÍMBOLOS GENERADOS AUTOMÁTICAMENTE POR CMAKE ---
+// La ruta 'assets/' y la extensión '.bin' se convierten en parte del nombre.
+
+// Panel Jugador
+extern const uint8_t _binary_assets_BTN_1_bin_start[];
+extern const uint8_t _binary_assets_BTN_2_bin_start[];
+extern const uint8_t _binary_assets_BTN_3_bin_start[];
+
+// Panel Admin
+extern const uint8_t _binary_assets_BTN_4_bin_start[];
+extern const uint8_t _binary_assets_BTN_5_bin_start[];
+extern const uint8_t _binary_assets_BTN_6_bin_start[];
+
+// Panel Config
+extern const uint8_t _binary_assets_BTN_7_bin_start[];
+extern const uint8_t _binary_assets_BTN_8_bin_start[];
+extern const uint8_t _binary_assets_BTN_9_bin_start[];
+
+// Panel Evolución
+extern const uint8_t _binary_assets_EVO_1_bin_start[];
+extern const uint8_t _binary_assets_EVO_2_bin_start[];
+extern const uint8_t _binary_assets_EVO_3_bin_start[];
+extern const uint8_t _binary_assets_EVO_4_bin_start[];
+extern const uint8_t _binary_assets_EVO_5_bin_start[];
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // IMAGES_H
+
+# =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\screens.c
 # =================================================================================================
 
 /*
   Fichero: ./components/diymon_ui/screens.c
-  Fecha: 13/08/2025 - 12:06 
-  Último cambio: Integrado el nuevo módulo de telemetría.
-  Descripción: Se ha integrado el módulo ui_telemetry en la creación y destrucción de la
-               pantalla principal. Esto asegura que los labels de datos de los sensores
-               se creen junto con la UI y se limpien correctamente al cerrar.
+  Fecha: 13/08/2025 - 11:45 
+  Último cambio: Simplificada la llamada a ui_idle_animation_start.
+  Descripción: Se actualiza la llamada a la función de inicio de la animación
+               de reposo para que coincida con la nueva firma, que ahora requiere
+               el objeto padre como argumento.
 */
 #include "screens.h"
 #include "ui_idle_animation.h"
 #include "ui_actions_panel.h"
 #include "ui_action_animations.h"
-#include "ui_telemetry.h" // Incluir el nuevo módulo
+#include "ui_telemetry.h"
+#include "diymon_ui_helpers.h"
 #include "esp_log.h"
 #include "bsp_api.h"
 #include "screen_manager.h"
 
 static const char *TAG = "SCREENS";
 
-// --- Variables para la detección manual de doble toque ---
 static uint8_t g_click_count = 0;
 static lv_timer_t *g_double_click_timer = NULL;
 
@@ -12610,9 +12760,6 @@ static lv_coord_t touch_start_y = -1;
 
 static void main_screen_event_cb(lv_event_t *e);
 
-/**
- * @brief Callback del temporizador que se activa si no hay un segundo toque.
- */
 static void double_click_timer_cb(lv_timer_t *timer) {
     g_click_count = 0;
     g_double_click_timer = NULL;
@@ -12625,10 +12772,12 @@ void create_screen_main(void) {
     lv_obj_add_flag(g_main_screen_obj, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(g_main_screen_obj, main_screen_event_cb, LV_EVENT_ALL, NULL);
 
+    ui_helpers_load_background(g_main_screen_obj);
+
     ui_action_animations_create(g_main_screen_obj);
     g_idle_animation_obj = ui_idle_animation_start(g_main_screen_obj);
     ui_actions_panel_create(g_main_screen_obj);
-    ui_telemetry_create(g_main_screen_obj); // Crear los labels de telemetría
+    ui_telemetry_create(g_main_screen_obj);
 
     ESP_LOGI(TAG, "Pantalla principal creada delegando en módulos.");
 }
@@ -12694,7 +12843,8 @@ void delete_screen_main(void) {
     }
     ui_idle_animation_stop();
     ui_action_animations_destroy();
-    ui_telemetry_destroy(); // Destruir el timer de telemetría
+    ui_telemetry_destroy();
+    ui_helpers_free_background_buffer();
 }
 
 void create_screens(void) {
@@ -12708,20 +12858,19 @@ void create_screens(void) {
 
 /*
  * Fichero: ./components/diymon_ui/screens.h
- * Fecha: 10/08/2025 - 03:40
- * Último cambio: Añadida la inclusión de `lvgl.h` para resolver tipos desconocidos.
- * Descripción: Se incluye la cabecera principal de LVGL para que el compilador reconozca el tipo `lv_obj_t` y corrija el error de "unknown type name".
+ * Fecha: 13/08/2025 - 09:34 
+ * Último cambio: Eliminado el puntero g_idle_animation_obj obsoleto.
+ * Descripción: Se ha limpiado la cabecera eliminando la declaración del puntero g_idle_animation_obj, ya que la animación de reposo ahora utiliza el objeto de imagen compartido.
  */
 #ifndef SCREENS_H
 #define SCREENS_H
 
 #include "ui.h" 
-#include <lvgl.h> // <-- LA SOLUCIÓN AL PRIMER ERROR
+#include <lvgl.h>
 
 // --- DECLARACIONES DE OBJETOS GLOBALES ---
 // Usamos 'extern' para decirle a otros archivos .c (como ui.c)
 // que estas variables existen y serán definidas en screens.c.
-extern lv_obj_t *g_idle_animation_obj;
 extern lv_obj_t *g_main_screen_obj;
 
 
@@ -12732,6 +12881,7 @@ void delete_screen_main(void);
 void create_screens(void);
 
 #endif // SCREENS_H
+
 
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\structs.h
@@ -12766,20 +12916,18 @@ using namespace eez;
 # =================================================================================================
 
 /*
- * Archivo: styles.c
- * Versión: 8.0 (CORREGIDO sin el include de images.h)
+ * Fichero: ./components/diymon_ui/styles.c
+ * Fecha: 13/08/2025 - 11:39 
+ * Último cambio: Limpieza de comentarios.
+ * Descripción: Fichero para la inicialización de estilos de LVGL.
  */
-
 #include "styles.h"
-// [ELIMINADO] #include "images.h" // Este archivo ya no existe.
 #include "lvgl.h"
-
-// Aquí iría tu código para crear y registrar estilos de LVGL, si lo tuvieras.
-// Por ahora, puede estar vacío.
 
 void init_styles(void) {
     // Inicializa aquí los estilos que necesites
 }
+
 
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\styles.h
@@ -12808,9 +12956,9 @@ extern "C" {
 
 /*
  * Fichero: ./components/diymon_ui/ui_action_animations.c
- * Fecha: 14/08/2025 - 10:00 am
- * Último cambio: Implementada la lógica de búfer de animación compartido.
- * Descripción: Gestión de las animaciones de acción (comer, etc.). Ahora asigna un único búfer de memoria que será compartido con la animación de reposo. Controla la pausa y reanudación de la animación de reposo para evitar conflictos de dibujado.
+ * Fecha: 13/08/2025 - 10:04 
+ * Último cambio: Ajustada la resolución del búfer de animación a 150x230.
+ * Descripción: Gestión de las animaciones de acción. Se ha corregido el tamaño del búfer de animación compartido a 150x230 para que coincida con las dimensiones de los assets de animación, solucionando problemas de visualización y liberando RAM adicional.
  */
 #include "ui_action_animations.h"
 #include "animation_loader.h"
@@ -12830,7 +12978,6 @@ static lv_timer_t *s_anim_timer;
 static bool s_is_action_in_progress = false;
 static int s_current_frame_index;
 
-// Velocidad de la animación en milisegundos por fotograma.
 #define FRAME_INTERVAL_MS 500
 
 // --- Declaraciones de Funciones Internas ---
@@ -12841,21 +12988,19 @@ static const char* get_anim_prefix(diymon_action_id_t action_id);
 // --- Implementación de Funciones Públicas ---
 
 void ui_action_animations_create(lv_obj_t *parent) {
-    // 1. Inicializar el reproductor compartido. Esto reserva el búfer de memoria una sola vez.
-    g_animation_player = animation_loader_init(NULL, 170, 320, 0);
+    // [SOLUCIÓN] Ajustar el tamaño del búfer a la resolución real de la animación.
+    g_animation_player = animation_loader_init(NULL, 150, 230, 0);
     if (g_animation_player.img_dsc.data == NULL) {
         ESP_LOGE(TAG, "FALLO CRÍTICO: No se pudo reservar memoria para el búfer de animación compartido.");
         return;
     }
-    ESP_LOGI(TAG, "Búfer de animación compartido pre-reservado correctamente.");
+    ESP_LOGI(TAG, "Búfer de animación compartido (150x230) pre-reservado correctamente.");
 
-    // 2. Crear el objeto de imagen que actuará como lienzo para todas las animaciones.
     g_animation_img_obj = lv_img_create(parent);
     lv_img_set_src(g_animation_img_obj, &g_animation_player.img_dsc);
-    lv_obj_align(g_animation_img_obj, LV_ALIGN_CENTER, 0, 0);
     
-    // Se mueve al fondo para que los botones y otros elementos de la UI aparezcan por encima.
-    lv_obj_move_background(g_animation_img_obj);
+    lv_obj_set_style_bg_opa(g_animation_img_obj, LV_OPA_TRANSP, 0);
+    lv_obj_align(g_animation_img_obj, LV_ALIGN_BOTTOM_MID, 0, 0);
 }
 
 void ui_action_animations_play(diymon_action_id_t action_id) {
@@ -12867,7 +13012,6 @@ void ui_action_animations_play(diymon_action_id_t action_id) {
 
     s_is_action_in_progress = true;
     
-    // Pausar la animación de reposo para tomar control del búfer
     ui_idle_animation_pause();
 
     const char *prefix = get_anim_prefix(action_id);
@@ -12879,7 +13023,7 @@ void ui_action_animations_play(diymon_action_id_t action_id) {
     uint16_t frame_count = animation_loader_count_frames(path_buffer, prefix);
     if (frame_count == 0) {
         ESP_LOGE(TAG, "No se encontraron fotogramas para la animación '%s' en '%s'.", prefix, path_buffer);
-        animation_finished(); // Llama a finished para reanudar idle y limpiar estado.
+        animation_finished(); 
         return;
     }
     
@@ -12891,7 +13035,7 @@ void ui_action_animations_play(diymon_action_id_t action_id) {
 
     s_current_frame_index = 0;
     if (animation_loader_load_frame(&g_animation_player, s_current_frame_index, prefix)) {
-        lv_obj_invalidate(g_animation_img_obj); // Redibuja el objeto de imagen con el nuevo frame.
+        lv_obj_invalidate(g_animation_img_obj);
         s_anim_timer = lv_timer_create(animation_timer_cb, FRAME_INTERVAL_MS, (void*)(intptr_t)action_id);
     } else {
         ESP_LOGE(TAG, "Fallo al cargar el primer fotograma (%s).", prefix);
@@ -12902,15 +13046,11 @@ void ui_action_animations_play(diymon_action_id_t action_id) {
 void ui_action_animations_destroy(void) {
     ESP_LOGI(TAG, "Liberando búfer de animación compartido.");
     animation_loader_free(&g_animation_player);
-    // El objeto g_animation_img_obj es hijo del screen y LVGL lo destruirá automáticamente.
 }
 
 animation_t* ui_action_animations_get_player(void) {
     return &g_animation_player;
 }
-
-
-// --- Implementación de Funciones Internas ---
 
 static void animation_timer_cb(lv_timer_t *timer) {
     s_current_frame_index++;
@@ -12942,7 +13082,6 @@ static void animation_finished(void) {
     }
     g_animation_player.frame_count = 0;
     
-    // Devuelve el control del búfer a la animación de reposo.
     ui_idle_animation_resume();
     
     s_is_action_in_progress = false;
@@ -12957,6 +13096,7 @@ static const char* get_anim_prefix(diymon_action_id_t action_id) {
         default:                  return "";
     }
 }
+
 
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_action_animations.h
@@ -13027,12 +13167,11 @@ animation_t* ui_action_animations_get_player(void);
 
 /*
   Fichero: ./components/diymon_ui/ui_actions_panel.c
-  Fecha: 13/08/2025 - 12:23 
-  Último cambio: Corregida la transparencia de los botones de acción.
+  Fecha: 13/08/2025 - 08:30 
+  Último cambio: Corregidas las funciones de chroma key a la API de LVGL v9.
   Descripción: Se ha modificado la creación de botones para asegurar que su fondo sea
-               completamente transparente en todos los estados (normal, presionado, etc.).
-               Esto soluciona un problema visual donde los botones mostraban un fondo opaco,
-               y ahora permite que la animación de fondo sea visible a través de ellos.
+               completamente transparente. Se habilita la transparencia por chroma key para el asset 
+               ASSET_ICON_CONFIG_PLACEHOLDER, usando las funciones correctas de LVGL v9 (lv_obj_set_style_img_chroma_keyed).
 */
 #include "ui_actions_panel.h"
 #include "ui_asset_loader.h"
@@ -13095,6 +13234,7 @@ static lv_obj_t* create_top_action_button(lv_obj_t *parent, ui_asset_id_t asset_
     lv_obj_t *img = lv_img_create(btn);
     lv_img_set_src(img, ui_assets_get_icon(asset_id));
     lv_obj_center(img);
+        
     lv_obj_set_pos(btn, (BUTTON_SIZE + BUTTON_PADDING) * index, -BUTTON_SIZE);
     lv_obj_add_flag(btn, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_event_cb(btn, button_event_cb, LV_EVENT_PRESSED, NULL);
@@ -13114,6 +13254,7 @@ static lv_obj_t* create_side_action_button(lv_obj_t *parent, ui_asset_id_t asset
     lv_obj_t *img = lv_img_create(btn);
     lv_img_set_src(img, ui_assets_get_icon(asset_id));
     lv_obj_center(img);
+    
     lv_obj_set_pos(btn, -BUTTON_SIZE, BUTTON_PADDING + (BUTTON_SIZE + BUTTON_PADDING) * index);
     lv_obj_add_flag(btn, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_event_cb(btn, button_event_cb, LV_EVENT_PRESSED, NULL);
@@ -13419,110 +13560,47 @@ lv_obj_t* ui_actions_panel_get_config_placeholder_btn(void);
 
 /*
   Fichero: ./components/diymon_ui/ui_asset_loader.c
-  Fecha: 14/08/2025 - 11:00 am
-  Último cambio: Actualizada la carga de assets para usar la nueva estructura de nombres.
-  Descripción: Implementación del gestor de assets. Se han modificado los nombres de los ficheros binarios para que coincidan con la estructura `BTN_X.bin` y `EVO_X.bin` proporcionada.
+  Fecha: 14/08/2025 - 12:30 pm
+  Último cambio: Actualizado para usar los nombres de assets auto-generados por CMake.
 */
 #include "ui_asset_loader.h"
-#include "diymon_ui_helpers.h"
+#include "images.h"
 #include "esp_log.h"
-#include <stdio.h>
-#include <stdlib.h>
 
 static const char *TAG = "UI_ASSET_LOADER";
 
-// Almacenamiento estático para los descriptores y los datos de los iconos.
 static lv_img_dsc_t g_asset_dscs[ASSET_COUNT];
-static uint8_t* g_asset_buffers[ASSET_COUNT] = {NULL};
-
-/**
- * @brief Invierte el orden de los bytes para cada píxel de 16 bits (RGB565).
- *        Necesario para corregir el endianness en la plataforma.
- */
-static void swap_bytes_for_rgb565(uint8_t *data, size_t size) {
-    for (size_t i = 0; i < size; i += 2) {
-        uint8_t temp = data[i];
-        data[i] = data[i + 1];
-        data[i + 1] = temp;
-    }
-}
-
-/**
- * @brief Carga un único asset (icono) desde un fichero a la memoria.
- */
-static bool load_asset(ui_asset_id_t id, const char* filename) {
-    char path[128];
-    ui_helpers_build_asset_path(path, sizeof(path), filename);
-
-    FILE* f = fopen(path, "rb");
-    if (!f) {
-        ESP_LOGE(TAG, "No se pudo abrir el asset: %s", path);
-        return false;
-    }
-
-    // Leer la cabecera LVGL directamente.
-    fread(&g_asset_dscs[id].header, 1, sizeof(lv_image_header_t), f);
-
-    // Calcular tamaño, reservar búfer y leer los datos de píxeles.
-    fseek(f, 0, SEEK_END);
-    long file_size = ftell(f);
-    size_t data_size = file_size - sizeof(lv_image_header_t);
-    g_asset_dscs[id].data_size = data_size;
-
-    g_asset_buffers[id] = (uint8_t*)malloc(data_size);
-    if (!g_asset_buffers[id]) {
-        ESP_LOGE(TAG, "Fallo al reservar memoria para el asset %s", filename);
-        fclose(f);
-        return false;
-    }
-    
-    fseek(f, sizeof(lv_image_header_t), SEEK_SET);
-    fread(g_asset_buffers[id], 1, data_size, f);
-    fclose(f);
-    
-    // Corregir los bytes de los datos leídos.
-    // swap_bytes_for_rgb565(g_asset_buffers[id], data_size);
-    
-    // Apuntar el descriptor al búfer en memoria.
-    g_asset_dscs[id].data = g_asset_buffers[id];
-
-    ESP_LOGI(TAG, "Asset '%s' cargado correctamente en memoria.", filename);
-    return true;
-}
 
 void ui_assets_init(void) {
-    ESP_LOGI(TAG, "Precargando todos los assets de la UI con la nueva estructura de nombres...");
-    
-    // Panel de jugador (iconos 1-3)
-    load_asset(ASSET_ICON_EAT, "BTN_1.bin");
-    load_asset(ASSET_ICON_GYM, "BTN_2.bin");
-    load_asset(ASSET_ICON_ATK, "BTN_3.bin");
-    
-    // Panel de admin (iconos 4-6)
-    load_asset(ASSET_ICON_BRIGHTNESS, "BTN_4.bin");
-    load_asset(ASSET_ICON_SCREEN_OFF, "BTN_5.bin");
-    load_asset(ASSET_ICON_ADMIN_PLACEHOLDER, "BTN_6.bin");
+    ESP_LOGI(TAG, "Inicializando assets desde memoria flash (símbolos auto-generados)...");
 
-    // Panel de configuración (iconos 7-9)
-    load_asset(ASSET_ICON_RESET_ALL, "BTN_7.bin");
-    load_asset(ASSET_ICON_ENABLE_FTP, "BTN_8.bin");
-    load_asset(ASSET_ICON_CONFIG_PLACEHOLDER, "BTN_9.bin");
+    // Panel Jugador
+    g_asset_dscs[ASSET_ICON_EAT] = *(const lv_img_dsc_t *)_binary_assets_BTN_1_bin_start;
+    g_asset_dscs[ASSET_ICON_GYM] = *(const lv_img_dsc_t *)_binary_assets_BTN_2_bin_start;
+    g_asset_dscs[ASSET_ICON_ATK] = *(const lv_img_dsc_t *)_binary_assets_BTN_3_bin_start;
+    
+    // Panel Admin
+    g_asset_dscs[ASSET_ICON_BRIGHTNESS] = *(const lv_img_dsc_t *)_binary_assets_BTN_4_bin_start;
+    g_asset_dscs[ASSET_ICON_SCREEN_OFF] = *(const lv_img_dsc_t *)_binary_assets_BTN_5_bin_start;
+    g_asset_dscs[ASSET_ICON_ADMIN_PLACEHOLDER] = *(const lv_img_dsc_t *)_binary_assets_BTN_6_bin_start;
 
-    // Panel lateral de evolución (iconos EVO 1-5)
-    load_asset(ASSET_ICON_EVO_FIRE,  "EVO_1.bin");
-    load_asset(ASSET_ICON_EVO_WATER, "EVO_2.bin");
-    load_asset(ASSET_ICON_EVO_EARTH, "EVO_3.bin");
-    load_asset(ASSET_ICON_EVO_WIND,  "EVO_4.bin");
-    load_asset(ASSET_ICON_EVO_BACK,  "EVO_5.bin");
+    // Panel Config
+    g_asset_dscs[ASSET_ICON_RESET_ALL] = *(const lv_img_dsc_t *)_binary_assets_BTN_7_bin_start;
+    g_asset_dscs[ASSET_ICON_ENABLE_FTP] = *(const lv_img_dsc_t *)_binary_assets_BTN_8_bin_start;
+    g_asset_dscs[ASSET_ICON_CONFIG_PLACEHOLDER] = *(const lv_img_dsc_t *)_binary_assets_BTN_9_bin_start;
+
+    // Panel Evolución
+    g_asset_dscs[ASSET_ICON_EVO_FIRE]  = *(const lv_img_dsc_t *)_binary_assets_EVO_1_bin_start;
+    g_asset_dscs[ASSET_ICON_EVO_WATER] = *(const lv_img_dsc_t *)_binary_assets_EVO_2_bin_start;
+    g_asset_dscs[ASSET_ICON_EVO_EARTH] = *(const lv_img_dsc_t *)_binary_assets_EVO_3_bin_start;
+    g_asset_dscs[ASSET_ICON_EVO_WIND]  = *(const lv_img_dsc_t *)_binary_assets_EVO_4_bin_start;
+    g_asset_dscs[ASSET_ICON_EVO_BACK]  = *(const lv_img_dsc_t *)_binary_assets_EVO_5_bin_start;
+
+    ESP_LOGI(TAG, "Todos los assets han sido enlazados.");
 }
 
 void ui_assets_deinit(void) {
-    for (int i = 0; i < ASSET_COUNT; i++) {
-        if (g_asset_buffers[i]) {
-            free(g_asset_buffers[i]);
-            g_asset_buffers[i] = NULL;
-        }
-    }
+    // No es necesario hacer nada aquí
 }
 
 const lv_img_dsc_t* ui_assets_get_icon(ui_asset_id_t asset_id) {
@@ -13599,11 +13677,12 @@ const lv_img_dsc_t* ui_assets_get_icon(ui_asset_id_t asset_id);
 
 /*
  * Fichero: ./components/diymon_ui/ui_idle_animation.c
- * Fecha: 11/08/2025 - 10:15
- * Último cambio: Implementadas las funciones para pausar y reanudar.
- * Descripción: Implementación de la animación de reposo. Se añaden las funciones
- *              para pausar y reanudar su temporizador, evitando conflictos de
- *              renderizado con otras animaciones que usen el mismo búfer.
+ * Fecha: 13/08/2025 - 11:45 
+ * Último cambio: Corregida la firma de la función de inicio.
+ * Descripción: Implementación de la animación de reposo. Se corrige la firma de
+ *              la función 'ui_idle_animation_start' para que coincida con su
+ *              declaración, aceptando un objeto padre y devolviendo el objeto
+ *              de animación creado, resolviendo así el error de compilación.
  */
 #include "ui_idle_animation.h"
 #include "ui_action_animations.h" // Necesario para obtener el reproductor compartido
@@ -13620,7 +13699,6 @@ static const char *TAG = "UI_IDLE_ANIM";
 #define IDLE_FRAME_INTERVAL 1500
 
 // Variables estáticas para la gestión de la animación de reposo
-static lv_obj_t *g_anim_img_obj;
 static lv_timer_t *g_anim_timer;
 static animation_t g_idle_animation_player; // Player local que usa el búfer compartido
 static int g_current_frame_index = -1;
@@ -13631,7 +13709,10 @@ static void idle_animation_timer_cb(lv_timer_t *timer) {
     g_current_frame_index = (g_current_frame_index + 1) % g_idle_animation_player.frame_count;
     
     if (animation_loader_load_frame(&g_idle_animation_player, g_current_frame_index, "IDLE_")) {
-        lv_obj_invalidate(g_anim_img_obj);
+        // g_animation_img_obj es el objeto global declarado en ui_action_animations.h
+        if (g_animation_img_obj) {
+            lv_obj_invalidate(g_animation_img_obj);
+        }
     }
 }
 
@@ -13652,16 +13733,18 @@ lv_obj_t* ui_idle_animation_start(lv_obj_t *parent) {
     g_idle_animation_player.base_path = strdup(anim_path);
     g_idle_animation_player.frame_count = IDLE_ANIM_FRAME_COUNT;
 
-    g_anim_img_obj = lv_img_create(parent);
-    lv_img_set_src(g_anim_img_obj, &g_idle_animation_player.img_dsc);
-    lv_obj_align(g_anim_img_obj, LV_ALIGN_TOP_LEFT, 0, 0);
-    lv_obj_move_background(g_anim_img_obj);
-
+    // g_animation_img_obj es el objeto de imagen compartido. Lo usamos para mostrar la animación.
+    // Ya fue creado en ui_action_animations_create, así que no lo creamos de nuevo.
+    // Solo nos aseguramos de que sea visible y esté en el fondo.
+    if(g_animation_img_obj) {
+        lv_obj_move_background(g_animation_img_obj);
+    }
+    
     g_anim_timer = lv_timer_create(idle_animation_timer_cb, IDLE_FRAME_INTERVAL, NULL);
     lv_timer_ready(g_anim_timer);
     
     ESP_LOGI(TAG, "Animación de Idle iniciada desde %s (usando búfer compartido).", anim_path);
-    return g_anim_img_obj;
+    return g_animation_img_obj; // Devolvemos el puntero al objeto de imagen compartido
 }
 
 void ui_idle_animation_stop(void) {
@@ -13691,17 +13774,19 @@ void ui_idle_animation_resume(void) {
     }
 }
 
+
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_idle_animation.h
 # =================================================================================================
 
 /*
  * Fichero: ./components/diymon_ui/ui_idle_animation.h
- * Fecha: 11/08/2025 - 10:15
- * Último cambio: Añadidas declaraciones para pausar y reanudar la animación.
- * Descripción: Interfaz pública para la animación de reposo. Se añaden controles
- *              para pausar y reanudar el temporizador de la animación, permitiendo
- *              que otras partes de la UI puedan detenerla temporalmente sin destruirla.
+ * Fecha: 13/08/2025 - 11:43 
+ * Último cambio: Corregida la firma de la función de inicio.
+ * Descripción: Interfaz pública para la animación de reposo. Se corrige la
+ *              declaración de 'ui_idle_animation_start' para que acepte un
+ *              parámetro y devuelva un puntero a objeto, solucionando el error
+ *              de compilación.
  */
 #ifndef UI_IDLE_ANIMATION_H
 #define UI_IDLE_ANIMATION_H
@@ -13731,6 +13816,7 @@ void ui_idle_animation_pause(void);
 void ui_idle_animation_resume(void);
 
 #endif // UI_IDLE_ANIMATION_H
+
 
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_priv.h
@@ -19159,9 +19245,9 @@ idf_component_register(
 
 /*
  * Fichero: ./main/hardware_manager.c
- * Fecha: 12/08/2025 - 05:05 pm
- * Último cambio: Eliminada la configuración redundante de brillo.
- * Descripción: Orquestador de hardware. Se elimina la llamada explícita a bsp_display_set_brightness(100), ya que ahora la función bsp_display_init se encarga de restaurar el brillo desde la NVS, evitando sobreescribir la configuración del usuario.
+ * Fecha: 13/08/2025 - 08:03 
+ * Último cambio: Habilitado el intercambio de bytes en el port de LVGL.
+ * Descripción: Orquestador de hardware. Se habilita el flag 'swap_bytes' en la configuración de LVGL para corregir el orden de los bytes de color en la pantalla. Esto soluciona problemas visuales con colores incorrectos en todos los elementos de la UI.
  */
 #include "hardware_manager.h"
 #include "esp_log.h"
@@ -19185,6 +19271,9 @@ esp_err_t hardware_manager_init(void) {
         .double_buffer = 1,
         .hres = bsp_get_display_hres(),
         .vres = bsp_get_display_vres(),
+        .flags = {
+            .swap_bytes = true, // Corregir el orden de bytes de color para RGB565
+        }
     };
     lv_disp_t * disp = lvgl_port_add_disp(&disp_cfg);
 
@@ -19313,12 +19402,9 @@ endmenu
 
 /*
   Fichero: ./main/main.c
-  Fecha: 13/08/2025 - 12:06 
-  Último cambio: Eliminada la tarea de telemetría.
-  Descripción: Se elimina la tarea sensor_log_task de este fichero. La responsabilidad
-               de leer y mostrar los datos de los sensores se ha trasladado completamente
-               al nuevo componente ui_telemetry dentro de diymon_ui, centralizando toda
-               la lógica de la interfaz.
+  Fecha: 13/08/2025 - 10:20 
+  Último cambio: Eliminada la integración con el sistema de ficheros de LVGL para evitar errores de compilación.
+  Descripción: Se ha eliminado la llamada a lv_fs_fatfs_init() y su prototipo. El acceso a la SD para cargar recursos se gestionará con funciones estándar de C, volviendo a un enfoque más estable que no depende de la integración directa de LVGL con FatFS.
 */
 #include <stdio.h>
 #include <string.h>
@@ -19350,9 +19436,6 @@ static void run_wifi_portal_mode(void);
 static void run_main_application_mode(void);
 static bool check_config_mode_flag(void);
 static void erase_config_mode_flag(void);
-static void evolution_timer_callback(void* arg);
-
-static esp_timer_handle_t evolution_timer_handle;
 
 void app_main(void)
 {
@@ -19467,23 +19550,6 @@ static void erase_config_mode_flag(void) {
         nvs_close(nvs_handle);
     } else {
         ESP_LOGE(TAG, "Error (%s) al abrir NVS para borrar la bandera.", esp_err_to_name(err));
-    }
-}
-
-static void evolution_timer_callback(void* arg) {
-    const char* current_code = diymon_get_current_code();
-    const char* next_evolution = diymon_get_next_evolution_in_sequence(current_code);
-    if (next_evolution != NULL) {
-        ESP_LOGI(TAG, "¡EVOLUCIÓN! Nuevo código: %s", next_evolution);
-        diymon_set_current_code(next_evolution);
-        if (lvgl_port_lock(0)) {
-            delete_screen_main();
-            ui_init();
-            lvgl_port_unlock();
-        }
-    } else {
-        ESP_LOGI(TAG, "El DIYMON ha alcanzado su forma final.");
-        esp_timer_stop(evolution_timer_handle);
     }
 }
 
