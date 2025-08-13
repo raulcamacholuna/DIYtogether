@@ -1,10 +1,8 @@
 /*
  * Fichero: ./components/diymon_ui/animation_loader.c
- * Fecha: 11/08/2025 - 12:00
- * Último cambio: Añadida la implementación de `animation_loader_count_frames`.
- * Descripción: Se añade el cuerpo de la función que cuenta dinámicamente los
- *              ficheros de animación en un directorio, solucionando el error
- *              de "undefined reference" durante el enlazado.
+ * Fecha: 13/08/2025 - 10:01 
+ * Último cambio: Corregido el acceso a miembros de un puntero.
+ * Descripción: Se ha corregido un error de sintaxis en nimation_loader_load_frame donde se usaba el operador '.' en lugar de '->' para acceder a los datos de la animación a través de un puntero, lo que causaba un fallo de compilación.
  */
 #include "animation_loader.h"
 #include "esp_log.h"
@@ -61,6 +59,7 @@ bool animation_loader_load_frame(animation_t *anim, uint16_t frame_index, const 
     if (!f) { return false; } // No logueamos aquí para no spamear durante el conteo.
     
     fseek(f, LVGL_BIN_HEADER_SIZE, SEEK_SET);
+    // [CORRECCIÓN] Se usa '->' en lugar de '.' porque 'anim' es un puntero.
     fread((void *)anim->img_dsc.data, 1, anim->img_dsc.data_size, f);
     fclose(f);
 

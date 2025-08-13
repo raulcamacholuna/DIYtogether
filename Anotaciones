@@ -3,4 +3,8 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
 
 Frames animacion
 
-python Z:\DIYMON\VSCODE\DIYToguether\components_dependencies\lvgl\scripts\LVGLImage.py z:\DIYMON\SD\lvgl_converter\idle1.png --out z:\DIYMON\SD\lvgl_converter\ --ofmt BIN --cf ARGB8565
+
+
+
+
+python "Z:\DIYTOGETHER\DIYtogether\components_dependencies\lvgl\scripts\LVGLImage.py" "Z:\DIYTOGETHER\DIYtogether\IMG_converter\BG.png" --out "Z:\DIYTOGETHER\DIYtogether\IMG_converter\BG.c" --ofmt C --cf I8

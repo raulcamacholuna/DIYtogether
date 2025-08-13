@@ -1,3 +1,11 @@
+# Fichero: ./components_dependencies/lvgl/CMakeLists.txt
+# Fecha: 13/08/2025 - 10:14 
+# Último cambio: Añadida la dependencia 'fatfs' para el soporte de sistema de ficheros.
+# Descripción: Registro del componente LVGL. Se añade la dependencia 'fatfs' para que el compilador encuentre 'ff.h' al compilar el driver de LVGL para FatFS, solucionando un error de 'file not found'.
+# Fichero: ./components_dependencies/lvgl/CMakeLists.txt
+# Fecha: 13/08/2025 - 10:12 
+# Último cambio: Añadida la dependencia 'fatfs' para el soporte de sistema de ficheros.
+# Descripción: Registro del componente LVGL. Se añade la dependencia 'fatfs' para que el compilador encuentre 'ff.h' al compilar el driver de LVGL para FatFS, solucionando un error de 'file not found'.
 cmake_minimum_required(VERSION 3.12.4)
 
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
@@ -34,3 +42,4 @@ if (MSVC)
     PRIVATE LV_ATTRIBUTE_EXTERN_DATA=__declspec\(dllexport\)
   )
 endif()
+

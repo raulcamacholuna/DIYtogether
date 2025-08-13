@@ -1,8 +1,8 @@
 /*
   Fichero: ./components/diymon_ui/ui_asset_loader.c
-  Fecha: 14/08/2025 - 11:00 am
-  Último cambio: Actualizada la carga de assets para usar la nueva estructura de nombres.
-  Descripción: Implementación del gestor de assets. Se han modificado los nombres de los ficheros binarios para que coincidan con la estructura `BTN_X.bin` y `EVO_X.bin` proporcionada.
+  Fecha: 13/08/2025 - 09:37 
+  Último cambio: Eliminada la función no utilizada swap_bytes_for_rgb565.
+  Descripción: Implementación del gestor de assets. Se ha eliminado una función estática que no se estaba utilizando para limpiar el código y resolver una advertencia del compilador.
 */
 #include "ui_asset_loader.h"
 #include "diymon_ui_helpers.h"
@@ -15,18 +15,6 @@ static const char *TAG = "UI_ASSET_LOADER";
 // Almacenamiento estático para los descriptores y los datos de los iconos.
 static lv_img_dsc_t g_asset_dscs[ASSET_COUNT];
 static uint8_t* g_asset_buffers[ASSET_COUNT] = {NULL};
-
-/**
- * @brief Invierte el orden de los bytes para cada píxel de 16 bits (RGB565).
- *        Necesario para corregir el endianness en la plataforma.
- */
-static void swap_bytes_for_rgb565(uint8_t *data, size_t size) {
-    for (size_t i = 0; i < size; i += 2) {
-        uint8_t temp = data[i];
-        data[i] = data[i + 1];
-        data[i + 1] = temp;
-    }
-}
 
 /**
  * @brief Carga un único asset (icono) desde un fichero a la memoria.
@@ -60,9 +48,6 @@ static bool load_asset(ui_asset_id_t id, const char* filename) {
     fseek(f, sizeof(lv_image_header_t), SEEK_SET);
     fread(g_asset_buffers[id], 1, data_size, f);
     fclose(f);
-    
-    // Corregir los bytes de los datos leídos.
-    // swap_bytes_for_rgb565(g_asset_buffers[id], data_size);
     
     // Apuntar el descriptor al búfer en memoria.
     g_asset_dscs[id].data = g_asset_buffers[id];

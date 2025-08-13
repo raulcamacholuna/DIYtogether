@@ -1,13 +1,11 @@
 /*
  * Fichero: ./components/diymon_ui/ui_idle_animation.c
- * Fecha: 11/08/2025 - 10:15
- * Último cambio: Implementadas las funciones para pausar y reanudar.
- * Descripción: Implementación de la animación de reposo. Se añaden las funciones
- *              para pausar y reanudar su temporizador, evitando conflictos de
- *              renderizado con otras animaciones que usen el mismo búfer.
+ * Fecha: 13/08/2025 - 09:34 
+ * Último cambio: Refactorizado para usar el objeto de imagen y búfer compartidos.
+ * Descripción: La animación de reposo ya no crea su propio objeto de imagen. En su lugar, utiliza el g_animation_img_obj global creado por el módulo de animaciones de acción. Esto soluciona conflictos de renderizado y asegura el uso de un único búfer de memoria.
  */
 #include "ui_idle_animation.h"
-#include "ui_action_animations.h" // Necesario para obtener el reproductor compartido
+#include "ui_action_animations.h" // Necesario para obtener el reproductor y el objeto de imagen compartidos
 #include "animation_loader.h"
 #include "diymon_ui_helpers.h"
 #include "esp_log.h"
@@ -17,11 +15,9 @@
 
 static const char *TAG = "UI_IDLE_ANIM";
 
-#define IDLE_ANIM_FRAME_COUNT 3
 #define IDLE_FRAME_INTERVAL 1500
 
 // Variables estáticas para la gestión de la animación de reposo
-static lv_obj_t *g_anim_img_obj;
 static lv_timer_t *g_anim_timer;
 static animation_t g_idle_animation_player; // Player local que usa el búfer compartido
 static int g_current_frame_index = -1;
@@ -31,18 +27,19 @@ static void idle_animation_timer_cb(lv_timer_t *timer) {
     
     g_current_frame_index = (g_current_frame_index + 1) % g_idle_animation_player.frame_count;
     
-    if (animation_loader_load_frame(&g_idle_animation_player, g_current_frame_index, "IDLE_")) {
-        lv_obj_invalidate(g_anim_img_obj);
+    if (animation_loader_load_frame(&g_idle_animation_player, g_current_frame_index, "ANIM_IDLE_")) {
+        lv_obj_invalidate(g_animation_img_obj); // Invalida el objeto de imagen compartido
     }
 }
 
-lv_obj_t* ui_idle_animation_start(lv_obj_t *parent) {
+void ui_idle_animation_start(void) {
     animation_t* shared_player = ui_action_animations_get_player();
     if (shared_player == NULL || shared_player->img_dsc.data == NULL) {
         ESP_LOGE(TAG, "No se puede iniciar la animación idle: el búfer compartido no es válido.");
-        return NULL;
+        return;
     }
 
+    // Apuntar al búfer de datos del descriptor de imagen compartido
     g_idle_animation_player.img_dsc = shared_player->img_dsc;
 
     char anim_path[128];
@@ -51,18 +48,18 @@ lv_obj_t* ui_idle_animation_start(lv_obj_t *parent) {
     if (len > 0 && anim_path[len - 1] == '/') anim_path[len - 1] = '\0';
     
     g_idle_animation_player.base_path = strdup(anim_path);
-    g_idle_animation_player.frame_count = IDLE_ANIM_FRAME_COUNT;
-
-    g_anim_img_obj = lv_img_create(parent);
-    lv_img_set_src(g_anim_img_obj, &g_idle_animation_player.img_dsc);
-    lv_obj_align(g_anim_img_obj, LV_ALIGN_TOP_LEFT, 0, 0);
-    lv_obj_move_background(g_anim_img_obj);
-
-    g_anim_timer = lv_timer_create(idle_animation_timer_cb, IDLE_FRAME_INTERVAL, NULL);
-    lv_timer_ready(g_anim_timer);
+    g_idle_animation_player.frame_count = animation_loader_count_frames(anim_path, "ANIM_IDLE_");
     
-    ESP_LOGI(TAG, "Animación de Idle iniciada desde %s (usando búfer compartido).", anim_path);
-    return g_anim_img_obj;
+    if(g_idle_animation_player.frame_count == 0) {
+        ESP_LOGW(TAG, "No se encontraron fotogramas para 'ANIM_IDLE_' en %s.", anim_path);
+    }
+    
+    // El objeto de imagen ya existe, no se crea uno nuevo.
+    // Se crea el temporizador que cargará los fotogramas y los dibujará.
+    g_anim_timer = lv_timer_create(idle_animation_timer_cb, IDLE_FRAME_INTERVAL, NULL);
+    lv_timer_ready(g_anim_timer); // Ejecuta el primer ciclo inmediatamente para cargar el frame inicial
+    
+    ESP_LOGI(TAG, "Animación de Idle iniciada desde %s con %d fotogramas (usando búfer compartido).", anim_path, g_idle_animation_player.frame_count);
 }
 
 void ui_idle_animation_stop(void) {

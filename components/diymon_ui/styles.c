@@ -1,14 +1,12 @@
 /*
- * Archivo: styles.c
- * Versión: 8.0 (CORREGIDO sin el include de images.h)
+ * Fichero: ./components/diymon_ui/styles.c
+ * Fecha: 13/08/2025 - 11:27 
+ * Último cambio: Eliminado el include obsoleto a images.h.
+ * Descripción: Limpieza del fichero de estilos. Se elimina un comentario
+ *              que hacía referencia a un fichero de imágenes inexistente.
  */
-
 #include "styles.h"
-// [ELIMINADO] #include "images.h" // Este archivo ya no existe.
 #include "lvgl.h"
-
-// Aquí iría tu código para crear y registrar estilos de LVGL, si lo tuvieras.
-// Por ahora, puede estar vacío.
 
 void init_styles(void) {
     // Inicializa aquí los estilos que necesites

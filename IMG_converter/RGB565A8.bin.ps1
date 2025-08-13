@@ -1,4 +1,4 @@
-# Fichero: Convertir-PNG-Individual.ps1
+# Fichero: RGB565A8.bin.ps1
 # Fecha: 10/08/2025 - 06:00
 # Último cambio: Corregido el parámetro --out para generar ficheros en lugar de carpetas.
 # Descripción: Script de PowerShell que procesa cada fichero .png de forma individual. Se ha
@@ -44,9 +44,9 @@ foreach ($file in $pngFiles) {
     # --- LA SOLUCIÓN ---
     # Al parámetro --out solo le pasamos la carpeta de destino.
     # El script de LVGL se encargará de nombrar el fichero de salida correctamente.
-    $commandToRun = "python `"$lvglConverterScript`" `"$inputFile`" --out `"$currentFolder`" --ofmt BIN --cf RGB565"
+    $commandToRun = "python `"$lvglConverterScript`" `"$inputFile`" --out `"$currentFolder`" --ofmt BIN --cf RGB565A8"
     
-    Write-Host "  -> Comando: $commandToRun" -ForegroundColor Gray
+    Write-Host "-> Comando: $commandToRun" -ForegroundColor Gray
     
     Invoke-Expression $commandToRun
     

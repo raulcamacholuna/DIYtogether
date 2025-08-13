@@ -1,9 +1,9 @@
 # Fichero: ./components/diymon_ui/CMakeLists.txt
-# Fecha: 13/08/2025 - 12:08 
-# Último cambio: Corregida la sintaxis de la variable de CMake para las fuentes.
-# Descripción: Se corrige el error de sintaxis en idf_component_register que impedía
-#              la correcta expansión de la lista de ficheros fuente, solucionando el fallo
-#              de compilación.
+# Fecha: 13/08/2025 - 11:27 
+# Último cambio: Añadido images.c a la lista de fuentes.
+# Descripción: Fichero de compilación de la UI. Se añade el nuevo fichero
+#              'images.c' a la lista de ficheros fuente para que sea
+#              compilado y enlazado, solucionando el error 'undefined reference'.
 
 file(GLOB component_sources
     "*.c"
@@ -12,6 +12,9 @@ file(GLOB component_sources
     "styles/*.c"
     "ui_telemetry.c"
 )
+
+# Se añade explícitamente el nuevo fichero a la lista de fuentes
+list(APPEND component_sources "images.c")
 
 idf_component_register(
     SRCS ${component_sources}

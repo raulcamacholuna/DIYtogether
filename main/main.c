@@ -1,11 +1,8 @@
 /*
   Fichero: ./main/main.c
-  Fecha: 13/08/2025 - 12:06 
-  Último cambio: Eliminada la tarea de telemetría.
-  Descripción: Se elimina la tarea sensor_log_task de este fichero. La responsabilidad
-               de leer y mostrar los datos de los sensores se ha trasladado completamente
-               al nuevo componente ui_telemetry dentro de diymon_ui, centralizando toda
-               la lógica de la interfaz.
+  Fecha: 13/08/2025 - 10:20 
+  Último cambio: Eliminada la integración con el sistema de ficheros de LVGL para evitar errores de compilación.
+  Descripción: Se ha eliminado la llamada a lv_fs_fatfs_init() y su prototipo. El acceso a la SD para cargar recursos se gestionará con funciones estándar de C, volviendo a un enfoque más estable que no depende de la integración directa de LVGL con FatFS.
 */
 #include <stdio.h>
 #include <string.h>
@@ -37,9 +34,6 @@ static void run_wifi_portal_mode(void);
 static void run_main_application_mode(void);
 static bool check_config_mode_flag(void);
 static void erase_config_mode_flag(void);
-static void evolution_timer_callback(void* arg);
-
-static esp_timer_handle_t evolution_timer_handle;
 
 void app_main(void)
 {
@@ -154,22 +148,5 @@ static void erase_config_mode_flag(void) {
         nvs_close(nvs_handle);
     } else {
         ESP_LOGE(TAG, "Error (%s) al abrir NVS para borrar la bandera.", esp_err_to_name(err));
-    }
-}
-
-static void evolution_timer_callback(void* arg) {
-    const char* current_code = diymon_get_current_code();
-    const char* next_evolution = diymon_get_next_evolution_in_sequence(current_code);
-    if (next_evolution != NULL) {
-        ESP_LOGI(TAG, "¡EVOLUCIÓN! Nuevo código: %s", next_evolution);
-        diymon_set_current_code(next_evolution);
-        if (lvgl_port_lock(0)) {
-            delete_screen_main();
-            ui_init();
-            lvgl_port_unlock();
-        }
-    } else {
-        ESP_LOGI(TAG, "El DIYMON ha alcanzado su forma final.");
-        esp_timer_stop(evolution_timer_handle);
     }
 }
