@@ -1,8 +1,8 @@
 /*
  * Fichero: ./components/diymon_ui/ui_action_animations.h
- * Fecha: $timestamp
+ * Fecha: 13/08/2025 - 06:06 
  * Último cambio: Simplificada la interfaz al eliminar la gestión de buffer compartido.
- * Descripción: Interfaz pública para el módulo de animaciones de acción. Se ha eliminado la función `ui_action_animations_get_player` ya que el sistema ya no utiliza un búfer de animación compartido.
+ * Descripción: Interfaz pública para el módulo de animaciones de acción. El sistema ya no utiliza un búfer de animación compartido.
  */
 #ifndef UI_ACTION_ANIMATIONS_H
 #define UI_ACTION_ANIMATIONS_H

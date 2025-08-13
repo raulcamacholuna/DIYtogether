@@ -1,8 +1,8 @@
 /*
  * Fichero: ./components/diymon_ui/animation_loader.c
- * Fecha: 13/08/2025 - 05:59 
- * Último cambio: Revertido el búfer de animación a una gestión sin buffer compartido.
- * Descripción: Se ha revertido la lógica para que cada animación (idle y acción) gestione su propio búfer. El búfer compartido causaba problemas de memoria y complejidad. Ahora, nimation_loader_init reserva memoria y nimation_loader_free la libera, simplificando el ciclo de vida de las animaciones.
+ * Fecha: 13/08/2025 - 06:06 
+ * Último cambio: Revertido a un búfer no compartido y corregido el cálculo del tamaño para RGB565A8.
+ * Descripción: Se ha corregido el cálculo del tamaño del búfer para el formato RGB565A8 (3 bytes/píxel) y se ha vuelto a un modelo donde cada animación gestiona su propia memoria. El problema de memoria anterior se resolvió moviendo el fondo al firmware, liberando suficiente RAM.
  */
 #include "animation_loader.h"
 #include "esp_log.h"
@@ -21,24 +21,25 @@ animation_t animation_loader_init(const char *path, uint16_t width, uint16_t hei
     anim.width = width;
     anim.height = height;
     
-    uint32_t line_bytes = width * 2;
-    uint32_t stride = (line_bytes + 3) & ~3;
-    size_t buffer_size = stride * height;
+    // Para RGB565A8, el stride de la parte de color es width * 2.
+    // El tamaño total del buffer es el plano de color (width * height * 2) más el plano alfa (width * height * 1).
+    uint32_t rgb_stride = width * 2; 
+    size_t buffer_size = (size_t)width * height * 3; // Cálculo correcto para 3 bytes por píxel
 
     anim.img_dsc.data = (uint8_t *)malloc(buffer_size);
     if (!anim.img_dsc.data) { 
-        ESP_LOGE(TAG, "Fallo al reservar buffer de animación de tamaño %d!", (int)buffer_size);
+        ESP_LOGE(TAG, "Fallo al reservar buffer de animación de tamaño %u!", (unsigned int)buffer_size);
         animation_loader_free(&anim); 
         return anim; 
     }
     
     anim.img_dsc.header.w = width;
     anim.img_dsc.header.h = height;
-    anim.img_dsc.header.stride = stride;
+    anim.img_dsc.header.stride = rgb_stride;
     anim.img_dsc.header.cf = LV_COLOR_FORMAT_RGB565A8;
     anim.img_dsc.data_size = buffer_size;
     
-    ESP_LOGI(TAG, "Gestor de animación inicializado. Buffer de %d bytes.", (int)buffer_size);
+    ESP_LOGI(TAG, "Gestor de animación inicializado. Buffer de %u bytes.", (unsigned int)buffer_size);
     return anim;
 }
 

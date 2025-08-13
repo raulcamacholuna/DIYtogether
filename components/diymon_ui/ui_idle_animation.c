@@ -1,8 +1,8 @@
 /*
  * Fichero: ./components/diymon_ui/ui_idle_animation.c
- * Fecha: 13/08/2025 - 05:59 
- * Último cambio: Adaptado a la gestión de memoria sin buffer compartido.
- * Descripción: La animación de reposo ahora crea y gestiona su propio nimation_t player, cargando los fotogramas desde la SD. Ya no depende de un búfer compartido, lo que simplifica la lógica y previene conflictos de memoria.
+ * Fecha: 13/08/2025 - 06:11 
+ * Último cambio: Modificada la lógica de pausa/reanudación para no liberar memoria.
+ * Descripción: La función de pausa ahora solo detiene el temporizador de la animación en lugar de liberar el buffer de memoria. La función de reanudación reinicia el temporizador y fuerza un redibujado inmediato del frame actual. Esto evita que la animación desaparezca durante los gestos del panel.
  */
 #include "ui_idle_animation.h"
 #include "ui_action_animations.h" 
@@ -30,7 +30,7 @@ static void idle_animation_timer_cb(lv_timer_t *timer) {
     
     if (animation_loader_load_frame(&s_idle_animation_player, g_current_frame_index, "ANIM_IDLE_")) {
         if (g_animation_img_obj) {
-            lv_img_set_src(g_animation_img_obj, &s_idle_animation_player.img_dsc);
+            lv_image_set_src(g_animation_img_obj, &s_idle_animation_player.img_dsc);
             lv_obj_invalidate(g_animation_img_obj);
         }
     }
@@ -68,7 +68,7 @@ void ui_idle_animation_stop(void) {
 }
 
 void ui_idle_animation_pause(void) {
-    if (g_anim_timer) {
+    if (g_anim_timer && g_is_idle_running) {
         lv_timer_pause(g_anim_timer);
         g_is_idle_running = false;
         ESP_LOGI(TAG, "Animación de Idle PAUSADA.");
@@ -76,11 +76,13 @@ void ui_idle_animation_pause(void) {
 }
 
 void ui_idle_animation_resume(void) {
-    if (g_anim_timer) {
+    if (g_anim_timer && !g_is_idle_running) {
         g_is_idle_running = true;
         lv_timer_resume(g_anim_timer);
         // Forzar una actualización inmediata para mostrar el idle en lugar del último frame de la acción
-        idle_animation_timer_cb(g_anim_timer);
+        if (g_animation_img_obj) {
+             lv_image_set_src(g_animation_img_obj, &s_idle_animation_player.img_dsc);
+        }
         ESP_LOGI(TAG, "Animación de Idle REANUDADA.");
     }
 }

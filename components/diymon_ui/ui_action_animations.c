@@ -1,8 +1,8 @@
 /*
  * Fichero: ./components/diymon_ui/ui_action_animations.c
- * Fecha: 13/08/2025 - 05:59 
+ * Fecha: 13/08/2025 - 06:06 
  * Último cambio: Adaptado a la gestión de memoria sin buffer compartido.
- * Descripción: La gestión de animaciones de acción ahora crea y libera su propio nimation_t player en cada reproducción. Esto simplifica la lógica y elimina la dependencia de un búfer de animación compartido, resolviendo conflictos de memoria.
+ * Descripción: La gestión de animaciones de acción ahora crea y libera su propio nimation_t player en cada reproducción. Esto simplifica la lógica y elimina la dependencia de un búfer de animación compartido.
  */
 #include "ui_action_animations.h"
 #include "animation_loader.h"
@@ -33,7 +33,7 @@ static const char* get_anim_prefix(diymon_action_id_t action_id);
 
 void ui_action_animations_create(lv_obj_t *parent) {
     // Solo crea el objeto de imagen. El buffer se gestionará por animación.
-    g_animation_img_obj = lv_img_create(parent);
+    g_animation_img_obj = lv_image_create(parent);
     lv_obj_set_style_bg_opa(g_animation_img_obj, LV_OPA_TRANSP, 0);
     lv_obj_align(g_animation_img_obj, LV_ALIGN_BOTTOM_MID, 0, 0);
 }
@@ -67,7 +67,7 @@ void ui_action_animations_play(diymon_action_id_t action_id) {
         return;
     }
     
-    lv_img_set_src(g_animation_img_obj, &s_animation_player.img_dsc);
+    lv_image_set_src(g_animation_img_obj, &s_animation_player.img_dsc);
 
     s_current_frame_index = 0;
     if (animation_loader_load_frame(&s_animation_player, s_current_frame_index, prefix)) {
@@ -80,7 +80,7 @@ void ui_action_animations_play(diymon_action_id_t action_id) {
 }
 
 void ui_action_animations_destroy(void) {
-    // Esta función ya no necesita hacer nada, la limpieza se hace en animation_finished
+    // La limpieza se hace en animation_finished al terminar cada animación
 }
 
 static void animation_timer_cb(lv_timer_t *timer) {
