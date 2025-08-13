@@ -1,8 +1,8 @@
 /*
  * Fichero: ./components/diymon_ui/BG.h
- * Fecha: 13/08/2025 - 10:50 
+ * Fecha: 13/08/2025 - 05:59 
  * Último cambio: Creación del fichero.
- * Descripción: Declara el descriptor de la imagen de fondo g_0 que está
+ * Descripción: Declara el descriptor de la imagen de fondo `bg_0` que está
  *              definida en BG.c para que sea accesible desde otros módulos.
  */
 #ifndef BG_H

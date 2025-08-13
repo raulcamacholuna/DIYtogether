@@ -1,25 +1,17 @@
+/*
+  Fichero: ./components/diymon_ui/BG.c
+  Fecha: 13/08/2025 - 05:59 
+  Último cambio: Creado el asset del fondo de pantalla como un fichero C en formato I8.
+  Descripción: Contiene los datos de la imagen de fondo como un array C en formato I8 (indexado de 8 bits) para ser compilado directamente en el firmware. Se debe reemplazar el contenido de 'bg_0_map' con el array generado por el convertidor de LVGL.
+*/
+#include <lvgl.h>
 
-#if defined(LV_LVGL_H_INCLUDE_SIMPLE)
-#include "lvgl.h"
-#elif defined(LV_BUILD_TEST)
-#include "../lvgl.h"
-#else
-#include "lvgl/lvgl.h"
-#endif
-
-
-#ifndef LV_ATTRIBUTE_MEM_ALIGN
-#define LV_ATTRIBUTE_MEM_ALIGN
-#endif
-
-#ifndef LV_ATTRIBUTE_IMG_DUST
-#define LV_ATTRIBUTE_IMG_DUST
-#endif
-
-static const
-LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_DUST
-uint8_t BG_map[] = {
-
+// ¡¡¡CRÍTICO!!!: El siguiente array es solo un marcador de posición para que el proyecto compile.
+// DEBES REEMPLAZAR todo el contenido de este array con el array 'C'
+// generado por el Convertidor de Imágenes Online de LVGL para tu fichero de fondo.
+// Asegúrate de seleccionar el formato de color correcto (I8, indexado 8 bits).
+// Un fondo de 170x320 en I8 debería ocupar (170 * 320 * 1) = 54400 bytes, más la paleta.
+static const uint8_t bg_0_map[] = {
     0x14,0x35,0x1f,0xff,0x15,0x37,0x20,0xff,0x0e,0x2b,0x18,0xff,0x16,0x37,0x20,0xff,
     0x17,0x38,0x20,0xff,0x14,0x35,0x1e,0xff,0x14,0x37,0x21,0xff,0x16,0x38,0x20,0xff,
     0x14,0x38,0x1f,0xff,0x15,0x36,0x1e,0xff,0x15,0x3a,0x23,0xff,0x15,0x36,0x20,0xff,
@@ -408,14 +400,12 @@ uint8_t BG_map[] = {
 
 };
 
-const lv_image_dsc_t BG = {
-  .header.magic = LV_IMAGE_HEADER_MAGIC,
-  .header.cf = LV_COLOR_FORMAT_I8,
-  .header.flags = 0,
-  .header.w = 170,
-  .header.h = 320,
-  .header.stride = 170,
-  .data_size = sizeof(BG_map),
-  .data = BG_map,
+// Descriptor de imagen LVGL que apunta al array del fondo.
+const lv_img_dsc_t bg_0 = {
+    .header.cf = LV_COLOR_FORMAT_I8,
+    .header.w = 170,
+    .header.h = 320,
+    .header.stride = 170, // 170 píxeles * 1 byte por píxel
+    .data_size = sizeof(bg_0_map),
+    .data = bg_0_map,
 };
-

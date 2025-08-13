@@ -1,8 +1,8 @@
 /*
  * Fichero: ./components/diymon_ui/animation_loader.c
- * Fecha: 13/08/2025 - 05:44 
- * Último cambio: Corregido el formato de color a RGB565A8 para soportar transparencia alfa.
- * Descripción: Se ha corregido el formato de color en el descriptor de imagen a LV_COLOR_FORMAT_RGB565A8. Esto permite que LVGL interprete correctamente el canal alfa de 8 bits incluido en los assets .bin, logrando fondos transparentes para las animaciones.
+ * Fecha: 13/08/2025 - 05:59 
+ * Último cambio: Revertido el búfer de animación a una gestión sin buffer compartido.
+ * Descripción: Se ha revertido la lógica para que cada animación (idle y acción) gestione su propio búfer. El búfer compartido causaba problemas de memoria y complejidad. Ahora, nimation_loader_init reserva memoria y nimation_loader_free la libera, simplificando el ciclo de vida de las animaciones.
  */
 #include "animation_loader.h"
 #include "esp_log.h"
@@ -21,21 +21,20 @@ animation_t animation_loader_init(const char *path, uint16_t width, uint16_t hei
     anim.width = width;
     anim.height = height;
     
-    // Para RGB565A8, el stride se refiere a la parte de color (2 bytes/px).
-    // El tamaño total del buffer debe incluir el plano alfa (1 byte/px).
-    uint32_t rgb_stride = width * 2; 
-    size_t buffer_size = (width * height * 2) + (width * height);
+    uint32_t line_bytes = width * 2;
+    uint32_t stride = (line_bytes + 3) & ~3;
+    size_t buffer_size = stride * height;
 
     anim.img_dsc.data = (uint8_t *)malloc(buffer_size);
     if (!anim.img_dsc.data) { 
-        ESP_LOGE(TAG, "Fallo al reservar buffer de animación!");
+        ESP_LOGE(TAG, "Fallo al reservar buffer de animación de tamaño %d!", (int)buffer_size);
         animation_loader_free(&anim); 
         return anim; 
     }
     
     anim.img_dsc.header.w = width;
     anim.img_dsc.header.h = height;
-    anim.img_dsc.header.stride = rgb_stride;
+    anim.img_dsc.header.stride = stride;
     anim.img_dsc.header.cf = LV_COLOR_FORMAT_RGB565A8;
     anim.img_dsc.data_size = buffer_size;
     
@@ -44,7 +43,7 @@ animation_t animation_loader_init(const char *path, uint16_t width, uint16_t hei
 }
 
 bool animation_loader_load_frame(animation_t *anim, uint16_t frame_index, const char *prefix) {
-    if (!anim || !anim->base_path) return false;
+    if (!anim || !anim->base_path || !anim->img_dsc.data) return false;
     char full_path[128];
     snprintf(full_path, sizeof(full_path), "%s/%s%d.bin", anim->base_path, prefix, frame_index + 1);
 

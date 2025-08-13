@@ -1,8 +1,8 @@
 /*
  * Fichero: ./components/diymon_ui/diymon_ui_helpers.c
- * Fecha: 13/08/2025 - 05:41 
+ * Fecha: 13/08/2025 - 05:59 
  * Último cambio: Modificado para usar el fondo de pantalla desde el firmware.
- * Descripción: Se ha reescrito la función `ui_helpers_load_background` para que utilice el asset `bg_0` compilado en el firmware en lugar de cargarlo desde la tarjeta SD. Esto elimina la necesidad de un buffer en RAM para el fondo, solucionando el error de memoria insuficiente. La función para liberar el buffer ha sido eliminada.
+ * Descripción: Se ha reescrito la función `ui_helpers_load_background` para que utilice el asset `bg_0` compilado en el firmware en lugar de cargarlo desde la tarjeta SD. Se crea un objeto de imagen que se mueve al fondo de la pantalla.
  */
 #include "diymon_ui_helpers.h"
 #include "diymon_evolution.h"
@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include "assets/BG.h" // Incluir el nuevo asset de fondo
+#include "BG.h" // Incluir el nuevo asset de fondo
 
 #define SD_MOUNT_POINT "/sdcard"
 static const char* TAG_HELPERS = "UI_HELPERS";
@@ -35,16 +35,17 @@ void ui_helpers_build_asset_path(char* buffer, size_t buffer_size, const char* a
     snprintf(buffer, buffer_size, "%s/DIYMON/%s/%s", SD_MOUNT_POINT, dir_name, asset_filename);
 }
 
-// Carga la imagen de fondo desde el firmware.
+// Carga la imagen de fondo desde el firmware creando un objeto de imagen.
 void ui_helpers_load_background(lv_obj_t* parent) {
-    ESP_LOGI(TAG_HELPERS, "Fondo de pantalla cargado desde firmware.");
-    lv_obj_set_style_bg_img_src(parent, &bg_0, 0);
-    lv_obj_set_style_bg_opa(parent, LV_OPA_COVER, 0);
+    ESP_LOGI(TAG_HELPERS, "Creando objeto de imagen para el fondo desde firmware.");
+    lv_obj_t *bg_img = lv_image_create(parent);
+    lv_image_set_src(bg_img, &bg_0);
+    lv_obj_set_pos(bg_img, 0, 0); 
+    lv_obj_move_background(bg_img); 
 }
 
 // La función para liberar el buffer de fondo ya no es necesaria.
 void ui_helpers_free_background_buffer() {
-    // Esta función se mantiene vacía por compatibilidad, pero ya no hace nada.
     ESP_LOGD(TAG_HELPERS, "ui_helpers_free_background_buffer ya no es necesaria y ha sido ignorada.");
 }
 

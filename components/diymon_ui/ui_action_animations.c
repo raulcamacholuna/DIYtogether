@@ -1,8 +1,8 @@
 /*
  * Fichero: ./components/diymon_ui/ui_action_animations.c
- * Fecha: 13/08/2025 - 05:19 
- * Último cambio: Eliminadas las llamadas a funciones de chroma key inexistentes.
- * Descripción: Se han eliminado las llamadas a lv_obj_set_style_img_chroma_keyed y lv_obj_set_style_img_chroma_key_color que causaban errores de compilación ya que no existen en la API de LVGL v9.
+ * Fecha: 13/08/2025 - 05:59 
+ * Último cambio: Adaptado a la gestión de memoria sin buffer compartido.
+ * Descripción: La gestión de animaciones de acción ahora crea y libera su propio nimation_t player en cada reproducción. Esto simplifica la lógica y elimina la dependencia de un búfer de animación compartido, resolviendo conflictos de memoria.
  */
 #include "ui_action_animations.h"
 #include "animation_loader.h"
@@ -16,7 +16,7 @@ static const char *TAG = "UI_ACTION_ANIM";
 
 // --- Variables Globales y Estáticas ---
 lv_obj_t *g_animation_img_obj;
-animation_t g_animation_player;
+static animation_t s_animation_player; // Player local para esta animación
 
 static lv_timer_t *s_anim_timer;
 static bool s_is_action_in_progress = false;
@@ -32,26 +32,14 @@ static const char* get_anim_prefix(diymon_action_id_t action_id);
 // --- Implementación de Funciones Públicas ---
 
 void ui_action_animations_create(lv_obj_t *parent) {
-    g_animation_player = animation_loader_init(NULL, 150, 230, 0);
-    if (g_animation_player.img_dsc.data == NULL) {
-        ESP_LOGE(TAG, "FALLO CRÍTICO: No se pudo reservar memoria para el búfer de animación compartido.");
-        return;
-    }
-    ESP_LOGI(TAG, "Búfer de animación compartido (150x230) pre-reservado correctamente.");
-
+    // Solo crea el objeto de imagen. El buffer se gestionará por animación.
     g_animation_img_obj = lv_img_create(parent);
-    lv_img_set_src(g_animation_img_obj, &g_animation_player.img_dsc);
-    
     lv_obj_set_style_bg_opa(g_animation_img_obj, LV_OPA_TRANSP, 0);
     lv_obj_align(g_animation_img_obj, LV_ALIGN_BOTTOM_MID, 0, 0);
 }
 
 void ui_action_animations_play(diymon_action_id_t action_id) {
     if (s_is_action_in_progress || action_id >= ACTION_ID_COUNT) return;
-    if (g_animation_player.img_dsc.data == NULL) {
-        ESP_LOGE(TAG, "No se puede iniciar la animación: el búfer compartido no está disponible.");
-        return;
-    }
 
     s_is_action_in_progress = true;
     
@@ -72,12 +60,17 @@ void ui_action_animations_play(diymon_action_id_t action_id) {
     
     ESP_LOGI(TAG, "Reproduciendo animación '%s' (%d fotogramas) a %dms/frame.", prefix, frame_count, FRAME_INTERVAL_MS);
 
-    if (g_animation_player.base_path) free(g_animation_player.base_path);
-    g_animation_player.base_path = strdup(path_buffer);
-    g_animation_player.frame_count = frame_count;
+    s_animation_player = animation_loader_init(path_buffer, 150, 230, frame_count);
+    if(s_animation_player.img_dsc.data == NULL) {
+        ESP_LOGE(TAG, "No se pudo crear el reproductor para la animación de acción.");
+        animation_finished();
+        return;
+    }
+    
+    lv_img_set_src(g_animation_img_obj, &s_animation_player.img_dsc);
 
     s_current_frame_index = 0;
-    if (animation_loader_load_frame(&g_animation_player, s_current_frame_index, prefix)) {
+    if (animation_loader_load_frame(&s_animation_player, s_current_frame_index, prefix)) {
         lv_obj_invalidate(g_animation_img_obj);
         s_anim_timer = lv_timer_create(animation_timer_cb, FRAME_INTERVAL_MS, (void*)(intptr_t)action_id);
     } else {
@@ -87,17 +80,12 @@ void ui_action_animations_play(diymon_action_id_t action_id) {
 }
 
 void ui_action_animations_destroy(void) {
-    ESP_LOGI(TAG, "Liberando búfer de animación compartido.");
-    animation_loader_free(&g_animation_player);
-}
-
-animation_t* ui_action_animations_get_player(void) {
-    return &g_animation_player;
+    // Esta función ya no necesita hacer nada, la limpieza se hace en animation_finished
 }
 
 static void animation_timer_cb(lv_timer_t *timer) {
     s_current_frame_index++;
-    if (s_current_frame_index >= g_animation_player.frame_count) {
+    if (s_current_frame_index >= s_animation_player.frame_count) {
         animation_finished();
         return;
     }
@@ -105,7 +93,7 @@ static void animation_timer_cb(lv_timer_t *timer) {
     diymon_action_id_t action_id = (diymon_action_id_t)(intptr_t)timer->user_data;
     const char *prefix = get_anim_prefix(action_id);
 
-    if (animation_loader_load_frame(&g_animation_player, s_current_frame_index, prefix)) {
+    if (animation_loader_load_frame(&s_animation_player, s_current_frame_index, prefix)) {
         lv_obj_invalidate(g_animation_img_obj);
     } else {
         ESP_LOGW(TAG, "No se pudo cargar el fotograma %d para %s. Finalizando animación.", s_current_frame_index + 1, prefix);
@@ -119,11 +107,7 @@ static void animation_finished(void) {
         s_anim_timer = NULL;
     }
     
-    if (g_animation_player.base_path) {
-        free(g_animation_player.base_path);
-        g_animation_player.base_path = NULL;
-    }
-    g_animation_player.frame_count = 0;
+    animation_loader_free(&s_animation_player);
     
     ui_idle_animation_resume();
     
