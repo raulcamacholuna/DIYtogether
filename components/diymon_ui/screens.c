@@ -1,8 +1,8 @@
 /*
   Fichero: ./components/diymon_ui/screens.c
-  Fecha: 13/08/2025 - 05:41 
-  Último cambio: Eliminada la llamada a la función obsoleta ui_helpers_free_background_buffer.
-  Descripción: Se ha eliminado la llamada a `ui_helpers_free_background_buffer` de la función de borrado de la pantalla, ya que el fondo de pantalla ahora se carga desde el firmware y no utiliza un buffer de memoria dinámico.
+  Fecha: 13/08/2025 - 06:14 
+  Último cambio: Añadido un retardo de 500ms para reanudar la animación de reposo.
+  Descripción: Se ha implementado un temporizador que espera 500ms después de que el usuario levanta el dedo de la pantalla (LV_EVENT_RELEASED) antes de reanudar la animación de reposo. Cualquier nueva pulsación cancela este temporizador, mejorando la experiencia de usuario durante interacciones rápidas.
 */
 #include "screens.h"
 #include "ui_idle_animation.h"
@@ -18,6 +18,7 @@ static const char *TAG = "SCREENS";
 
 static uint8_t g_click_count = 0;
 static lv_timer_t *g_double_click_timer = NULL;
+static lv_timer_t *s_resume_idle_timer = NULL; // Temporizador para reanudar el idle
 
 lv_obj_t *g_idle_animation_obj = NULL;
 lv_obj_t *g_main_screen_obj = NULL;
@@ -30,6 +31,12 @@ static void main_screen_event_cb(lv_event_t *e);
 static void double_click_timer_cb(lv_timer_t *timer) {
     g_click_count = 0;
     g_double_click_timer = NULL;
+}
+
+static void resume_idle_timer_cb(lv_timer_t *timer) {
+    ESP_LOGD(TAG, "Temporizador de reanudación de idle disparado.");
+    ui_idle_animation_resume();
+    s_resume_idle_timer = NULL; // El temporizador se auto-elimina (repeat_count=1)
 }
 
 void create_screen_main(void) {
@@ -55,6 +62,12 @@ static void main_screen_event_cb(lv_event_t *e) {
 
     switch(code) {
         case LV_EVENT_PRESSED: {
+            // Si hay un temporizador para reanudar el idle, lo cancelamos.
+            if (s_resume_idle_timer) {
+                lv_timer_del(s_resume_idle_timer);
+                s_resume_idle_timer = NULL;
+            }
+
             lv_point_t p;
             lv_indev_get_point(indev, &p);
             touch_start_x = p.x;
@@ -65,10 +78,18 @@ static void main_screen_event_cb(lv_event_t *e) {
             }
             break;
         }
-        case LV_EVENT_RELEASED:
+        case LV_EVENT_RELEASED: {
             touch_start_x = -1;
             touch_start_y = -1;
+            
+            // Si la pantalla está encendida y no hay ya un temporizador, creamos uno.
+            if (!screen_manager_is_off() && s_resume_idle_timer == NULL) {
+                 ESP_LOGD(TAG, "Touch released. Starting 500ms timer to resume idle animation.");
+                s_resume_idle_timer = lv_timer_create(resume_idle_timer_cb, 500, NULL);
+                lv_timer_set_repeat_count(s_resume_idle_timer, 1);
+            }
             break;
+        }
         case LV_EVENT_GESTURE: {
             if (!screen_manager_is_off()) { 
                 lv_dir_t dir = lv_indev_get_gesture_dir(indev);
@@ -91,9 +112,6 @@ static void main_screen_event_cb(lv_event_t *e) {
                     screen_manager_turn_on();
                     g_click_count = 0;
                 }
-            } else {
-                ESP_LOGD(TAG, "Simple click detected, resuming idle animation.");
-                ui_idle_animation_resume();
             }
             break;
         }

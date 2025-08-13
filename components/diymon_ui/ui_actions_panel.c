@@ -1,8 +1,8 @@
 /*
   Fichero: ./components/diymon_ui/ui_actions_panel.c
-  Fecha: 13/08/2025 - 05:19 
-  Último cambio: Eliminada la llamada a la función de chroma key inexistente.
-  Descripción: Se ha eliminado la llamada a lv_obj_set_style_img_chroma_keyed que causaba un error de compilación al no existir en la API de LVGL v9.
+  Fecha: 13/08/2025 - 06:17 
+  Último cambio: Implementada la navegación circular de paneles.
+  Descripción: Se ha añadido lógica para que, al hacer un gesto de deslizar hacia abajo en el último panel (Configuración), se oculte este y se muestre el primer panel (Jugador), creando un bucle de navegación.
 */
 #include "ui_actions_panel.h"
 #include "ui_asset_loader.h"
@@ -311,7 +311,11 @@ void ui_actions_panel_handle_gesture(lv_dir_t dir, lv_coord_t start_x, lv_coord_
             break;
             
         case PANEL_STATE_CONFIG_VISIBLE:
-            if (dir == LV_DIR_TOP) {
+             if (dir == LV_DIR_BOTTOM) { // Navegación circular
+                animate_panel_out_top(s_config_btns);
+                animate_panel_in_top(s_player_btns);
+                s_panel_state = PANEL_STATE_PLAYER_VISIBLE;
+            } else if (dir == LV_DIR_TOP) {
                 animate_panel_out_top(s_config_btns);
                 s_panel_state = PANEL_STATE_HIDDEN;
                 ui_idle_animation_resume();
