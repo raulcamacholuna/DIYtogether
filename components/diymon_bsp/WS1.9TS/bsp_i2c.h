@@ -1,14 +1,12 @@
 /*
- * Archivo: components/diymon_bsp/WS1.9TS/bsp_touch.h
- * Versión Corregida: Header privado para el módulo táctil.
+ * Fichero: ./components/diymon_bsp/WS1.9TS/bsp_i2c.h
+ * Fecha: 13/08/2025 - 05:00 
+ * Último cambio: Corregido el contenido del fichero.
+ * Descripción: Cabecera privada para el módulo I2C del BSP. Se ha corregido un error de copiado y pegado que contenía declaraciones incorrectas.
  */
-#ifndef BSP_TOUCH_H__
-#define BSP_TOUCH_H__
+#ifndef BSP_I2C_H__
+#define BSP_I2C_H__
 
-#include "driver/i2c_master.h"
-#include "esp_lcd_touch_axs5106.h"
+// Este es un header privado. Las declaraciones públicas están en bsp_api.h.
 
-// No se declaran funciones aquí porque todas las funciones públicas
-// están definidas en bsp_api.h.
-
-#endif // BSP_TOUCH_H__
+#endif // BSP_I2C_H__

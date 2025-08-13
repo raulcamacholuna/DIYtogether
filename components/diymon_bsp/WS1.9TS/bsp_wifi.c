@@ -1,8 +1,8 @@
 /*
   Fichero: ./components/diymon_bsp/WS1.9TS/bsp_wifi.c
-  Fecha: 12/08/2025 - 04:35 pm
-  Último cambio: Añadido log de depuración para mostrar la contraseña leída de NVS.
-  Descripción: Gestor de conexión WiFi. Se añade un log de advertencia para imprimir la contraseña real utilizada durante la conexión, facilitando la depuración de caracteres especiales.
+  Fecha: 13/08/2025 - 05:00 
+  Último cambio: Añadida la función bsp_wifi_init_sta para corregir error de compilación.
+  Descripción: Gestor de conexión WiFi. Se añade una nueva función para permitir la conexión a una red WiFi pasando el SSID y la contraseña directamente, sin depender de la NVS.
 */
 #include "bsp_api.h"
 #include <string.h>
@@ -222,3 +222,41 @@ void bsp_wifi_get_ip(char *ip) {
         sprintf(ip, IPSTR, IP2STR(&ip_info.ip));
     }
 }
+
+void bsp_wifi_init_sta(const char *ssid, const char *pass) {
+    esp_netif_create_default_wifi_sta();
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL, NULL));
+
+    s_ip_acquired_sem = xSemaphoreCreateBinary();
+
+    if (ssid && strlen(ssid) > 0) {
+        ESP_LOGI(TAG, "Configurando conexión: SSID:[%s]", ssid);
+
+        wifi_config_t wifi_config = {0};
+        strcpy((char *)wifi_config.sta.ssid, ssid);
+        if (pass) {
+             strcpy((char *)wifi_config.sta.password, pass);
+        }
+        wifi_config.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
+        wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK; // Default to WPA2 for compatibility
+        wifi_config.sta.pmf_cfg.capable = false;
+        wifi_config.sta.pmf_cfg.required = false;
+
+        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+        ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+        
+        ESP_LOGI(TAG, "Protocolos WiFi limitados a 802.11b/g/n para máxima compatibilidad.");
+        ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N));
+        
+        ESP_ERROR_CHECK(esp_wifi_start());
+        ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
+
+        ESP_LOGI(TAG, "Iniciando conexión a la red: %s", ssid);
+    } else {
+        ESP_LOGW(TAG, "SSID inválido para conectar.");
+    }
+}
+

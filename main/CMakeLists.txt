@@ -1,8 +1,7 @@
 # Fichero: ./main/CMakeLists.txt
-# Fecha: 12/08/2025 - 13:00
-# Último cambio: Actualizadas las dependencias para usar el nuevo servidor web.
-# Descripción: Se elimina la dependencia del componente `ftp_server` y se añade
-#              la dependencia del nuevo componente `web_server`.
+# Fecha: 13/08/2025 - 05:44 
+# Último cambio: Eliminada la dependencia de iot_button.
+# Descripción: Se ha eliminado la dependencia del componente iot_button que ya no es necesario después de limpiar el código de ejemplo de main.c.
 
 idf_component_register(
     SRCS 

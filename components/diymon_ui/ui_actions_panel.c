@@ -1,10 +1,8 @@
 /*
   Fichero: ./components/diymon_ui/ui_actions_panel.c
-  Fecha: 13/08/2025 - 08:30 
-  Último cambio: Corregidas las funciones de chroma key a la API de LVGL v9.
-  Descripción: Se ha modificado la creación de botones para asegurar que su fondo sea
-               completamente transparente. Se habilita la transparencia por chroma key para el asset 
-               ASSET_ICON_CONFIG_PLACEHOLDER, usando las funciones correctas de LVGL v9 (lv_obj_set_style_img_chroma_keyed).
+  Fecha: 13/08/2025 - 05:19 
+  Último cambio: Eliminada la llamada a la función de chroma key inexistente.
+  Descripción: Se ha eliminado la llamada a lv_obj_set_style_img_chroma_keyed que causaba un error de compilación al no existir en la API de LVGL v9.
 */
 #include "ui_actions_panel.h"
 #include "ui_asset_loader.h"
@@ -59,7 +57,6 @@ static lv_obj_t* create_top_action_button(lv_obj_t *parent, ui_asset_id_t asset_
     lv_obj_remove_style_all(btn); // Eliminar estilos por defecto
     lv_obj_set_size(btn, BUTTON_SIZE, BUTTON_SIZE);
     
-    // Forzar transparencia total para el fondo, borde y sombra en todos los estados.
     lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, LV_STATE_ANY);
     lv_obj_set_style_border_width(btn, 0, LV_STATE_ANY);
     lv_obj_set_style_shadow_width(btn, 0, LV_STATE_ANY);
@@ -79,7 +76,6 @@ static lv_obj_t* create_side_action_button(lv_obj_t *parent, ui_asset_id_t asset
     lv_obj_remove_style_all(btn); // Eliminar estilos por defecto
     lv_obj_set_size(btn, BUTTON_SIZE, BUTTON_SIZE);
 
-    // Forzar transparencia total para el fondo, borde y sombra en todos los estados.
     lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, LV_STATE_ANY);
     lv_obj_set_style_border_width(btn, 0, LV_STATE_ANY);
     lv_obj_set_style_shadow_width(btn, 0, LV_STATE_ANY);

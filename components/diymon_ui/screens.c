@@ -1,10 +1,8 @@
 /*
   Fichero: ./components/diymon_ui/screens.c
-  Fecha: 13/08/2025 - 11:45 
-  Último cambio: Simplificada la llamada a ui_idle_animation_start.
-  Descripción: Se actualiza la llamada a la función de inicio de la animación
-               de reposo para que coincida con la nueva firma, que ahora requiere
-               el objeto padre como argumento.
+  Fecha: 13/08/2025 - 05:41 
+  Último cambio: Eliminada la llamada a la función obsoleta ui_helpers_free_background_buffer.
+  Descripción: Se ha eliminado la llamada a `ui_helpers_free_background_buffer` de la función de borrado de la pantalla, ya que el fondo de pantalla ahora se carga desde el firmware y no utiliza un buffer de memoria dinámico.
 */
 #include "screens.h"
 #include "ui_idle_animation.h"
@@ -113,7 +111,6 @@ void delete_screen_main(void) {
     ui_idle_animation_stop();
     ui_action_animations_destroy();
     ui_telemetry_destroy();
-    ui_helpers_free_background_buffer();
 }
 
 void create_screens(void) {

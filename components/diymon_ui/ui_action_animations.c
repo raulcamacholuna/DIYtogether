@@ -1,8 +1,8 @@
 /*
  * Fichero: ./components/diymon_ui/ui_action_animations.c
- * Fecha: 13/08/2025 - 10:04 
- * Último cambio: Ajustada la resolución del búfer de animación a 150x230.
- * Descripción: Gestión de las animaciones de acción. Se ha corregido el tamaño del búfer de animación compartido a 150x230 para que coincida con las dimensiones de los assets de animación, solucionando problemas de visualización y liberando RAM adicional.
+ * Fecha: 13/08/2025 - 05:19 
+ * Último cambio: Eliminadas las llamadas a funciones de chroma key inexistentes.
+ * Descripción: Se han eliminado las llamadas a lv_obj_set_style_img_chroma_keyed y lv_obj_set_style_img_chroma_key_color que causaban errores de compilación ya que no existen en la API de LVGL v9.
  */
 #include "ui_action_animations.h"
 #include "animation_loader.h"
@@ -32,7 +32,6 @@ static const char* get_anim_prefix(diymon_action_id_t action_id);
 // --- Implementación de Funciones Públicas ---
 
 void ui_action_animations_create(lv_obj_t *parent) {
-    // [SOLUCIÓN] Ajustar el tamaño del búfer a la resolución real de la animación.
     g_animation_player = animation_loader_init(NULL, 150, 230, 0);
     if (g_animation_player.img_dsc.data == NULL) {
         ESP_LOGE(TAG, "FALLO CRÍTICO: No se pudo reservar memoria para el búfer de animación compartido.");

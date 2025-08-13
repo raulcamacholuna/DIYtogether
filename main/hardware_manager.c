@@ -1,8 +1,8 @@
 /*
  * Fichero: ./main/hardware_manager.c
- * Fecha: 13/08/2025 - 08:03 
- * Último cambio: Habilitado el intercambio de bytes en el port de LVGL.
- * Descripción: Orquestador de hardware. Se habilita el flag 'swap_bytes' en la configuración de LVGL para corregir el orden de los bytes de color en la pantalla. Esto soluciona problemas visuales con colores incorrectos en todos los elementos de la UI.
+ * Fecha: 13/08/2025 - 05:33 
+ * Último cambio: Establecido el formato de color del display a RGB565.
+ * Descripción: Orquestador de hardware. Se ha añadido la llamada lv_display_set_color_format para configurar explícitamente el display en modo RGB565. Esto es crucial para que LVGL v9 realice correctamente la mezcla de canales alfa de las imágenes RGB565A8.
  */
 #include "hardware_manager.h"
 #include "esp_log.h"
@@ -31,6 +31,9 @@ esp_err_t hardware_manager_init(void) {
         }
     };
     lv_disp_t * disp = lvgl_port_add_disp(&disp_cfg);
+
+    // Configura el formato de color del framebuffer para la correcta mezcla de alpha.
+    lv_display_set_color_format(disp, LV_COLOR_FORMAT_RGB565);
 
     /*
      * Configuración de la orientación del panel táctil.

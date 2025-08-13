@@ -1,8 +1,8 @@
 /*
  * Fichero: ./main/main.c
- * Fecha: 13/08/2025 - 01:52 
- * Último cambio: Eliminada la llamada a la función lv_fs_fatfs_init no definida.
- * Descripción: Fichero principal de la aplicación DIYMON. Se ha eliminado la llamada a lv_fs_fatfs_init() y su prototipo. El acceso a la SD para cargar recursos se gestionará con funciones estándar de C, volviendo a un enfoque más estable que no depende de la integración directa de LVGL con FatFS.
+ * Fecha: 13/08/2025 - 05:44 
+ * Último cambio: Refactorizado para eliminar código de ejemplo obsoleto.
+ * Descripción: Fichero principal de la aplicación DIYMON. Se ha eliminado todo el código de ejemplo relacionado con lv_demos, 	ouch_test y la inicialización manual de periféricos en pp_main. La lógica ahora está centralizada en los modos de operación (aplicación principal, portal wifi, servidor de configuración) y los gestores de hardware y UI. Esto resuelve el error de compilación utton_gpio.h: No such file or directory.
 */
 #include <stdio.h>
 #include <string.h>
@@ -25,6 +25,9 @@
 #include "web_server.h"
 #include "screen_manager.h"
 #include "service_screen.h"
+
+#include "esp_err.h"
+#include "esp_check.h"
 
 static const char *TAG = "DIYMON_MAIN";
 

@@ -1,9 +1,8 @@
 /*
  * Fichero: ./components/diymon_ui/diymon_ui_helpers.h
- * Fecha: 13/08/2025 - 11:39 
- * Último cambio: Limpieza de includes.
- * Descripción: Funciones de ayuda para la interfaz de usuario. Se elimina
- *              el include a 'images.h' que ya no existe.
+ * Fecha: 13/08/2025 - 05:41 
+ * Último cambio: Eliminada la declaración de la función para liberar el buffer de fondo.
+ * Descripción: Funciones de ayuda para la interfaz de usuario. Se elimina la declaración de `ui_helpers_free_background_buffer` ya que el fondo se carga ahora desde el firmware y no requiere un buffer dinámico.
  */
 #ifndef DIYMON_UI_HELPERS_H
 #define DIYMON_UI_HELPERS_H

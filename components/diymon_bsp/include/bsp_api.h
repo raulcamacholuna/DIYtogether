@@ -1,10 +1,8 @@
 /*
   Fichero: ./components/diymon_bsp/include/bsp_api.h
-  Fecha: 13/08/2025 - 12:06 
-  Último cambio: Limpieza de la API del IMU y añadido bsp_battery_init.
-  Descripción: Interfaz pública del BSP. Se eliminan las declaraciones de funciones
-               relacionadas con la interrupción del IMU y se añade la declaración
-               correcta para bsp_battery_init.
+  Fecha: 13/08/2025 - 05:00 
+  Último cambio: Añadida la declaración de bsp_wifi_init_sta para corregir un error de compilación.
+  Descripción: Interfaz pública del BSP. Se añade una nueva función para iniciar el WiFi en modo estación con credenciales pasadas como argumento.
 */
 #ifndef BSP_API_H
 #define BSP_API_H
@@ -33,6 +31,7 @@ esp_err_t bsp_battery_init(void);
 
 // --- FUNCIONES DE WIFI ---
 void bsp_wifi_init_stack(void);
+void bsp_wifi_init_sta(const char *ssid, const char *pass);
 void bsp_wifi_start_ap(void);
 void bsp_wifi_init_sta_from_nvs(void);
 bool bsp_wifi_wait_for_ip(uint32_t timeout_ms);
@@ -59,3 +58,4 @@ int bsp_get_display_vres(void);
 size_t bsp_get_display_buffer_size(void);
 
 #endif // BSP_API_H
+
