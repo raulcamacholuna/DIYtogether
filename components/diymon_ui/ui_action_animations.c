@@ -1,8 +1,8 @@
 /*
  * Fichero: ./components/diymon_ui/ui_action_animations.c
- * Fecha: 13/08/2025 - 06:06 
- * Último cambio: Adaptado a la gestión de memoria sin buffer compartido.
- * Descripción: La gestión de animaciones de acción ahora crea y libera su propio nimation_t player en cada reproducción. Esto simplifica la lógica y elimina la dependencia de un búfer de animación compartido.
+ * Fecha: 13/08/2025 - 06:21 
+ * Último cambio: Desplazada la animación 30 píxeles hacia arriba.
+ * Descripción: Se ha modificado el alineamiento del objeto de imagen de la animación para desplazarlo 30 píxeles hacia arriba, mejorando su posición en la pantalla.
  */
 #include "ui_action_animations.h"
 #include "animation_loader.h"
@@ -35,7 +35,7 @@ void ui_action_animations_create(lv_obj_t *parent) {
     // Solo crea el objeto de imagen. El buffer se gestionará por animación.
     g_animation_img_obj = lv_image_create(parent);
     lv_obj_set_style_bg_opa(g_animation_img_obj, LV_OPA_TRANSP, 0);
-    lv_obj_align(g_animation_img_obj, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_align(g_animation_img_obj, LV_ALIGN_BOTTOM_MID, 0, -30);
 }
 
 void ui_action_animations_play(diymon_action_id_t action_id) {
