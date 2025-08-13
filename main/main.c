@@ -1,8 +1,11 @@
 /*
   Fichero: ./main/main.c
-  Fecha: 12/08/2025 - 05:05 pm
-  Último cambio: Centralizada la inicialización del hardware en los modos de servicio.
-  Descripción: Orquestador principal de la aplicación. Se ha modificado la lógica para que la inicialización del hardware (BSP) se realice aquí, antes de llamar a los componentes de servicio como service_screen, evitando así inicializaciones múltiples y resolviendo un error crítico de reinicialización del bus SPI.
+  Fecha: 13/08/2025 - 12:06 
+  Último cambio: Eliminada la tarea de telemetría.
+  Descripción: Se elimina la tarea sensor_log_task de este fichero. La responsabilidad
+               de leer y mostrar los datos de los sensores se ha trasladado completamente
+               al nuevo componente ui_telemetry dentro de diymon_ui, centralizando toda
+               la lógica de la interfaz.
 */
 #include <stdio.h>
 #include <string.h>
@@ -61,11 +64,9 @@ void app_main(void)
 static void run_config_server_mode(void) {
     ESP_LOGI(TAG, "Arrancando en modo Servidor Web de Configuración (STA)...");
     
-    // 1. Inicializar hardware mínimo para mostrar pantalla y usar SD.
     bsp_init_service_mode();
     service_screen_show("/sdcard/config/FTP.bin");
 
-    // 2. Inicializar y conectar WiFi.
     bsp_wifi_init_stack();
     bsp_wifi_init_sta_from_nvs();
     bool ip_ok = bsp_wifi_wait_for_ip(15000);
@@ -74,7 +75,7 @@ static void run_config_server_mode(void) {
         char ip_addr_buffer[16] = "0.0.0.0";
         bsp_wifi_get_ip(ip_addr_buffer);
         ESP_LOGI(TAG, "Dispositivo conectado. IP: %s. Iniciando servidor web.", ip_addr_buffer);
-        web_server_start(); // Bloqueante
+        web_server_start();
     } else {
         ESP_LOGE(TAG, "No se pudo obtener IP. Reiniciando en 10 segundos...");
         vTaskDelay(pdMS_TO_TICKS(10000));
@@ -85,13 +86,11 @@ static void run_config_server_mode(void) {
 static void run_wifi_portal_mode(void) {
     ESP_LOGI(TAG, "No hay credenciales. Arrancando en modo Portal WiFi...");
     
-    // 1. Inicializar hardware mínimo y mostrar pantalla de portal.
     bsp_init_service_mode();
     service_screen_show("/sdcard/config/WIFI.bin");
     
-    // 2. Iniciar stack WiFi y portal.
     bsp_wifi_init_stack();
-    wifi_portal_start(); // Bloqueante
+    wifi_portal_start();
 }
 
 static void run_main_application_mode(void) {
@@ -108,13 +107,6 @@ static void run_main_application_mode(void) {
         lvgl_port_unlock();
     }
     ESP_LOGI(TAG, "Interfaz de Usuario principal inicializada.");
-
-    const esp_timer_create_args_t evolution_timer_args = {
-        .callback = &evolution_timer_callback, .name = "evolution-timer"
-    };
-    // Desactivado para permitir evolución manual
-    // ESP_ERROR_CHECK(esp_timer_create(&evolution_timer_args, &evolution_timer_handle));
-    // ESP_ERROR_CHECK(esp_timer_start_periodic(evolution_timer_handle, 5 * 1000000));
     
     ESP_LOGI(TAG, "¡Firmware DIYMON en marcha!");
 }

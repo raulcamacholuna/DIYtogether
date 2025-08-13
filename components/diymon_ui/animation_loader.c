@@ -64,7 +64,7 @@ bool animation_loader_load_frame(animation_t *anim, uint16_t frame_index, const 
     fread((void *)anim->img_dsc.data, 1, anim->img_dsc.data_size, f);
     fclose(f);
 
-    swap_bytes_for_rgb565((uint8_t *)anim->img_dsc.data, anim->img_dsc.data_size);
+    // swap_bytes_for_rgb565((uint8_t *)anim->img_dsc.data, anim->img_dsc.data_size);
     return true;
 }
 

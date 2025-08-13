@@ -1,3 +1,12 @@
+/*
+ * Fichero: ./components/diymon_bsp/WS1.9TS/bsp_battery.c
+ * Fecha: 13/08/2025 - 12:06 
+ * Último cambio: Corregido el tipo de retorno de la función de inicialización.
+ * Descripción: Se ha corregido la firma de la función sp_battery_init de oid a sp_err_t
+ *              para que coincida con su declaración en la API pública. Esto resuelve un error
+ *              crítico de compilación (ESP_ERROR_CHECK sobre una función void) que causaba
+ *              un reinicio del dispositivo durante el arranque.
+ */
 #include "bsp_battery.h"
 
 #include "esp_adc/adc_oneshot.h"
@@ -74,7 +83,7 @@ static bool example_adc_calibration_init(adc_unit_t unit, adc_channel_t channel,
 }
 
 
-void bsp_battery_init(void)
+esp_err_t bsp_battery_init(void)
 {
 
     adc_oneshot_unit_init_cfg_t init_config1 = {
@@ -91,6 +100,7 @@ void bsp_battery_init(void)
     //-------------ADC1 Calibration Init---------------//
 
     do_calibration1_chan0 = example_adc_calibration_init(EXAMPLE_ADC_UNIT, EXAMPLE_BATTERY_ADC_CHANNEL, EXAMPLE_ADC_ATTEN, &adc1_cali_chan0_handle);
+    return ESP_OK;
 }
 
 

@@ -1,9 +1,11 @@
 /*
   Fichero: ./components/diymon_bsp/WS1.9TS/bsp.c
-  Fecha: 12/08/2025 - 07:15
-  Último cambio: Limpieza y refactorización final de las funciones de inicialización.
-  Descripción: Orquestador del BSP. Se definen claramente las funciones para cada
-               modo de operación, asegurando que solo se inicializa lo necesario.
+  Fecha: 13/08/2025 - 12:06 
+  Último cambio: Añadida la inicialización del ADC de la batería.
+  Descripción: Orquestador del BSP. Se añade la llamada a sp_battery_init en la
+               secuencia de inicialización principal para asegurar que el ADC esté
+               listo antes de que cualquier tarea intente leer el voltaje de la batería,
+               solucionando así un crash por puntero nulo.
 */
 #include "bsp_api.h"
 #include "esp_err.h"
@@ -22,6 +24,7 @@ esp_err_t bsp_init(void) {
     ESP_ERROR_CHECK(bsp_touch_init());
     ESP_ERROR_CHECK(bsp_imu_init());
     ESP_ERROR_CHECK(bsp_sdcard_init());
+    ESP_ERROR_CHECK(bsp_battery_init());
     return ESP_OK;
 }
 

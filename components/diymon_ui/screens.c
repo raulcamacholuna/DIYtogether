@@ -1,7 +1,16 @@
+/*
+  Fichero: ./components/diymon_ui/screens.c
+  Fecha: 13/08/2025 - 12:06 
+  Último cambio: Integrado el nuevo módulo de telemetría.
+  Descripción: Se ha integrado el módulo ui_telemetry en la creación y destrucción de la
+               pantalla principal. Esto asegura que los labels de datos de los sensores
+               se creen junto con la UI y se limpien correctamente al cerrar.
+*/
 #include "screens.h"
 #include "ui_idle_animation.h"
 #include "ui_actions_panel.h"
 #include "ui_action_animations.h"
+#include "ui_telemetry.h" // Incluir el nuevo módulo
 #include "esp_log.h"
 #include "bsp_api.h"
 #include "screen_manager.h"
@@ -38,6 +47,7 @@ void create_screen_main(void) {
     ui_action_animations_create(g_main_screen_obj);
     g_idle_animation_obj = ui_idle_animation_start(g_main_screen_obj);
     ui_actions_panel_create(g_main_screen_obj);
+    ui_telemetry_create(g_main_screen_obj); // Crear los labels de telemetría
 
     ESP_LOGI(TAG, "Pantalla principal creada delegando en módulos.");
 }
@@ -52,8 +62,6 @@ static void main_screen_event_cb(lv_event_t *e) {
             lv_indev_get_point(indev, &p);
             touch_start_x = p.x;
             touch_start_y = p.y;
-            // ANOTACIÓN: Se pausa la animación de reposo al detectar cualquier toque en la pantalla.
-            // Esto libera la CPU para que las animaciones de los paneles sean fluidas.
             if (!screen_manager_is_off()) {
                 ESP_LOGD(TAG, "Touch detected, pausing idle animation.");
                 ui_idle_animation_pause();
@@ -87,8 +95,6 @@ static void main_screen_event_cb(lv_event_t *e) {
                     g_click_count = 0;
                 }
             } else {
-                // ANOTACIÓN: Si es un click simple y no un gesto, la animación de idle debe reanudarse,
-                // ya que los paneles no se mostrarán.
                 ESP_LOGD(TAG, "Simple click detected, resuming idle animation.");
                 ui_idle_animation_resume();
             }
@@ -107,6 +113,7 @@ void delete_screen_main(void) {
     }
     ui_idle_animation_stop();
     ui_action_animations_destroy();
+    ui_telemetry_destroy(); // Destruir el timer de telemetría
 }
 
 void create_screens(void) {

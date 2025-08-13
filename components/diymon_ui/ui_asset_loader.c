@@ -62,7 +62,7 @@ static bool load_asset(ui_asset_id_t id, const char* filename) {
     fclose(f);
     
     // Corregir los bytes de los datos leídos.
-    swap_bytes_for_rgb565(g_asset_buffers[id], data_size);
+    // swap_bytes_for_rgb565(g_asset_buffers[id], data_size);
     
     // Apuntar el descriptor al búfer en memoria.
     g_asset_dscs[id].data = g_asset_buffers[id];

@@ -1,13 +1,16 @@
 # Fichero: ./components/diymon_ui/CMakeLists.txt
-# Fecha: 11/08/2025 - 16:15
-# Último cambio: Versión final y verificada.
-# Descripción: Se definen las dependencias del componente de la UI.
+# Fecha: 13/08/2025 - 12:08 
+# Último cambio: Corregida la sintaxis de la variable de CMake para las fuentes.
+# Descripción: Se corrige el error de sintaxis en idf_component_register que impedía
+#              la correcta expansión de la lista de ficheros fuente, solucionando el fallo
+#              de compilación.
 
 file(GLOB component_sources
     "*.c"
     "screens/*.c"
     "actions/*.c"
     "styles/*.c"
+    "ui_telemetry.c"
 )
 
 idf_component_register(

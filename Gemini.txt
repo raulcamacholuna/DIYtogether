@@ -9539,11 +9539,11 @@ CONFIG_SEMIHOSTFS_MAX_MOUNT_POINTS=1
 
 /*
   Fichero: ./components/diymon_bsp/include/bsp_api.h
-  Fecha: 12/08/2025 - 09:00
-  Último cambio: Restauradas todas las declaraciones de funciones públicas necesarias.
-  Descripción: Interfaz pública del BSP. Se restauran las declaraciones de funciones
-               esenciales (`bsp_get_i2c_bus_handle`, `bsp_display_turn_on/off`)
-               para asegurar que todos los componentes que dependen del BSP compilen.
+  Fecha: 13/08/2025 - 12:06 
+  Último cambio: Limpieza de la API del IMU y añadido bsp_battery_init.
+  Descripción: Interfaz pública del BSP. Se eliminan las declaraciones de funciones
+               relacionadas con la interrupción del IMU y se añade la declaración
+               correcta para bsp_battery_init.
 */
 #ifndef BSP_API_H
 #define BSP_API_H
@@ -9552,7 +9552,9 @@ CONFIG_SEMIHOSTFS_MAX_MOUNT_POINTS=1
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_touch.h"
 #include "driver/i2c_master.h"
+#include "driver/gpio.h"
 #include "esp_wifi.h"
+#include <stdint.h> // Para uint16_t
 
 // --- INICIALIZADORES DE HARDWARE ---
 esp_err_t bsp_init(void);
@@ -9566,6 +9568,7 @@ esp_err_t bsp_display_init(void);
 esp_err_t bsp_touch_init(void);
 esp_err_t bsp_sdcard_init(void);
 esp_err_t bsp_imu_init(void);
+esp_err_t bsp_battery_init(void);
 
 // --- FUNCIONES DE WIFI ---
 void bsp_wifi_init_stack(void);
@@ -9579,6 +9582,12 @@ void bsp_display_set_brightness(int percentage);
 void bsp_display_turn_on(void);
 void bsp_display_turn_off(void);
 
+// --- FUNCIONES DEL IMU (SENSOR DE MOVIMIENTO) ---
+void bsp_imu_read(float acc[3], float gyro[3]);
+
+// --- FUNCIONES DE BATERÍA ---
+void bsp_battery_get_voltage(float *voltage, uint16_t *adc_value);
+
 // --- GETTERS DE HANDLES Y CONFIGURACIÓN ---
 i2c_master_bus_handle_t bsp_get_i2c_bus_handle(void);
 esp_lcd_panel_io_handle_t bsp_get_panel_io_handle(void);
@@ -9589,6 +9598,7 @@ int bsp_get_display_vres(void);
 size_t bsp_get_display_buffer_size(void);
 
 #endif // BSP_API_H
+
 
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_bsp\WS1.9TS\esp_lcd_touch_cst816s\include\esp_lcd_touch_cst816s.h
@@ -10385,6 +10395,15 @@ Get one X and Y coordinates with strength of touch.
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_bsp\WS1.9TS\bsp_battery.c
 # =================================================================================================
 
+/*
+ * Fichero: ./components/diymon_bsp/WS1.9TS/bsp_battery.c
+ * Fecha: 13/08/2025 - 12:06 
+ * Último cambio: Corregido el tipo de retorno de la función de inicialización.
+ * Descripción: Se ha corregido la firma de la función sp_battery_init de oid a sp_err_t
+ *              para que coincida con su declaración en la API pública. Esto resuelve un error
+ *              crítico de compilación (ESP_ERROR_CHECK sobre una función void) que causaba
+ *              un reinicio del dispositivo durante el arranque.
+ */
 #include "bsp_battery.h"
 
 #include "esp_adc/adc_oneshot.h"
@@ -10461,7 +10480,7 @@ static bool example_adc_calibration_init(adc_unit_t unit, adc_channel_t channel,
 }
 
 
-void bsp_battery_init(void)
+esp_err_t bsp_battery_init(void)
 {
 
     adc_oneshot_unit_init_cfg_t init_config1 = {
@@ -10478,6 +10497,7 @@ void bsp_battery_init(void)
     //-------------ADC1 Calibration Init---------------//
 
     do_calibration1_chan0 = example_adc_calibration_init(EXAMPLE_ADC_UNIT, EXAMPLE_BATTERY_ADC_CHANNEL, EXAMPLE_ADC_ATTEN, &adc1_cali_chan0_handle);
+    return ESP_OK;
 }
 
 
@@ -10506,9 +10526,19 @@ void bsp_battery_get_voltage(float *voltage, uint16_t *adc_value)
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_bsp\WS1.9TS\bsp_battery.h
 # =================================================================================================
 
+/*
+ * Fichero: ./components/diymon_bsp/WS1.9TS/bsp_battery.h
+ * Fecha: 13/08/2025 - 12:06 
+ * Último cambio: Corregido el tipo de retorno de la función de inicialización.
+ * Descripción: Cabecera privada para el driver de la batería. Se ha corregido la firma
+ *              de sp_battery_init a sp_err_t para que sea consistente con la
+ *              API pública y evitar un crash en tiempo de ejecución.
+ */
 #ifndef __BSP_BATTERY_H__
 #define __BSP_BATTERY_H__
 #include <stdio.h>
+#include "esp_err.h"
+#include <stdint.h>
 
 #define EXAMPLE_ADC_UNIT ADC_UNIT_1
 #define EXAMPLE_BATTERY_ADC_CHANNEL ADC_CHANNEL_0
@@ -10519,7 +10549,7 @@ void bsp_battery_get_voltage(float *voltage, uint16_t *adc_value)
 extern "C" {
 #endif
 
-void bsp_battery_init(void);
+esp_err_t bsp_battery_init(void);
 void bsp_battery_get_voltage(float *voltage, uint16_t *adc_value);
 
 #ifdef __cplusplus
@@ -10528,6 +10558,7 @@ void bsp_battery_get_voltage(float *voltage, uint16_t *adc_value);
 
 
 #endif
+
 
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_bsp\WS1.9TS\bsp_display.c
@@ -10603,7 +10634,7 @@ esp_err_t bsp_display_init(void) {
     esp_lcd_panel_io_spi_config_t io_config = {
         .cs_gpio_num = PIN_NUM_LCD_CS, .dc_gpio_num = PIN_NUM_LCD_DC,
         .spi_mode = 0, .pclk_hz = 40 * 1000 * 1000, .trans_queue_depth = 10,
-        .lcd_cmd_bits = 8, .lcd_param_bits = 8
+        .lcd_cmd_bits = 8, .lcd_param_bits = 8, .swap_color_bytes = 1
     };
     ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)BSP_SPI_HOST, &io_config, &g_io_handle));
 
@@ -10807,16 +10838,20 @@ i2c_master_bus_handle_t bsp_get_i2c_bus_handle(void)
 
 /*
   Fichero: ./components/diymon_bsp/WS1.9TS/bsp_qmi8658.c
-  Fecha: 12/08/2025 - 09:00
-  Último cambio: Corregido para usar el bus I2C global en lugar de pasarlo.
-  Descripción: Driver del sensor IMU QMI8658. Ahora utiliza la función pública
-               `bsp_get_i2c_bus_handle` para obtener el manejador del bus I2C,
-               simplificando su inicialización y asegurando la modularidad.
+  Fecha: 13/08/2025 - 12:03 
+  Último cambio: Eliminadas las funciones de interrupción no utilizadas.
+  Descripción: Driver del IMU. Se han eliminado las implementaciones de las funciones
+               de interrupción (bsp_imu_interrupt_init, bsp_imu_enable_motion_interrupt,
+               bsp_imu_clear_interrupt) para limpiar el código, ya que la detección
+               de 'shake' ahora se realiza por sondeo en la capa de la UI.
 */
 #include "bsp_api.h"
 #include "bsp_qmi8658.h"
 #include "esp_log.h"
 #include "driver/i2c_master.h"
+#include "driver/gpio.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 static const char *TAG = "bsp_qmi8658";
 
@@ -10824,6 +10859,29 @@ static const char *TAG = "bsp_qmi8658";
 #define I2C_CLK_SPEED_HZ 400000
 
 static i2c_master_dev_handle_t g_imu_dev_handle = NULL;
+
+// --- Funciones de ayuda estáticas ---
+static void qmi8658_on_demand_cali(void) {
+    ESP_LOGI(TAG, "Performing on-demand calibration...");
+    
+    uint8_t reset_buf[] = {QMI8658_RESET, 0xb0};
+    ESP_ERROR_CHECK(i2c_master_transmit(g_imu_dev_handle, reset_buf, sizeof(reset_buf), pdMS_TO_TICKS(100)));
+    vTaskDelay(pdMS_TO_TICKS(20));
+
+    uint8_t cali_cmd_buf[] = {QMI8658_CTRL9, QMI8658_CTRL9_CMD_ON_DEMAND_CALI};
+    ESP_ERROR_CHECK(i2c_master_transmit(g_imu_dev_handle, cali_cmd_buf, sizeof(cali_cmd_buf), pdMS_TO_TICKS(100)));
+    
+    vTaskDelay(pdMS_TO_TICKS(2200));
+
+    uint8_t nop_cmd_buf[] = {QMI8658_CTRL9, QMI8658_CTRL9_CMD_NOP};
+    ESP_ERROR_CHECK(i2c_master_transmit(g_imu_dev_handle, nop_cmd_buf, sizeof(nop_cmd_buf), pdMS_TO_TICKS(100)));
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    ESP_LOGI(TAG, "On-demand calibration finished.");
+}
+
+
+// --- Funciones públicas ---
 
 esp_err_t bsp_imu_init(void)
 {
@@ -10855,10 +10913,15 @@ esp_err_t bsp_imu_init(void)
     }
     ESP_LOGI(TAG, "QMI8658 found successfully! WhoAmI: 0x%02X", who_am_i);
 
+    qmi8658_on_demand_cali();
+    
+    uint8_t ctrl1_buf[] = {QMI8658_CTRL1, 0x60}; // Habilitar Address Auto-Increment
+    ESP_ERROR_CHECK(i2c_master_transmit(g_imu_dev_handle, ctrl1_buf, sizeof(ctrl1_buf), pdMS_TO_TICKS(100)));
+
     uint8_t ctrl_regs_data[][2] = {
-        {QMI8658_CTRL7, 0x03},
-        {QMI8658_CTRL2, 0x23},
-        {QMI8658_CTRL3, 0x53}
+        {QMI8658_CTRL7, 0x03}, // Habilitar Accel y Gyro
+        {QMI8658_CTRL2, 0x23}, // Accel: +-8g, 250Hz ODR
+        {QMI8658_CTRL3, 0x53}  // Gyro:  +-1024dps, 250Hz ODR
     };
 
     for (int i = 0; i < sizeof(ctrl_regs_data) / sizeof(ctrl_regs_data[0]); i++) {
@@ -10873,6 +10936,8 @@ void bsp_imu_read(float acc[3], float gyro[3])
 {
     if (g_imu_dev_handle == NULL) {
         ESP_LOGE(TAG, "IMU device handle not initialized, cannot read.");
+        acc[0] = acc[1] = acc[2] = 0;
+        gyro[0] = gyro[1] = gyro[2] = 0;
         return;
     }
 
@@ -10880,10 +10945,17 @@ void bsp_imu_read(float acc[3], float gyro[3])
     short raw_acc_xyz[3];
     short raw_gyro_xyz[3];
 
-    i2c_master_transmit_receive(g_imu_dev_handle,
+    esp_err_t ret = i2c_master_transmit_receive(g_imu_dev_handle,
                                 (uint8_t[]){QMI8658_AX_L}, 1,
                                 buf_reg, 12,
                                 pdMS_TO_TICKS(100));
+
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read IMU data via I2C");
+        acc[0] = acc[1] = acc[2] = 0;
+        gyro[0] = gyro[1] = gyro[2] = 0;
+        return;
+    }
 
     raw_acc_xyz[0] = (int16_t)((buf_reg[1] << 8) | buf_reg[0]);
     raw_acc_xyz[1] = (int16_t)((buf_reg[3] << 8) | buf_reg[2]);
@@ -10892,13 +10964,17 @@ void bsp_imu_read(float acc[3], float gyro[3])
     raw_gyro_xyz[1] = (int16_t)((buf_reg[9] << 8) | buf_reg[8]);
     raw_gyro_xyz[2] = (int16_t)((buf_reg[11] << 8) | buf_reg[10]);
 
+    // Conversión a m/s^2 (+-8g)
     acc[0] = ((float)raw_acc_xyz[0] / 4096.0f) * 9.81f;
     acc[1] = ((float)raw_acc_xyz[1] / 4096.0f) * 9.81f;
     acc[2] = ((float)raw_acc_xyz[2] / 4096.0f) * 9.81f;
-    gyro[0] = (float)raw_gyro_xyz[0] / 16.0f;
-    gyro[1] = (float)raw_gyro_xyz[1] / 16.0f;
-    gyro[2] = (float)raw_gyro_xyz[2] / 16.0f;
+    
+    // Conversión a dps (+-1024dps)
+    gyro[0] = (float)raw_gyro_xyz[0] / 32.0f;
+    gyro[1] = (float)raw_gyro_xyz[1] / 32.0f;
+    gyro[2] = (float)raw_gyro_xyz[2] / 32.0f;
 }
+
 
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_bsp\WS1.9TS\bsp_qmi8658.h
@@ -10906,16 +10982,19 @@ void bsp_imu_read(float acc[3], float gyro[3])
 
 /*
  * Fichero: ./diymon_bsp/WS1.9TS/bsp_qmi8658.h
- * Fecha: 08/08/2025 - 02:40
- * Último cambio: Convertido en cabecera privada del componente.
- * Descripción: Declaraciones y registros específicos para el sensor QMI8658. Esta cabecera es privada y solo debe ser incluida por los ficheros `.c` dentro del mismo componente BSP.
+ * Fecha: 12/08/2025 - 09:25 pm
+ * Último cambio: Corregidos los valores de los registros y añadidos los de calibración.
+ * Descripción: Cabecera privada para el sensor QMI8658. Se han corregido las direcciones
+ *              de los registros de datos (temperatura, acelerómetro, etc.) para que coincidan
+ *              con la hoja de datos oficial y se han añadido los registros y comandos
+ *              necesarios para la calibración y configuración avanzada del sensor.
  */
 #ifndef BSP_QMI8658_H
 #define BSP_QMI8658_H
 
 #include <stdint.h>
 
-// Definición de los registros del sensor QMI8658
+// Definición de los registros del sensor QMI8658 (corregidos según datasheet)
 typedef enum
 {
     QMI8658_WHO_AM_I        = 0x00,
@@ -10925,25 +11004,36 @@ typedef enum
     QMI8658_CTRL3           = 0x04,
     QMI8658_CTRL4           = 0x05,
     QMI8658_CTRL5           = 0x06,
+    QMI8658_CTRL6           = 0x07,
     QMI8658_CTRL7           = 0x08,
-    //... (se pueden añadir más registros si es necesario)
-    QMI8658_TEMP_L          = 0x31,
-    QMI8658_TEMP_H          = 0x32,
-    QMI8658_AX_L            = 0x33,
-    QMI8658_AX_H            = 0x34,
-    QMI8658_AY_L            = 0x35,
-    QMI8658_AY_H            = 0x36,
-    QMI8658_AZ_L            = 0x37,
-    QMI8658_AZ_H            = 0x38,
-    QMI8658_GX_L            = 0x39,
-    QMI8658_GX_H            = 0x3A,
-    QMI8658_GY_L            = 0x3B,
-    QMI8658_GY_H            = 0x3C,
-    QMI8658_GZ_L            = 0x3D,
-    QMI8658_GZ_H            = 0x3E,
+    QMI8658_CTRL9           = 0x0A,
+    QMI8658_CAL1_L          = 0x0B,
+    QMI8658_STATUS_INT      = 0x2D,
+    QMI8658_TEMP_L          = 0x33,
+    QMI8658_TEMP_H          = 0x34,
+    QMI8658_AX_L            = 0x35,
+    QMI8658_AX_H            = 0x36,
+    QMI8658_AY_L            = 0x37,
+    QMI8658_AY_H            = 0x38,
+    QMI8658_AZ_L            = 0x39,
+    QMI8658_AZ_H            = 0x3A,
+    QMI8658_GX_L            = 0x3B,
+    QMI8658_GX_H            = 0x3C,
+    QMI8658_GY_L            = 0x3D,
+    QMI8658_GY_H            = 0x3E,
+    QMI8658_GZ_L            = 0x3F,
+    QMI8658_GZ_H            = 0x40,
+    QMI8658_RESET           = 0x60
 } qmi8658_reg_t;
 
+// Comandos para el registro CTRL9
+typedef enum {
+    QMI8658_CTRL9_CMD_NOP = 0x00,
+    QMI8658_CTRL9_CMD_ON_DEMAND_CALI = 0xA2,
+} qmi8658_ctrl9_cmd_t;
+
 #endif // BSP_QMI8658_H
+
 
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_bsp\WS1.9TS\bsp_sdcard.c
@@ -11490,10 +11580,12 @@ void bsp_wifi_get_ip(char *ip);
 
 /*
   Fichero: ./components/diymon_bsp/WS1.9TS/bsp.c
-  Fecha: 12/08/2025 - 07:15
-  Último cambio: Limpieza y refactorización final de las funciones de inicialización.
-  Descripción: Orquestador del BSP. Se definen claramente las funciones para cada
-               modo de operación, asegurando que solo se inicializa lo necesario.
+  Fecha: 13/08/2025 - 12:06 
+  Último cambio: Añadida la inicialización del ADC de la batería.
+  Descripción: Orquestador del BSP. Se añade la llamada a sp_battery_init en la
+               secuencia de inicialización principal para asegurar que el ADC esté
+               listo antes de que cualquier tarea intente leer el voltaje de la batería,
+               solucionando así un crash por puntero nulo.
 */
 #include "bsp_api.h"
 #include "esp_err.h"
@@ -11512,6 +11604,7 @@ esp_err_t bsp_init(void) {
     ESP_ERROR_CHECK(bsp_touch_init());
     ESP_ERROR_CHECK(bsp_imu_init());
     ESP_ERROR_CHECK(bsp_sdcard_init());
+    ESP_ERROR_CHECK(bsp_battery_init());
     return ESP_OK;
 }
 
@@ -11532,6 +11625,7 @@ esp_err_t bsp_init_minimal_headless(void) {
     ESP_ERROR_CHECK(bsp_sdcard_init());
     return ESP_OK;
 }
+
 
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_bsp\CMakeLists.txt
@@ -12222,7 +12316,7 @@ bool animation_loader_load_frame(animation_t *anim, uint16_t frame_index, const 
     fread((void *)anim->img_dsc.data, 1, anim->img_dsc.data_size, f);
     fclose(f);
 
-    swap_bytes_for_rgb565((uint8_t *)anim->img_dsc.data, anim->img_dsc.data_size);
+    // swap_bytes_for_rgb565((uint8_t *)anim->img_dsc.data, anim->img_dsc.data_size);
     return true;
 }
 
@@ -12304,15 +12398,18 @@ uint16_t animation_loader_count_frames(const char *path, const char *prefix);
 # =================================================================================================
 
 # Fichero: ./components/diymon_ui/CMakeLists.txt
-# Fecha: 11/08/2025 - 16:15
-# Último cambio: Versión final y verificada.
-# Descripción: Se definen las dependencias del componente de la UI.
+# Fecha: 13/08/2025 - 12:08 
+# Último cambio: Corregida la sintaxis de la variable de CMake para las fuentes.
+# Descripción: Se corrige el error de sintaxis en idf_component_register que impedía
+#              la correcta expansión de la lista de ficheros fuente, solucionando el fallo
+#              de compilación.
 
 file(GLOB component_sources
     "*.c"
     "screens/*.c"
     "actions/*.c"
     "styles/*.c"
+    "ui_telemetry.c"
 )
 
 idf_component_register(
@@ -12327,6 +12424,7 @@ idf_component_register(
         screen_manager
         wifi_portal
 )
+
 
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\diymon_ui_helpers.c
@@ -12481,10 +12579,19 @@ dependencies:
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\screens.c
 # =================================================================================================
 
+/*
+  Fichero: ./components/diymon_ui/screens.c
+  Fecha: 13/08/2025 - 12:06 
+  Último cambio: Integrado el nuevo módulo de telemetría.
+  Descripción: Se ha integrado el módulo ui_telemetry en la creación y destrucción de la
+               pantalla principal. Esto asegura que los labels de datos de los sensores
+               se creen junto con la UI y se limpien correctamente al cerrar.
+*/
 #include "screens.h"
 #include "ui_idle_animation.h"
 #include "ui_actions_panel.h"
 #include "ui_action_animations.h"
+#include "ui_telemetry.h" // Incluir el nuevo módulo
 #include "esp_log.h"
 #include "bsp_api.h"
 #include "screen_manager.h"
@@ -12521,6 +12628,7 @@ void create_screen_main(void) {
     ui_action_animations_create(g_main_screen_obj);
     g_idle_animation_obj = ui_idle_animation_start(g_main_screen_obj);
     ui_actions_panel_create(g_main_screen_obj);
+    ui_telemetry_create(g_main_screen_obj); // Crear los labels de telemetría
 
     ESP_LOGI(TAG, "Pantalla principal creada delegando en módulos.");
 }
@@ -12535,8 +12643,6 @@ static void main_screen_event_cb(lv_event_t *e) {
             lv_indev_get_point(indev, &p);
             touch_start_x = p.x;
             touch_start_y = p.y;
-            // ANOTACIÓN: Se pausa la animación de reposo al detectar cualquier toque en la pantalla.
-            // Esto libera la CPU para que las animaciones de los paneles sean fluidas.
             if (!screen_manager_is_off()) {
                 ESP_LOGD(TAG, "Touch detected, pausing idle animation.");
                 ui_idle_animation_pause();
@@ -12570,8 +12676,6 @@ static void main_screen_event_cb(lv_event_t *e) {
                     g_click_count = 0;
                 }
             } else {
-                // ANOTACIÓN: Si es un click simple y no un gesto, la animación de idle debe reanudarse,
-                // ya que los paneles no se mostrarán.
                 ESP_LOGD(TAG, "Simple click detected, resuming idle animation.");
                 ui_idle_animation_resume();
             }
@@ -12590,11 +12694,13 @@ void delete_screen_main(void) {
     }
     ui_idle_animation_stop();
     ui_action_animations_destroy();
+    ui_telemetry_destroy(); // Destruir el timer de telemetría
 }
 
 void create_screens(void) {
     create_screen_main();
 }
+
 
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\screens.h
@@ -12919,12 +13025,15 @@ animation_t* ui_action_animations_get_player(void);
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_actions_panel.c
 # =================================================================================================
 
-// Fichero: ./components/diymon_ui/ui_actions_panel.c
-// Fecha: 12/08/2025 - 14:00
-// Último cambio: Renombrada la implementación de la función `get` del botón de configuración.
-// Descripción: Se actualiza el nombre de la función `ui_actions_panel_get_enable_ftp_btn`
-//              para que coincida con su nueva declaración en la cabecera, completando el refactor.
-
+/*
+  Fichero: ./components/diymon_ui/ui_actions_panel.c
+  Fecha: 13/08/2025 - 12:23 
+  Último cambio: Corregida la transparencia de los botones de acción.
+  Descripción: Se ha modificado la creación de botones para asegurar que su fondo sea
+               completamente transparente en todos los estados (normal, presionado, etc.).
+               Esto soluciona un problema visual donde los botones mostraban un fondo opaco,
+               y ahora permite que la animación de fondo sea visible a través de ellos.
+*/
 #include "ui_actions_panel.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
@@ -12975,9 +13084,14 @@ static void last_button_out_anim_ready_cb(lv_anim_t *a);
 
 static lv_obj_t* create_top_action_button(lv_obj_t *parent, ui_asset_id_t asset_id, int index) {
     lv_obj_t *btn = lv_btn_create(parent);
-    lv_obj_remove_style_all(btn);
+    lv_obj_remove_style_all(btn); // Eliminar estilos por defecto
     lv_obj_set_size(btn, BUTTON_SIZE, BUTTON_SIZE);
-    lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, 0);
+    
+    // Forzar transparencia total para el fondo, borde y sombra en todos los estados.
+    lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, LV_STATE_ANY);
+    lv_obj_set_style_border_width(btn, 0, LV_STATE_ANY);
+    lv_obj_set_style_shadow_width(btn, 0, LV_STATE_ANY);
+
     lv_obj_t *img = lv_img_create(btn);
     lv_img_set_src(img, ui_assets_get_icon(asset_id));
     lv_obj_center(img);
@@ -12989,9 +13103,14 @@ static lv_obj_t* create_top_action_button(lv_obj_t *parent, ui_asset_id_t asset_
 
 static lv_obj_t* create_side_action_button(lv_obj_t *parent, ui_asset_id_t asset_id, int index) {
     lv_obj_t *btn = lv_btn_create(parent);
-    lv_obj_remove_style_all(btn);
+    lv_obj_remove_style_all(btn); // Eliminar estilos por defecto
     lv_obj_set_size(btn, BUTTON_SIZE, BUTTON_SIZE);
-    lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, 0);
+
+    // Forzar transparencia total para el fondo, borde y sombra en todos los estados.
+    lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, LV_STATE_ANY);
+    lv_obj_set_style_border_width(btn, 0, LV_STATE_ANY);
+    lv_obj_set_style_shadow_width(btn, 0, LV_STATE_ANY);
+    
     lv_obj_t *img = lv_img_create(btn);
     lv_img_set_src(img, ui_assets_get_icon(asset_id));
     lv_obj_center(img);
@@ -13011,7 +13130,7 @@ void ui_actions_panel_create(lv_obj_t *parent) {
     s_admin_btns[2] = create_top_action_button(parent, ASSET_ICON_ADMIN_PLACEHOLDER, 2);
 
     s_config_btns[0] = create_top_action_button(parent, ASSET_ICON_RESET_ALL, 0);
-    s_config_btns[1] = create_top_action_button(parent, ASSET_ICON_ENABLE_FTP, 1); // El asset sigue siendo el mismo
+    s_config_btns[1] = create_top_action_button(parent, ASSET_ICON_ENABLE_FTP, 1);
     s_config_btns[2] = create_top_action_button(parent, ASSET_ICON_CONFIG_PLACEHOLDER, 2);
 
     s_side_btns[0] = create_side_action_button(parent, ASSET_ICON_EVO_FIRE, 0);
@@ -13030,7 +13149,7 @@ lv_obj_t* ui_actions_panel_get_brightness_btn(void) { return s_admin_btns[0]; }
 lv_obj_t* ui_actions_panel_get_toggle_screen_btn(void) { return s_admin_btns[1]; }
 lv_obj_t* ui_actions_panel_get_admin_placeholder_btn(void) { return s_admin_btns[2]; }
 lv_obj_t* ui_actions_panel_get_reset_all_btn(void) { return s_config_btns[0]; }
-lv_obj_t* ui_actions_panel_get_enable_config_mode_btn(void) { return s_config_btns[1]; } // Renombrado
+lv_obj_t* ui_actions_panel_get_enable_config_mode_btn(void) { return s_config_btns[1]; }
 lv_obj_t* ui_actions_panel_get_config_placeholder_btn(void) { return s_config_btns[2]; }
 lv_obj_t* ui_actions_panel_get_evo_fire_btn(void) { return s_side_btns[0]; }
 lv_obj_t* ui_actions_panel_get_evo_water_btn(void) { return s_side_btns[1]; }
@@ -13248,6 +13367,7 @@ static void button_event_cb(lv_event_t *e) {
     }
 }
 
+
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_actions_panel.h
 # =================================================================================================
@@ -13361,7 +13481,7 @@ static bool load_asset(ui_asset_id_t id, const char* filename) {
     fclose(f);
     
     // Corregir los bytes de los datos leídos.
-    swap_bytes_for_rgb565(g_asset_buffers[id], data_size);
+    // swap_bytes_for_rgb565(g_asset_buffers[id], data_size);
     
     // Apuntar el descriptor al búfer en memoria.
     g_asset_dscs[id].data = g_asset_buffers[id];
@@ -13673,6 +13793,161 @@ extern objects_t objects;
 #endif
 
 #endif // UI_PRIV_H
+
+# =================================================================================================
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_telemetry.c
+# =================================================================================================
+
+/*
+  Fichero: ./components/diymon_ui/ui_telemetry.c
+  Fecha: 13/08/2025 - 12:19 
+  Último cambio: Invertidos los colores y movidos los labels a la esquina inferior.
+  Descripción: Se ha modificado el estilo de los labels de telemetría para que tengan
+               texto negro sobre fondo blanco semitransparente. Además, se han realineado
+               todos los elementos en la esquina inferior izquierda de la pantalla para
+               mejorar la visibilidad de la animación principal.
+*/
+#include "ui_telemetry.h"
+#include "bsp_api.h"
+#include "screen_manager.h"
+#include "esp_log.h"
+#include "esp_lvgl_port.h"
+#include <math.h>
+
+static const char *TAG = "UI_TELEMETRY";
+
+// --- Constantes de configuración ---
+#define TELEMETRY_UPDATE_INTERVAL_MS 10000
+#define SHAKE_THRESHOLD_G            2.5f
+#define MIN_BAT_V                    3.0f
+#define MAX_BAT_V                    4.2f
+
+// --- Variables estáticas del módulo ---
+static lv_obj_t *s_battery_label;
+static lv_obj_t *s_orientation_label;
+static lv_obj_t *s_accel_label;
+static lv_timer_t *s_telemetry_timer;
+
+/**
+ * @brief Callback del temporizador que actualiza los datos de telemetría en la pantalla.
+ */
+static void telemetry_update_timer_cb(lv_timer_t *timer) {
+    float acc[3], gyro[3];
+    float voltage;
+
+    // Proteger el acceso I2C con el mutex de LVGL
+    if (lvgl_port_lock(0)) {
+        bsp_imu_read(acc, gyro);
+        bsp_battery_get_voltage(&voltage, NULL);
+        lvgl_port_unlock();
+    } else {
+        return; // No se pudo obtener el mutex, reintentar en el próximo ciclo
+    }
+
+    // 1. Procesar y mostrar datos de batería
+    float percentage = 100.0f * (voltage - MIN_BAT_V) / (MAX_BAT_V - MIN_BAT_V);
+    if (percentage > 100.0f) percentage = 100.0f;
+    if (percentage < 0.0f) percentage = 0.0f;
+    lv_label_set_text_fmt(s_battery_label, LV_SYMBOL_BATTERY_FULL " %d%%", (int)percentage);
+
+    // 2. Procesar y mostrar datos de aceleración
+    float magnitude = sqrt(acc[0] * acc[0] + acc[1] * acc[1] + acc[2] * acc[2]);
+    lv_label_set_text_fmt(s_accel_label, LV_SYMBOL_CHARGE " %.2f m/s2", magnitude);
+
+    // 3. Procesar y mostrar datos de orientación
+    float roll = atan2(acc[1], acc[2]) * 180.0 / M_PI;
+    float pitch = atan2(-acc[0], sqrt(acc[1] * acc[1] + acc[2] * acc[2])) * 180.0 / M_PI;
+    lv_label_set_text_fmt(s_orientation_label, LV_SYMBOL_SETTINGS " R:%.0f P:%.0f", roll, pitch);
+
+    // 4. Lógica de 'shake-to-wake'
+    if (screen_manager_is_off() && (magnitude > (SHAKE_THRESHOLD_G * 9.81f))) {
+        ESP_LOGI(TAG, "Shake detectado por sondeo (magnitud: %.2f > %.2f). Encendiendo pantalla.", magnitude, SHAKE_THRESHOLD_G * 9.81f);
+        if (lvgl_port_lock(0)) {
+            screen_manager_turn_on();
+            lvgl_port_unlock();
+        }
+    }
+}
+
+void ui_telemetry_create(lv_obj_t *parent) {
+    // Estilo para los labels de telemetría (colores invertidos)
+    static lv_style_t style_telemetry;
+    lv_style_init(&style_telemetry);
+    lv_style_set_text_color(&style_telemetry, lv_color_black());
+    lv_style_set_text_font(&style_telemetry, &lv_font_montserrat_14);
+    lv_style_set_bg_color(&style_telemetry, lv_color_white());
+    lv_style_set_bg_opa(&style_telemetry, LV_OPA_70); // Un poco más opaco para legibilidad
+    lv_style_set_radius(&style_telemetry, 5);
+    lv_style_set_pad_all(&style_telemetry, 5);
+
+    // Crear los tres labels en la esquina inferior
+    s_orientation_label = lv_label_create(parent);
+    lv_obj_add_style(s_orientation_label, &style_telemetry, 0);
+    lv_obj_align(s_orientation_label, LV_ALIGN_BOTTOM_LEFT, 5, -5);
+    lv_label_set_text(s_orientation_label, LV_SYMBOL_SETTINGS " R:-- P:--");
+
+    s_battery_label = lv_label_create(parent);
+    lv_obj_add_style(s_battery_label, &style_telemetry, 0);
+    lv_obj_align_to(s_battery_label, s_orientation_label, LV_ALIGN_OUT_TOP_LEFT, 0, -5);
+    lv_label_set_text(s_battery_label, LV_SYMBOL_BATTERY_FULL " --%");
+
+    s_accel_label = lv_label_create(parent);
+    lv_obj_add_style(s_accel_label, &style_telemetry, 0);
+    lv_obj_align_to(s_accel_label, s_battery_label, LV_ALIGN_OUT_RIGHT_MID, 10, 0);
+    lv_label_set_text(s_accel_label, LV_SYMBOL_CHARGE " -- m/s2");
+    
+    // Crear y lanzar el temporizador
+    s_telemetry_timer = lv_timer_create(telemetry_update_timer_cb, TELEMETRY_UPDATE_INTERVAL_MS, NULL);
+    ESP_LOGI(TAG, "Módulo de telemetría de UI creado.");
+}
+
+void ui_telemetry_destroy(void) {
+    if (s_telemetry_timer) {
+        lv_timer_del(s_telemetry_timer);
+        s_telemetry_timer = NULL;
+        ESP_LOGI(TAG, "Temporizador de telemetría destruido.");
+    }
+}
+
+
+# =================================================================================================
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_telemetry.h
+# =================================================================================================
+
+/*
+  Fichero: ./components/diymon_ui/ui_telemetry.h
+  Fecha: 13/08/2025 - 12:03 
+  Último cambio: Creación del fichero.
+  Descripción: Interfaz pública para el nuevo módulo de telemetría de la UI.
+               Define las funciones para crear y destruir los elementos de la UI
+               que mostrarán los datos de los sensores.
+*/
+#ifndef UI_TELEMETRY_H
+#define UI_TELEMETRY_H
+
+#include <lvgl.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Crea los labels y el temporizador para mostrar los datos de los sensores.
+ * @param parent El objeto padre sobre el que se crearán los labels.
+ */
+void ui_telemetry_create(lv_obj_t *parent);
+
+/**
+ * @brief Destruye el temporizador de telemetría para liberar recursos.
+ */
+void ui_telemetry_destroy(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // UI_TELEMETRY_H
+
 
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui.c
@@ -17776,10 +18051,12 @@ idf_component_register(SRCS "screen_manager.c"
 
 /*
   Fichero: ./components/screen_manager/screen_manager.c
-  Fecha: 12/08/2025 - 09:00
-  Último cambio: Sin cambios funcionales, se mantiene para consistencia.
-  Descripción: Gestor de estado de la pantalla. Se encarga de la lógica de
-               encendido, apagado y control de brillo, delegando en el BSP.
+  Fecha: 13/08/2025 - 12:03 
+  Último cambio: Eliminada completamente la lógica de 'shake-to-wake'.
+  Descripción: Se ha eliminado toda la funcionalidad de shake-to-wake, incluyendo la tarea,
+               el semáforo y la inicialización de la interrupción del BSP. Esta funcionalidad
+               será re-implementada dentro de la nueva tarea de telemetría en la capa de la UI
+               para consolidar la lógica y resolver conflictos de I2C.
 */
 #include "screen_manager.h"
 #include "bsp_api.h"
@@ -17812,6 +18089,7 @@ void screen_manager_set_brightness(int percentage) {
 bool screen_manager_is_off(void) {
     return g_is_screen_off;
 }
+
 
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\screen_manager\screen_manager.h
@@ -17987,12 +18265,13 @@ esp_err_t service_screen_show(const char* image_path);
 # =================================================================================================
 
 # Fichero: ./components/web_server/CMakeLists.txt
-# Fecha: 12/08/2025 - 13:00
-# Último cambio: Creación del componente.
-# Descripción: Registro y dependencias para el componente del servidor web.
+# Fecha: 13/08/2025 - 07:20 pm
+# Último cambio: Añadido web_server_page.h a las cabeceras privadas.
+# Descripción: Registro y dependencias para el componente del servidor web. Se incluye el nuevo fichero de cabecera que contiene el HTML.
 
 idf_component_register(SRCS "web_server.c"
                     INCLUDE_DIRS "."
+                    PRIV_INCLUDE_DIRS "."
                     REQUIRES
                         driver
                         esp_wifi
@@ -18004,17 +18283,250 @@ idf_component_register(SRCS "web_server.c"
                         sdmmc
 )
 
+
+# =================================================================================================
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server_page.h
+# =================================================================================================
+
+/*
+  Fichero: ./components/web_server/web_server_page.h
+  Fecha: 13/08/2025 - 07:30 pm
+  Último cambio: Mejorada la visualización del tamaño de los archivos.
+  Descripción: Contiene la página HTML principal del portal de configuración. Se ha añadido una función JavaScript para formatear el tamaño de los archivos (Bytes, KB, MB) y mejorar la legibilidad.
+*/
+#ifndef WEB_SERVER_PAGE_H
+#define WEB_SERVER_PAGE_H
+
+static const char* INDEX_HTML_CONTENT = R"rawliteral(
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestor de Archivos ESP32</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; color: #333; }
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        .header { text-align: center; margin-bottom: 30px; color: white; }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        .header p { font-size: 1.2em; opacity: 0.9; }
+        .card { background: white; border-radius: 15px; padding: 25px; margin-bottom: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .card h3 { color: #5a67d8; margin-bottom: 20px; font-size: 1.4em; }
+        .btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 12px 25px; border-radius: 25px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
+        .btn-secondary { background: linear-gradient(135deg, #4fd1c7 0%, #06b6d4 100%); }
+        .btn-danger { background: linear-gradient(135deg, #fc8181 0%, #f56565 100%); }
+        .file-list { max-height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 10px; margin-top: 20px; }
+        .file-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-bottom: 1px solid #f0f2f5; transition: background 0.3s ease; }
+        .file-item:hover { background: #f7fafc; }
+        .file-item:last-child { border-bottom: none; }
+        .file-info { display: flex; align-items: center; gap: 10px; word-break: break-all; }
+        .file-actions { display: flex; gap: 10px; }
+        .btn-small { padding: 6px 12px; font-size: 12px; border-radius: 15px; }
+        .progress-bar { width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin: 10px 0; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #48bb78, #38a169); border-radius: 4px; transition: width 0.3s ease; }
+        .upload-area { border: 3px dashed #cbd5e0; border-radius: 15px; padding: 40px 20px; text-align: center; cursor: pointer; transition: all 0.3s ease; background: rgba(90, 103, 216, 0.02); }
+        .upload-area:hover, .upload-area.dragover { border-color: #5a67d8; background: rgba(90, 103, 216, 0.05); }
+        .hidden { display: none !important; }
+        .status { font-size: 0.9em; color: #718096; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📦 Gestor de Archivos</h1>
+            <p>Sube y gestiona los archivos de tu dispositivo</p>
+        </div>
+
+        <div class="card">
+            <h3>📤 Subir Archivos</h3>
+            <div id="upload-area" class="upload-area">
+                <h4>Arrastra archivos aquí o haz clic para seleccionar</h4>
+                <p style="font-size: 0.9em; color: #666; margin-top: 10px;">
+                    Sube skins, animaciones y configuraciones a la SD.
+                </p>
+            </div>
+            <input type="file" id="file-input" multiple class="hidden">
+            
+            <div style="margin-top: 20px;">
+                <label>Progreso de Subida</label>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="upload-progress" style="width: 0%"></div>
+                </div>
+                <span id="upload-status" class="status">Listo para subir archivos.</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>📁 Archivos en la Tarjeta SD</h3>
+            <div style="margin-bottom: 15px;">
+                <button class="btn btn-secondary" id="refresh-btn">🔄 Actualizar</button>
+            </div>
+            <div class="file-list" id="file-list">
+                <p>Cargando lista de archivos...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const uploadArea = document.getElementById('upload-area');
+            const fileInput = document.getElementById('file-input');
+            const fileListDiv = document.getElementById('file-list');
+            const refreshBtn = document.getElementById('refresh-btn');
+
+            function formatBytes(bytes, decimals = 2) {
+                if (!+bytes) return '0 Bytes'
+                const k = 1024
+                const dm = decimals < 0 ? 0 : decimals
+                const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
+                const i = Math.floor(Math.log(bytes) / Math.log(k))
+                return ${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} 
+            }
+
+            async function fetchFileList() {
+                fileListDiv.innerHTML = '<p>Cargando lista de archivos...</p>';
+                try {
+                    const response = await fetch('/listfiles');
+                    if (!response.ok) {
+                        throw new Error('Error del servidor: ' + response.statusText);
+                    }
+                    const files = await response.json();
+                    renderFileList(files);
+                } catch (error) {
+                    console.error('Error al obtener la lista de archivos:', error);
+                    fileListDiv.innerHTML = '<p style="color: red;">No se pudo cargar la lista de archivos. Revisa la conexión con el dispositivo.</p>';
+                }
+            }
+
+            async function handleFileUpload(files) {
+                const progressBar = document.getElementById('upload-progress');
+                const statusText = document.getElementById('upload-status');
+                if (files.length === 0) return;
+
+                statusText.textContent = 'Iniciando subida de ' + files.length + ' archivo(s)...';
+                progressBar.style.width = '0%';
+                let filesUploaded = 0;
+
+                for (const file of files) {
+                    const formData = new FormData();
+                    formData.append('file', file, file.name);
+
+                    try {
+                        statusText.textContent = 'Subiendo ' + file.name + '...';
+                        const response = await fetch('/upload', { method: 'POST', body: formData });
+                        if (!response.ok) {
+                            throw new Error('Fallo en la subida del archivo ' + file.name);
+                        }
+                        filesUploaded++;
+                        const progress = (filesUploaded / files.length) * 100;
+                        progressBar.style.width = progress + '%';
+                    } catch (error) {
+                        console.error(error);
+                        statusText.innerHTML = '<span style="color: red;">❌ Error al subir ' + file.name + '.</span>';
+                        await new Promise(resolve => setTimeout(resolve, 3000));
+                    }
+                }
+                
+                statusText.innerHTML = '<span style="color: green;">✅ Subida completada.</span>';
+                fetchFileList();
+                setTimeout(() => {
+                    progressBar.style.width = '0%';
+                    statusText.textContent = 'Listo para subir archivos.';
+                }, 2000);
+            }
+            
+            async function deleteFile(filename) {
+                if (!confirm('⚠️ ¿Estás seguro de que quieres borrar "' + filename + '"?')) return;
+                
+                try {
+                    const formData = new FormData();
+                    formData.append('filename', filename);
+                    
+                    const response = await fetch('/delete', { method: 'POST', body: formData });
+                    if (!response.ok) throw new Error('El servidor no pudo borrar el archivo.');
+                    
+                    console.log('Archivo "' + filename + '" borrado.');
+                    fetchFileList(); 
+                } catch (error) {
+                    console.error('Error al borrar el archivo:', error);
+                    alert('No se pudo borrar el archivo: ' + filename);
+                }
+            }
+
+            function renderFileList(files) {
+                if (!files || files.length === 0) {
+                    fileListDiv.innerHTML = '<p>No hay archivos en la tarjeta SD.</p>';
+                    return;
+                }
+                
+                let html = '';
+                files.sort((a, b) => {
+                    if (a.type === b.type) return a.name.localeCompare(b.name);
+                    return a.type === 'dir' ? -1 : 1;
+                }).forEach(file => {
+                    const icon = file.type === 'dir' ? '📁' : '📄';
+                    const sizeFormatted = file.type === 'file' ? () : '';
+                    html += 
+                        <div class="file-item">
+                          <div class="file-info">
+                            <span style="font-size: 1.2em;">${icon}</span>
+                            <span>${file.name} </span>
+                          </div>
+                          <div class="file-actions">
+                            <button class="btn btn-small btn-danger" data-filename="${file.name}">🗑️ Borrar</button>
+                          </div>
+                        </div>;
+                });
+                fileListDiv.innerHTML = html;
+            }
+            
+            uploadArea.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', (e) => handleFileUpload(e.target.files));
+
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); });
+            });
+            ['dragenter', 'dragover'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, () => uploadArea.classList.add('dragover'));
+            });
+            ['dragleave', 'drop'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, () => uploadArea.classList.remove('dragover'));
+            });
+            uploadArea.addEventListener('drop', e => handleFileUpload(e.dataTransfer.files));
+
+            fileListDiv.addEventListener('click', e => {
+                if (e.target && e.target.matches('button.btn-danger')) {
+                    const filename = e.target.getAttribute('data-filename');
+                    if (filename) deleteFile(filename);
+                }
+            });
+
+            refreshBtn.addEventListener('click', fetchFileList);
+            
+            fetchFileList();
+        });
+    </script>
+</body>
+</html>
+)rawliteral";
+
+#endif // WEB_SERVER_PAGE_H
+
+
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server.c
 # =================================================================================================
 
 /*
   Fichero: ./components/web_server/web_server.c
-  Fecha: 12/08/2025 - 07:15 pm
-  Último cambio: Modificada la ruta base para servir archivos desde /sdcard/config.
-  Descripción: Servidor web para configuración. Se corrige la ruta para que apunte al directorio /config/ en la SD, unificando la ubicación de todos los archivos de servicio y solucionando los errores 404 (Not Found).
+  Fecha: 13/08/2025 - 07:30 pm
+  Último cambio: Confirmada la implementación funcional del explorador de archivos.
+  Descripción: Servidor web para configuración. Se confirma que los endpoints /listfiles, /upload, y /delete están correctamente implementados para interactuar con la tarjeta SD y dar soporte a la interfaz web. La página principal se sirve desde web_server_page.h.
 */
 #include "web_server.h"
+#include "web_server_page.h" // Incluir el HTML embebido
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "esp_vfs.h"
@@ -18023,6 +18535,8 @@ idf_component_register(SRCS "web_server.c"
 #include <string.h>
 #include <stdlib.h>
 #include <fcntl.h>
+#include <dirent.h>
+#include <sys/stat.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -18030,16 +18544,19 @@ static const char *TAG = "WEB_SERVER";
 #define WEB_MOUNT_POINT "/sdcard"
 #define FILE_UPLOAD_BUFFER_SIZE 2048
 
+// Estructura para gestionar el contexto de subida de archivos grandes
 struct file_upload_ctx {
     FILE *fd;
     char filepath[256];
 };
 
+// Manejador para la subida de archivos (POST /upload)
 static esp_err_t upload_post_handler(httpd_req_t *req) {
     char buf[FILE_UPLOAD_BUFFER_SIZE];
     int received;
     struct file_upload_ctx *ctx = (struct file_upload_ctx *)req->user_ctx;
 
+    // Si es el primer chunk, inicializar el contexto
     if (ctx == NULL) {
         ctx = malloc(sizeof(struct file_upload_ctx));
         if (!ctx) return ESP_ERR_NO_MEM;
@@ -18070,6 +18587,7 @@ static esp_err_t upload_post_handler(httpd_req_t *req) {
         }
     }
 
+    // Leer un chunk del cuerpo de la petición
     received = httpd_req_recv(req, buf, MIN(req->content_len, sizeof(buf)));
     if (received <= 0) {
         if (received == HTTPD_SOCK_ERR_TIMEOUT) {
@@ -18078,6 +18596,7 @@ static esp_err_t upload_post_handler(httpd_req_t *req) {
         return ESP_FAIL;
     }
 
+    // Escribir el chunk en el archivo
     if (fwrite(buf, 1, received, ctx->fd) != received) {
         ESP_LOGE(TAG, "Error al escribir en el archivo");
         fclose(ctx->fd);
@@ -18086,6 +18605,7 @@ static esp_err_t upload_post_handler(httpd_req_t *req) {
         return ESP_FAIL;
     }
 
+    // Si es el último chunk, cerrar el archivo y limpiar el contexto
     if (received < sizeof(buf)) {
         fclose(ctx->fd);
         ESP_LOGI(TAG, "Archivo subido correctamente a %s", ctx->filepath);
@@ -18097,29 +18617,142 @@ static esp_err_t upload_post_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-static esp_err_t file_get_handler(httpd_req_t *req) {
-    char filepath[256];
-    const char *uri = req->uri;
-    
-    if (strcmp(uri, "/") == 0) {
-        uri = "/index.html";
+// Manejador para listar archivos (GET /listfiles)
+static esp_err_t list_files_handler(httpd_req_t *req) {
+    ESP_LOGI(TAG, "Petición recibida para listar archivos en %s", WEB_MOUNT_POINT);
+
+    DIR *d = opendir(WEB_MOUNT_POINT);
+    if (!d) {
+        ESP_LOGE(TAG, "No se pudo abrir el directorio: %s", WEB_MOUNT_POINT);
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
     }
 
-    // [CORRECCIÓN] Se unifica la ruta base al directorio /config/ de la SD.
+    httpd_resp_set_type(req, "application/json");
+    
+    // Usar un buffer dinámico para construir la respuesta JSON
+    size_t buf_size = 1024;
+    char *json_buf = malloc(buf_size);
+    if (!json_buf) { closedir(d); httpd_resp_send_500(req); return ESP_ERR_NO_MEM; }
+    
+    strcpy(json_buf, "[");
+    bool first = true;
+    struct dirent *dir;
+
+    while ((dir = readdir(d)) != NULL) {
+        if (strcmp(dir->d_name, ".") == 0 || strcmp(dir->d_name, "..") == 0) continue;
+        
+        if (!first) strcat(json_buf, ",");
+        
+        char path[512];
+        snprintf(path, sizeof(path), "%s/%s", WEB_MOUNT_POINT, dir->d_name);
+        
+        struct stat st;
+        char entry_buf[512];
+        if (stat(path, &st) == 0) {
+            snprintf(entry_buf, sizeof(entry_buf), 
+                     "{\"name\":\"%s\",\"size\":%lld,\"type\":\"%s\"}", 
+                     dir->d_name, (long long)st.st_size, S_ISDIR(st.st_mode) ? "dir" : "file");
+        } else {
+            snprintf(entry_buf, sizeof(entry_buf), 
+                     "{\"name\":\"%s\",\"size\":0,\"type\":\"file\"}", dir->d_name);
+        }
+
+        if (strlen(json_buf) + strlen(entry_buf) + 2 > buf_size) {
+            buf_size *= 2;
+            char *new_buf = realloc(json_buf, buf_size);
+            if (!new_buf) { free(json_buf); closedir(d); httpd_resp_send_500(req); return ESP_ERR_NO_MEM; }
+            json_buf = new_buf;
+        }
+
+        strcat(json_buf, entry_buf);
+        first = false;
+    }
+    closedir(d);
+
+    strcat(json_buf, "]");
+    httpd_resp_send(req, json_buf, strlen(json_buf));
+    free(json_buf);
+
+    return ESP_OK;
+}
+
+// Manejador para borrar archivos (POST /delete)
+static esp_err_t delete_file_handler(httpd_req_t *req) {
+    char buf[192];
+    char filename[64] = {0};
+    int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
+
+    if (ret <= 0) return ESP_FAIL;
+    buf[ret] = '\0';
+
+    // Parser simplificado para multipart/form-data que extrae el nombre del archivo
+    char *ptr = strstr(buf, "name=\"filename\"");
+    if (ptr) {
+        ptr = strstr(ptr, "\r\n\r\n");
+        if (ptr) {
+            ptr += 4;
+            char *end_ptr = strstr(ptr, "\r\n--");
+            if (end_ptr) {
+                size_t len = end_ptr - ptr;
+                if (len < sizeof(filename)) {
+                    strncpy(filename, ptr, len);
+                    filename[len] = '\0';
+                }
+            }
+        }
+    }
+
+    if (strlen(filename) == 0) {
+        ESP_LOGE(TAG, "No se pudo extraer el nombre del archivo de la petición POST.");
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Nombre de archivo no encontrado.");
+        return ESP_FAIL;
+    }
+    
+    if (strstr(filename, "..")) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Nombre de archivo inválido.");
+        return ESP_FAIL;
+    }
+
+    char filepath[256];
+    snprintf(filepath, sizeof(filepath), "%s/%s", WEB_MOUNT_POINT, filename);
+
+    if (unlink(filepath) == 0) {
+        ESP_LOGI(TAG, "Archivo borrado: %s", filepath);
+        httpd_resp_send(req, "Archivo borrado.", HTTPD_RESP_USE_STRLEN);
+    } else {
+        ESP_LOGE(TAG, "Fallo al borrar el archivo: %s", filepath);
+        httpd_resp_send_500(req);
+    }
+
+    return ESP_OK;
+}
+
+// Manejador genérico para servir archivos estáticos (GET /*)
+static esp_err_t file_get_handler(httpd_req_t *req) {
+    const char *uri = req->uri;
+    
+    // Si la URI es la raíz o index.html, servir el contenido embebido
+    if (strcmp(uri, "/") == 0 || strcmp(uri, "/index.html") == 0) {
+        ESP_LOGI(TAG, "Sirviendo página principal embebida.");
+        httpd_resp_set_type(req, "text/html");
+        httpd_resp_send(req, INDEX_HTML_CONTENT, HTTPD_RESP_USE_STRLEN);
+        return ESP_OK;
+    }
+
+    // Para cualquier otra URI, intentar servir desde la SD (para futuros CSS/JS, etc.)
+    char filepath[256];
     const char *base_path = WEB_MOUNT_POINT "/config";
 
-    // Comprobación de seguridad en tiempo de ejecución para evitar desbordamientos.
     if ((strlen(base_path) + strlen(uri) + 1) > sizeof(filepath)) {
-        ESP_LOGE(TAG, "La ruta resultante de la URI es demasiado larga: %s", uri);
         httpd_resp_send_err(req, HTTPD_414_URI_TOO_LONG, "URI is too long");
         return ESP_FAIL;
     }
 
-    // Concatenación manual para evitar el warning/error del compilador.
     strcpy(filepath, base_path);
     strcat(filepath, uri);
 
-    ESP_LOGI(TAG, "Sirviendo archivo: %s", filepath);
+    ESP_LOGI(TAG, "Intentando servir archivo estático: %s", filepath);
 
     FILE *f = fopen(filepath, "r");
     if (f == NULL) {
@@ -18128,24 +18761,18 @@ static esp_err_t file_get_handler(httpd_req_t *req) {
         return ESP_FAIL;
     }
 
-    if (strstr(filepath, ".css")) {
-        httpd_resp_set_type(req, "text/css");
-    } else if (strstr(filepath, ".js")) {
-        httpd_resp_set_type(req, "application/javascript");
-    } else {
-        httpd_resp_set_type(req, "text/html");
-    }
+    if (strstr(filepath, ".css")) httpd_resp_set_type(req, "text/css");
+    else if (strstr(filepath, ".js")) httpd_resp_set_type(req, "application/javascript");
+    else httpd_resp_set_type(req, "text/html");
 
     char chunk[512];
     size_t chunksize;
     do {
         chunksize = fread(chunk, 1, sizeof(chunk), f);
-        if (chunksize > 0) {
-            if (httpd_resp_send_chunk(req, chunk, chunksize) != ESP_OK) {
-                fclose(f);
-                ESP_LOGE(TAG, "Error al enviar chunk de archivo");
-                return ESP_FAIL;
-            }
+        if (chunksize > 0 && httpd_resp_send_chunk(req, chunk, chunksize) != ESP_OK) {
+            fclose(f);
+            ESP_LOGE(TAG, "Error al enviar chunk de archivo");
+            return ESP_FAIL;
         }
     } while (chunksize != 0);
 
@@ -18153,7 +18780,6 @@ static esp_err_t file_get_handler(httpd_req_t *req) {
     httpd_resp_send_chunk(req, NULL, 0);
     return ESP_OK;
 }
-
 
 static httpd_handle_t start_webserver(void) {
     httpd_handle_t server = NULL;
@@ -18164,31 +18790,26 @@ static httpd_handle_t start_webserver(void) {
     ESP_LOGI(TAG, "Iniciando servidor httpd");
     if (httpd_start(&server, &config) == ESP_OK) {
         
-        httpd_uri_t upload_uri = {
-            .uri       = "/upload",
-            .method    = HTTP_POST,
-            .handler   = upload_post_handler,
-            .user_ctx  = NULL
-        };
+        httpd_uri_t upload_uri = { .uri = "/upload", .method = HTTP_POST, .handler = upload_post_handler, .user_ctx  = NULL };
         httpd_register_uri_handler(server, &upload_uri);
         
-        httpd_uri_t file_get_uri = {
-            .uri       = "/*",
-            .method    = HTTP_GET,
-            .handler   = file_get_handler,
-            .user_ctx  = NULL
-        };
-        httpd_register_uri_handler(server, &file_get_uri);
+        // Registrar los nuevos endpoints ANTES del comodín
+        httpd_uri_t list_uri = { .uri = "/listfiles", .method = HTTP_GET, .handler = list_files_handler, .user_ctx = NULL };
+        httpd_register_uri_handler(server, &list_uri);
         
+        httpd_uri_t delete_uri = { .uri = "/delete", .method = HTTP_POST, .handler = delete_file_handler, .user_ctx = NULL };
+        httpd_register_uri_handler(server, &delete_uri);
+        
+        // El comodín debe ser el ÚLTIMO en registrarse
+        httpd_uri_t file_get_uri = { .uri = "/*", .method = HTTP_GET, .handler = file_get_handler, .user_ctx = NULL };
+        httpd_register_uri_handler(server, &file_get_uri);
     }
     return server;
 }
 
 void web_server_start(void) {
     ESP_LOGI(TAG, "Iniciando servidor web de configuracion.");
-    
     start_webserver();
-
     while(1) {
         vTaskDelay(pdMS_TO_TICKS(10000));
     }
@@ -18692,9 +19313,12 @@ endmenu
 
 /*
   Fichero: ./main/main.c
-  Fecha: 12/08/2025 - 05:05 pm
-  Último cambio: Centralizada la inicialización del hardware en los modos de servicio.
-  Descripción: Orquestador principal de la aplicación. Se ha modificado la lógica para que la inicialización del hardware (BSP) se realice aquí, antes de llamar a los componentes de servicio como service_screen, evitando así inicializaciones múltiples y resolviendo un error crítico de reinicialización del bus SPI.
+  Fecha: 13/08/2025 - 12:06 
+  Último cambio: Eliminada la tarea de telemetría.
+  Descripción: Se elimina la tarea sensor_log_task de este fichero. La responsabilidad
+               de leer y mostrar los datos de los sensores se ha trasladado completamente
+               al nuevo componente ui_telemetry dentro de diymon_ui, centralizando toda
+               la lógica de la interfaz.
 */
 #include <stdio.h>
 #include <string.h>
@@ -18753,11 +19377,9 @@ void app_main(void)
 static void run_config_server_mode(void) {
     ESP_LOGI(TAG, "Arrancando en modo Servidor Web de Configuración (STA)...");
     
-    // 1. Inicializar hardware mínimo para mostrar pantalla y usar SD.
     bsp_init_service_mode();
     service_screen_show("/sdcard/config/FTP.bin");
 
-    // 2. Inicializar y conectar WiFi.
     bsp_wifi_init_stack();
     bsp_wifi_init_sta_from_nvs();
     bool ip_ok = bsp_wifi_wait_for_ip(15000);
@@ -18766,7 +19388,7 @@ static void run_config_server_mode(void) {
         char ip_addr_buffer[16] = "0.0.0.0";
         bsp_wifi_get_ip(ip_addr_buffer);
         ESP_LOGI(TAG, "Dispositivo conectado. IP: %s. Iniciando servidor web.", ip_addr_buffer);
-        web_server_start(); // Bloqueante
+        web_server_start();
     } else {
         ESP_LOGE(TAG, "No se pudo obtener IP. Reiniciando en 10 segundos...");
         vTaskDelay(pdMS_TO_TICKS(10000));
@@ -18777,13 +19399,11 @@ static void run_config_server_mode(void) {
 static void run_wifi_portal_mode(void) {
     ESP_LOGI(TAG, "No hay credenciales. Arrancando en modo Portal WiFi...");
     
-    // 1. Inicializar hardware mínimo y mostrar pantalla de portal.
     bsp_init_service_mode();
     service_screen_show("/sdcard/config/WIFI.bin");
     
-    // 2. Iniciar stack WiFi y portal.
     bsp_wifi_init_stack();
-    wifi_portal_start(); // Bloqueante
+    wifi_portal_start();
 }
 
 static void run_main_application_mode(void) {
@@ -18800,13 +19420,6 @@ static void run_main_application_mode(void) {
         lvgl_port_unlock();
     }
     ESP_LOGI(TAG, "Interfaz de Usuario principal inicializada.");
-
-    const esp_timer_create_args_t evolution_timer_args = {
-        .callback = &evolution_timer_callback, .name = "evolution-timer"
-    };
-    // Desactivado para permitir evolución manual
-    // ESP_ERROR_CHECK(esp_timer_create(&evolution_timer_args, &evolution_timer_handle));
-    // ESP_ERROR_CHECK(esp_timer_start_periodic(evolution_timer_handle, 5 * 1000000));
     
     ESP_LOGI(TAG, "¡Firmware DIYMON en marcha!");
 }

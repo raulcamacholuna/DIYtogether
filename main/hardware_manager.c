@@ -1,8 +1,8 @@
 /*
  * Fichero: ./main/hardware_manager.c
- * Fecha: 12/08/2025 - 05:05 pm
- * Último cambio: Eliminada la configuración redundante de brillo.
- * Descripción: Orquestador de hardware. Se elimina la llamada explícita a bsp_display_set_brightness(100), ya que ahora la función bsp_display_init se encarga de restaurar el brillo desde la NVS, evitando sobreescribir la configuración del usuario.
+ * Fecha: 13/08/2025 - 08:03 
+ * Último cambio: Habilitado el intercambio de bytes en el port de LVGL.
+ * Descripción: Orquestador de hardware. Se habilita el flag 'swap_bytes' en la configuración de LVGL para corregir el orden de los bytes de color en la pantalla. Esto soluciona problemas visuales con colores incorrectos en todos los elementos de la UI.
  */
 #include "hardware_manager.h"
 #include "esp_log.h"
@@ -26,6 +26,9 @@ esp_err_t hardware_manager_init(void) {
         .double_buffer = 1,
         .hres = bsp_get_display_hres(),
         .vres = bsp_get_display_vres(),
+        .flags = {
+            .swap_bytes = true, // Corregir el orden de bytes de color para RGB565
+        }
     };
     lv_disp_t * disp = lvgl_port_add_disp(&disp_cfg);
 

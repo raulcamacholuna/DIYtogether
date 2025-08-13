@@ -1,8 +1,8 @@
 /*
  * Fichero: ./components/diymon_bsp/WS1.9TS/bsp_display.c
- * Fecha: 12/08/2025 - 02:10 pm
- * Último cambio: Corregido el formato de los comentarios del encabezado a C-style.
- * Descripción: Driver del display. Ahora guarda el nivel de brillo en la memoria no volátil (NVS) cada vez que se cambia, y lo restaura al iniciar el dispositivo.
+ * Fecha: 13/08/2025 - 08:03 
+ * Último cambio: Eliminado 'swap_color_bytes' obsoleto para compatibilidad con ESP-IDF 5.x.
+ * Descripción: Driver del display. Se elimina la propiedad 'swap_color_bytes' de la configuración del panel IO SPI, ya que es obsoleta en la versión actual de ESP-IDF. La inversión de bytes se gestionará en una capa superior (LVGL port).
  */
 #include "bsp_api.h"
 #include "esp_log.h"

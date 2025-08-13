@@ -1,9 +1,12 @@
-// Fichero: ./components/diymon_ui/ui_actions_panel.c
-// Fecha: 12/08/2025 - 14:00
-// Último cambio: Renombrada la implementación de la función `get` del botón de configuración.
-// Descripción: Se actualiza el nombre de la función `ui_actions_panel_get_enable_ftp_btn`
-//              para que coincida con su nueva declaración en la cabecera, completando el refactor.
-
+/*
+  Fichero: ./components/diymon_ui/ui_actions_panel.c
+  Fecha: 13/08/2025 - 12:23 
+  Último cambio: Corregida la transparencia de los botones de acción.
+  Descripción: Se ha modificado la creación de botones para asegurar que su fondo sea
+               completamente transparente en todos los estados (normal, presionado, etc.).
+               Esto soluciona un problema visual donde los botones mostraban un fondo opaco,
+               y ahora permite que la animación de fondo sea visible a través de ellos.
+*/
 #include "ui_actions_panel.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
@@ -54,9 +57,14 @@ static void last_button_out_anim_ready_cb(lv_anim_t *a);
 
 static lv_obj_t* create_top_action_button(lv_obj_t *parent, ui_asset_id_t asset_id, int index) {
     lv_obj_t *btn = lv_btn_create(parent);
-    lv_obj_remove_style_all(btn);
+    lv_obj_remove_style_all(btn); // Eliminar estilos por defecto
     lv_obj_set_size(btn, BUTTON_SIZE, BUTTON_SIZE);
-    lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, 0);
+    
+    // Forzar transparencia total para el fondo, borde y sombra en todos los estados.
+    lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, LV_STATE_ANY);
+    lv_obj_set_style_border_width(btn, 0, LV_STATE_ANY);
+    lv_obj_set_style_shadow_width(btn, 0, LV_STATE_ANY);
+
     lv_obj_t *img = lv_img_create(btn);
     lv_img_set_src(img, ui_assets_get_icon(asset_id));
     lv_obj_center(img);
@@ -68,9 +76,14 @@ static lv_obj_t* create_top_action_button(lv_obj_t *parent, ui_asset_id_t asset_
 
 static lv_obj_t* create_side_action_button(lv_obj_t *parent, ui_asset_id_t asset_id, int index) {
     lv_obj_t *btn = lv_btn_create(parent);
-    lv_obj_remove_style_all(btn);
+    lv_obj_remove_style_all(btn); // Eliminar estilos por defecto
     lv_obj_set_size(btn, BUTTON_SIZE, BUTTON_SIZE);
-    lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, 0);
+
+    // Forzar transparencia total para el fondo, borde y sombra en todos los estados.
+    lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, LV_STATE_ANY);
+    lv_obj_set_style_border_width(btn, 0, LV_STATE_ANY);
+    lv_obj_set_style_shadow_width(btn, 0, LV_STATE_ANY);
+    
     lv_obj_t *img = lv_img_create(btn);
     lv_img_set_src(img, ui_assets_get_icon(asset_id));
     lv_obj_center(img);
@@ -90,7 +103,7 @@ void ui_actions_panel_create(lv_obj_t *parent) {
     s_admin_btns[2] = create_top_action_button(parent, ASSET_ICON_ADMIN_PLACEHOLDER, 2);
 
     s_config_btns[0] = create_top_action_button(parent, ASSET_ICON_RESET_ALL, 0);
-    s_config_btns[1] = create_top_action_button(parent, ASSET_ICON_ENABLE_FTP, 1); // El asset sigue siendo el mismo
+    s_config_btns[1] = create_top_action_button(parent, ASSET_ICON_ENABLE_FTP, 1);
     s_config_btns[2] = create_top_action_button(parent, ASSET_ICON_CONFIG_PLACEHOLDER, 2);
 
     s_side_btns[0] = create_side_action_button(parent, ASSET_ICON_EVO_FIRE, 0);
@@ -109,7 +122,7 @@ lv_obj_t* ui_actions_panel_get_brightness_btn(void) { return s_admin_btns[0]; }
 lv_obj_t* ui_actions_panel_get_toggle_screen_btn(void) { return s_admin_btns[1]; }
 lv_obj_t* ui_actions_panel_get_admin_placeholder_btn(void) { return s_admin_btns[2]; }
 lv_obj_t* ui_actions_panel_get_reset_all_btn(void) { return s_config_btns[0]; }
-lv_obj_t* ui_actions_panel_get_enable_config_mode_btn(void) { return s_config_btns[1]; } // Renombrado
+lv_obj_t* ui_actions_panel_get_enable_config_mode_btn(void) { return s_config_btns[1]; }
 lv_obj_t* ui_actions_panel_get_config_placeholder_btn(void) { return s_config_btns[2]; }
 lv_obj_t* ui_actions_panel_get_evo_fire_btn(void) { return s_side_btns[0]; }
 lv_obj_t* ui_actions_panel_get_evo_water_btn(void) { return s_side_btns[1]; }
