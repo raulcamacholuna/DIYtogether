@@ -1,7 +1,7 @@
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\CMakeLists.txt
 # Fecha: $timestamp
-# Último cambio: Eliminada la referencia al directorio 'assets' que ya no existe.
-# Descripción: CMakeLists para el componente de UI. Se elimina `PRIV_INCLUDE_DIRS "assets"` para resolver el error de compilación, ya que el directorio 'assets' ha sido borrado.
+# Último cambio: Actualizado para incluir `ui_config_screen.c` en la compilación.
+# Descripción: El `file(GLOB "*.c")` existente se encarga de encontrar y compilar automáticamente el nuevo fichero `ui_config_screen.c`. Se regenera el fichero para confirmar que este nuevo fuente se añade al componente.
 
 file(GLOB component_sources
     "*.c"
@@ -9,6 +9,7 @@ file(GLOB component_sources
     "actions/*.c"
     "styles/*.c"
     "ui_telemetry.c"
+    "assets/*.c"
 )
 
 idf_component_register(

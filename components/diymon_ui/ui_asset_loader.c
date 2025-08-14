@@ -1,111 +1,56 @@
 /*
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_asset_loader.c
 # Fecha: $timestamp
-# Último cambio: Modificado para cargar los iconos de los botones desde archivos .bin en la SD.
-# Descripción: Gestor de assets de la UI. En lugar de usar assets compilados desde ficheros .c, ahora carga dinámicamente las imágenes de los botones desde /sdcard/buttons/ en formato RGB565A8, permitiendo la personalización de skins sin recompilar.
+# Último cambio: Revertido a un modelo de assets enlazados en firmware para solucionar el lag de la SD.
+# Descripción: Se ha revertido la estrategia de carga de assets. En lugar de generar rutas de fichero para la SD, ahora se devuelve un puntero a un descriptor de imagen (`lv_img_dsc_t`) que estará compilado directamente en el firmware. Esto elimina las lentas operaciones de E/S de la tarjeta SD durante el renderizado, solucionando los graves problemas de rendimiento ("lag").
 */
 #include "ui_asset_loader.h"
+#include "ui_assets.h" // Este fichero contendrá las declaraciones 'extern' de los assets
 #include "esp_log.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 static const char *TAG = "UI_ASSET_LOADER";
 
-// --- Constantes de configuración de assets ---
-#define ASSET_BASE_PATH "/sdcard/buttons"
-#define ASSET_IMG_WIDTH 50
-#define ASSET_IMG_HEIGHT 50
-#define LVGL_BIN_HEADER_SIZE 12
-
-// Array de descriptores de imagen, uno para cada asset.
-static lv_img_dsc_t g_asset_dscs[ASSET_COUNT];
-
-// Mapeo de IDs de assets a nombres de fichero.
-static const char* g_asset_filenames[ASSET_COUNT] = {
-    [ASSET_ICON_EAT]                  = "BTN_1.bin",
-    [ASSET_ICON_GYM]                  = "BTN_2.bin",
-    [ASSET_ICON_ATK]                  = "BTN_3.bin",
-    [ASSET_ICON_BRIGHTNESS]           = "BTN_4.bin",
-    [ASSET_ICON_SCREEN_OFF]           = "BTN_5.bin",
-    [ASSET_ICON_ADMIN_PLACEHOLDER]    = "BTN_6.bin",
-    [ASSET_ICON_RESET_ALL]            = "BTN_7.bin",
-    [ASSET_ICON_ENABLE_FILE_SERVER]   = "BTN_8.bin",
-    [ASSET_ICON_CONFIG_PLACEHOLDER]   = "BTN_9.bin",
-    [ASSET_ICON_EVO_FIRE]             = "EVO_1.bin",
-    [ASSET_ICON_EVO_WATER]            = "EVO_2.bin",
-    [ASSET_ICON_EVO_EARTH]            = "EVO_3.bin",
-    [ASSET_ICON_EVO_WIND]             = "EVO_4.bin",
-    [ASSET_ICON_EVO_BACK]             = "EVO_5.bin",
+// --- Mapeo de IDs de assets a los punteros de los descriptores de imagen compilados ---
+static const lv_img_dsc_t* g_asset_dsc_pointers[ASSET_COUNT] = {
+    [ASSET_ICON_EAT]                  = &asset_btn_1,
+    [ASSET_ICON_GYM]                  = &asset_btn_2,
+    [ASSET_ICON_ATK]                  = &asset_btn_3,
+    [ASSET_ICON_BRIGHTNESS]           = &asset_btn_4,
+    [ASSET_ICON_SCREEN_OFF]           = &asset_btn_5,
+    [ASSET_ICON_ADMIN_PLACEHOLDER]    = &asset_btn_6,
+    [ASSET_ICON_RESET_ALL]            = &asset_btn_7,
+    [ASSET_ICON_ENABLE_FILE_SERVER]   = &asset_btn_8,
+    [ASSET_ICON_CONFIG_PLACEHOLDER]   = &asset_btn_9,
+    [ASSET_ICON_EVO_FIRE]             = &asset_evo_1,
+    [ASSET_ICON_EVO_WATER]            = &asset_evo_2,
+    [ASSET_ICON_EVO_EARTH]            = &asset_evo_3,
+    [ASSET_ICON_EVO_WIND]             = &asset_evo_4,
+    [ASSET_ICON_EVO_BACK]             = &asset_evo_5,
 };
 
 /**
- * @brief Carga todos los iconos desde la tarjeta SD y los almacena en RAM.
+ * @brief Inicializa el gestor de assets. En este modo no hace nada.
  */
 void ui_assets_init(void) {
-    ESP_LOGI(TAG, "Cargando assets de iconos desde la tarjeta SD...");
-
-    for (int i = 0; i < ASSET_COUNT; i++) {
-        char path_buf[128];
-        snprintf(path_buf, sizeof(path_buf), "%s/%s", ASSET_BASE_PATH, g_asset_filenames[i]);
-
-        // El formato es RGB565A8, que usa 3 bytes por píxel.
-        size_t buffer_size = ASSET_IMG_WIDTH * ASSET_IMG_HEIGHT * 3;
-        uint8_t *img_buf = malloc(buffer_size);
-
-        if (!img_buf) {
-            ESP_LOGE(TAG, "Fallo al reservar %u bytes para %s", (unsigned int)buffer_size, g_asset_filenames[i]);
-            g_asset_dscs[i].data = NULL; // Marcar como fallido
-            continue;
-        }
-
-        FILE* f = fopen(path_buf, "rb");
-        if (!f) {
-            ESP_LOGE(TAG, "No se pudo abrir el asset: %s", path_buf);
-            free(img_buf);
-            g_asset_dscs[i].data = NULL;
-            continue;
-        }
-
-        fseek(f, LVGL_BIN_HEADER_SIZE, SEEK_SET); // Omitir la cabecera del fichero .bin
-        size_t bytes_read = fread(img_buf, 1, buffer_size, f);
-        fclose(f);
-
-        if (bytes_read != buffer_size) {
-            ESP_LOGW(TAG, "Lectura incompleta para %s. Leidos %u de %u bytes.", path_buf, (unsigned int)bytes_read, (unsigned int)buffer_size);
-        }
-
-        g_asset_dscs[i].header.cf = LV_COLOR_FORMAT_RGB565A8;
-        g_asset_dscs[i].header.w = ASSET_IMG_WIDTH;
-        g_asset_dscs[i].header.h = ASSET_IMG_HEIGHT;
-        g_asset_dscs[i].header.stride = ASSET_IMG_WIDTH * 2; // Stride para la parte de color (RGB565)
-        g_asset_dscs[i].data_size = buffer_size;
-        g_asset_dscs[i].data = img_buf;
-    }
-
-    ESP_LOGI(TAG, "Carga de assets desde SD finalizada.");
+    ESP_LOGI(TAG, "Asset loader inicializado en modo 'firmware-linked'.");
 }
 
 /**
- * @brief Libera la memoria de todos los iconos cargados.
+ * @brief Desinicializa el gestor de assets. No hace nada en este modo.
  */
 void ui_assets_deinit(void) {
-    ESP_LOGI(TAG, "Liberando memoria de los assets de iconos.");
-    for (int i = 0; i < ASSET_COUNT; i++) {
-        if (g_asset_dscs[i].data) {
-            free((void*)g_asset_dscs[i].data);
-            g_asset_dscs[i].data = NULL;
-        }
-    }
+    // No hay memoria dinámica que liberar.
 }
 
 /**
- * @brief Obtiene un puntero al descriptor de imagen de un icono ya cargado.
+ * @brief Obtiene un puntero al descriptor de imagen de un icono compilado en el firmware.
+ * @param asset_id El identificador del icono.
+ * @return Un puntero constante al descriptor de imagen LVGL.
  */
 const lv_img_dsc_t* ui_assets_get_icon(ui_asset_id_t asset_id) {
-    if (asset_id < ASSET_COUNT && asset_id >= 0 && g_asset_dscs[asset_id].data != NULL) {
-        return &g_asset_dscs[asset_id];
+    if (asset_id < 0 || asset_id >= ASSET_COUNT) {
+        ESP_LOGE(TAG, "Asset ID %d solicitado está fuera de rango.", asset_id);
+        return NULL;
     }
-    ESP_LOGE(TAG, "Asset ID %d solicitado es invalido o no se pudo cargar.", asset_id);
-    return NULL; // Devuelve NULL si el asset no se pudo cargar o el ID es inválido.
+    return g_asset_dsc_pointers[asset_id];
 }

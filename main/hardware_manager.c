@@ -1,9 +1,9 @@
 /*
- * Fichero: ./main/hardware_manager.c
- * Fecha: 13/08/2025 - 05:33 
- * Último cambio: Establecido el formato de color del display a RGB565.
- * Descripción: Orquestador de hardware. Se ha añadido la llamada lv_display_set_color_format para configurar explícitamente el display en modo RGB565. Esto es crucial para que LVGL v9 realice correctamente la mezcla de canales alfa de las imágenes RGB565A8.
- */
+# Fichero: Z:\DIYTOGETHER\DIYtogether\main\hardware_manager.c
+# Fecha: $timestamp
+# Último cambio: Eliminado el driver de sistema de ficheros personalizado para LVGL.
+# Descripción: Ahora que los iconos de los botones están compilados en el firmware, LVGL ya no necesita acceder a la tarjeta SD. Se ha eliminado todo el código del driver de sistema de ficheros personalizado, simplificando el arranque, reduciendo el tamaño del binario y eliminando código que ya era obsoleto.
+*/
 #include "hardware_manager.h"
 #include "esp_log.h"
 #include "bsp_api.h"
@@ -27,24 +27,13 @@ esp_err_t hardware_manager_init(void) {
         .hres = bsp_get_display_hres(),
         .vres = bsp_get_display_vres(),
         .flags = {
-            .swap_bytes = true, // Corregir el orden de bytes de color para RGB565
+            .swap_bytes = true, 
         }
     };
     lv_disp_t * disp = lvgl_port_add_disp(&disp_cfg);
 
-    // Configura el formato de color del framebuffer para la correcta mezcla de alpha.
     lv_display_set_color_format(disp, LV_COLOR_FORMAT_RGB565);
 
-    /*
-     * Configuración de la orientación del panel táctil.
-     * Para alinear el sistema de coordenadas del táctil con la rotación del display (configurada en el BSP),
-     * es necesario aplicar la misma secuencia de transformaciones que el display:
-     * 1. Intercambiar los ejes X e Y (swap_xy en 'true').
-     * 2. No aplicar espejo en el nuevo eje X (mirror_x en 'false').
-     * 3. Aplicar espejo en el nuevo eje Y (mirror_y en 'true').
-     * Esta configuración asegura que un toque en una posición física de la pantalla se corresponda
-     * con la misma posición en el framebuffer de LVGL.
-     */
     ESP_LOGI(TAG, "Configuring touch driver orientation to match display rotation...");
     esp_lcd_touch_handle_t touch_handle = bsp_get_touch_handle();
     
@@ -57,7 +46,6 @@ esp_err_t hardware_manager_init(void) {
         .handle = touch_handle,
     };
     lvgl_port_add_touch(&touch_cfg);
-
-    // El brillo ahora se establece automáticamente desde la NVS durante bsp_init().
+    
     return ESP_OK;
 }

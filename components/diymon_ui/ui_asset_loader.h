@@ -1,8 +1,8 @@
 /*
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_asset_loader.h
-# Fecha: `$timestamp
-# Último cambio: Corregido para ser sintácticamente válido en C.
-# Descripción: Interfaz pública para el gestor de assets. Se han renombrado los identificadores de los iconos para que su nombre sea más descriptivo y coincida con la acción que representan.
+# Fecha: $timestamp
+# Último cambio: Corregido el tipo de retorno de `ui_assets_get_icon` a `const lv_img_dsc_t*`.
+# Descripción: Se corrige la declaración de `ui_assets_get_icon` para que devuelva un puntero a un descriptor de imagen (`const lv_img_dsc_t*`), coincidiendo con la nueva implementación que utiliza assets compilados en el firmware. Esto resuelve el error de compilación por tipos conflictivos.
 */
 #ifndef UI_ASSET_LOADER_H
 #define UI_ASSET_LOADER_H
@@ -37,17 +37,17 @@ typedef enum {
 } ui_asset_id_t;
 
 /**
- * @brief Inicializa el gestor y precarga todos los assets en memoria.
+ * @brief Inicializa el gestor de assets.
  */
 void ui_assets_init(void);
 
 /**
- * @brief Libera la memoria utilizada por los assets precargados.
+ * @brief Desinicializa el gestor de assets.
  */
 void ui_assets_deinit(void);
 
 /**
- * @brief Obtiene un puntero al descriptor de imagen de un icono ya cargado.
+ * @brief Obtiene un puntero al descriptor de imagen de un icono compilado en el firmware.
  * @param asset_id El identificador del icono a obtener.
  * @return Un puntero constante al descriptor de imagen LVGL.
  */
