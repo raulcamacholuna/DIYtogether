@@ -1,8 +1,8 @@
 /*
 # Fichero: Z:\DIYTOGETHER\DIYtogether\main\main.c
 # Fecha: `$timestamp
-# Último cambio: Acortada la clave NVS a 'file_server' para evitar error de longitud.
-# Descripción: Fichero principal de la aplicación DIYMON. Se ha refactorizado para utilizar las nuevas funciones del modo de servidor de archivos y las claves NVS correspondientes.
+# Último cambio: Implementado fallback a modo AP para el servidor de archivos.
+# Descripción: Fichero principal de la aplicación DIYMON. Se ha modificado la lógica para que si el modo 'servidor de archivos' no logra conectar a una red WiFi guardada, inicie un Punto de Acceso y ofrezca el servicio desde allí, garantizando siempre el acceso.
 */
 #include <stdio.h>
 #include <string.h>
@@ -59,7 +59,7 @@ void app_main(void)
 }
 
 static void run_file_server_mode(void) {
-    ESP_LOGI(TAG, "Arrancando en modo Servidor de Archivos (STA)...");
+    ESP_LOGI(TAG, "Arrancando en modo Servidor de Archivos...");
     
     bsp_init_service_mode();
     service_screen_show("/sdcard/config/FTP.bin");
@@ -71,14 +71,18 @@ static void run_file_server_mode(void) {
     if (ip_ok) {
         char ip_addr_buffer[16] = "0.0.0.0";
         bsp_wifi_get_ip(ip_addr_buffer);
-        ESP_LOGI(TAG, "Dispositivo conectado. IP: %s. Iniciando servidor web.", ip_addr_buffer);
-        web_server_start();
+        ESP_LOGI(TAG, "Dispositivo conectado a WiFi. IP: %s. Iniciando servidor web.", ip_addr_buffer);
     } else {
-        ESP_LOGE(TAG, "No se pudo obtener IP. Reiniciando en 10 segundos...");
-        vTaskDelay(pdMS_TO_TICKS(10000));
-        esp_restart();
+        ESP_LOGW(TAG, "No se pudo conectar a la red WiFi guardada. Iniciando en modo Punto de Acceso (AP).");
+        bsp_wifi_start_ap();
+        ESP_LOGI(TAG, "Punto de Acceso iniciado. Conéctate a 'DIYTogether' (pass: MakeItYours) y navega a http://192.168.4.1");
     }
+    
+    // El servidor web se inicia tanto si se conecta a una red como si crea la suya propia.
+    ESP_LOGI(TAG, "Iniciando servidor web...");
+    web_server_start(); // Esta función es bloqueante y no retorna.
 }
+
 
 static void run_wifi_portal_mode(void) {
     ESP_LOGI(TAG, "No hay credenciales. Arrancando en modo Portal WiFi...");

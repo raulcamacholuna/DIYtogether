@@ -1,8 +1,8 @@
 /*
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server_page.h
 # Fecha: `$timestamp
-# Último cambio: Corregido el fichero para que sea sintácticamente válido en C.
-# Descripción: Contiene la página HTML principal del portal de configuración para la gestión de archivos en la tarjeta SD.
+# Último cambio: Implementada navegación por directorios y subida de archivos contextual.
+# Descripción: Contiene la página HTML principal del portal de configuración. Se ha mejorado la interfaz para permitir la navegación por subdirectorios en la tarjeta SD y subir archivos al directorio actual.
 */
 #ifndef WEB_SERVER_PAGE_H
 #define WEB_SERVER_PAGE_H
@@ -22,16 +22,18 @@ static const char* INDEX_HTML_CONTENT = R"rawliteral(
         .header h1 { font-size: 2.5em; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
         .header p { font-size: 1.2em; opacity: 0.9; }
         .card { background: white; border-radius: 15px; padding: 25px; margin-bottom: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        .card h3 { color: #5a67d8; margin-bottom: 20px; font-size: 1.4em; }
+        .card h3 { color: #5a67d8; margin-bottom: 20px; font-size: 1.4em; word-break: break-all; }
         .btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 12px 25px; border-radius: 25px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
         .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
         .btn-secondary { background: linear-gradient(135deg, #4fd1c7 0%, #06b6d4 100%); }
         .btn-danger { background: linear-gradient(135deg, #fc8181 0%, #f56565 100%); }
-        .file-list { max-height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 10px; margin-top: 20px; }
+        .file-list { max-height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 10px; margin-top: 10px; }
         .file-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-bottom: 1px solid #f0f2f5; transition: background 0.3s ease; }
         .file-item:hover { background: #f7fafc; }
         .file-item:last-child { border-bottom: none; }
         .file-info { display: flex; align-items: center; gap: 10px; word-break: break-all; }
+        .file-info a { color: #4a5568; text-decoration: none; font-weight: 600; }
+        .file-info a:hover { color: #5a67d8; }
         .file-actions { display: flex; gap: 10px; }
         .btn-small { padding: 6px 12px; font-size: 12px; border-radius: 15px; }
         .progress-bar { width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin: 10px 0; }
@@ -50,12 +52,9 @@ static const char* INDEX_HTML_CONTENT = R"rawliteral(
         </div>
 
         <div class="card">
-            <h3>📤 Subir Archivos</h3>
+            <h3>📤 Subir a: <span id="upload-path">/</span></h3>
             <div id="upload-area" class="upload-area">
                 <h4>Arrastra archivos aquí o haz clic para seleccionar</h4>
-                <p style="font-size: 0.9em; color: #666; margin-top: 10px;">
-                    Sube skins, animaciones y configuraciones a la SD.
-                </p>
             </div>
             <input type="file" id="file-input" multiple class="hidden">
             
@@ -69,22 +68,23 @@ static const char* INDEX_HTML_CONTENT = R"rawliteral(
         </div>
 
         <div class="card">
-            <h3>📁 Archivos en la Tarjeta SD</h3>
+            <h3>📁 Archivos en: <span id="current-path">/</span></h3>
             <div style="margin-bottom: 15px;">
                 <button class="btn btn-secondary" id="refresh-btn">🔄 Actualizar</button>
             </div>
-            <div class="file-list" id="file-list">
-                <p>Cargando lista de archivos...</p>
-            </div>
+            <div class="file-list" id="file-list"></div>
         </div>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            let currentPath = '/';
             const uploadArea = document.getElementById('upload-area');
             const fileInput = document.getElementById('file-input');
             const fileListDiv = document.getElementById('file-list');
             const refreshBtn = document.getElementById('refresh-btn');
+            const currentPathSpan = document.getElementById('current-path');
+            const uploadPathSpan = document.getElementById('upload-path');
 
             function formatBytes(bytes, decimals = 2) {
                 if (!+bytes) return '0 Bytes'
@@ -95,18 +95,19 @@ static const char* INDEX_HTML_CONTENT = R"rawliteral(
                 return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`
             }
 
-            async function fetchFileList() {
+            async function fetchFileList(path) {
+                currentPath = path;
+                currentPathSpan.textContent = path;
+                uploadPathSpan.textContent = path;
                 fileListDiv.innerHTML = '<p>Cargando lista de archivos...</p>';
                 try {
-                    const response = await fetch('/listfiles');
-                    if (!response.ok) {
-                        throw new Error('Error del servidor: ' + response.statusText);
-                    }
+                    const response = await fetch(`/listfiles?path=${encodeURIComponent(path)}`);
+                    if (!response.ok) throw new Error('Error del servidor: ' + response.statusText);
                     const files = await response.json();
-                    renderFileList(files);
+                    renderFileList(files, path);
                 } catch (error) {
                     console.error('Error al obtener la lista de archivos:', error);
-                    fileListDiv.innerHTML = '<p style="color: red;">No se pudo cargar la lista de archivos. Revisa la conexión con el dispositivo.</p>';
+                    fileListDiv.innerHTML = '<p style="color: red;">No se pudo cargar la lista. Revisa la conexión.</p>';
                 }
             }
 
@@ -115,77 +116,92 @@ static const char* INDEX_HTML_CONTENT = R"rawliteral(
                 const statusText = document.getElementById('upload-status');
                 if (files.length === 0) return;
 
-                statusText.textContent = 'Iniciando subida de ' + files.length + ' archivo(s)...';
+                statusText.textContent = `Iniciando subida de ${files.length} archivo(s) a ${currentPath}...`;
                 progressBar.style.width = '0%';
                 let filesUploaded = 0;
 
                 for (const file of files) {
                     const formData = new FormData();
+                    formData.append('path', currentPath);
                     formData.append('file', file, file.name);
 
                     try {
-                        statusText.textContent = 'Subiendo ' + file.name + '...';
+                        statusText.textContent = `Subiendo ${file.name}...`;
                         const response = await fetch('/upload', { method: 'POST', body: formData });
-                        if (!response.ok) {
-                            throw new Error('Fallo en la subida del archivo ' + file.name);
-                        }
+                        if (!response.ok) throw new Error(`Fallo en la subida del archivo ${file.name}`);
                         filesUploaded++;
-                        const progress = (filesUploaded / files.length) * 100;
-                        progressBar.style.width = progress + '%';
+                        progressBar.style.width = `${(filesUploaded / files.length) * 100}%`;
                     } catch (error) {
                         console.error(error);
-                        statusText.innerHTML = '<span style="color: red;">❌ Error al subir ' + file.name + '.</span>';
+                        statusText.innerHTML = `<span style="color: red;">❌ Error al subir ${file.name}.</span>`;
                         await new Promise(resolve => setTimeout(resolve, 3000));
                     }
                 }
                 
                 statusText.innerHTML = '<span style="color: green;">✅ Subida completada.</span>';
-                fetchFileList();
+                fetchFileList(currentPath);
                 setTimeout(() => {
                     progressBar.style.width = '0%';
                     statusText.textContent = 'Listo para subir archivos.';
                 }, 2000);
             }
             
-            async function deleteFile(filename) {
-                if (!confirm('⚠️ ¿Estás seguro de que quieres borrar "' + filename + '"?')) return;
+            async function deleteFile(path, filename) {
+                if (!confirm(`⚠️ ¿Seguro que quieres borrar "${filename}"?`)) return;
                 
                 try {
                     const formData = new FormData();
+                    formData.append('path', path);
                     formData.append('filename', filename);
                     
                     const response = await fetch('/delete', { method: 'POST', body: formData });
                     if (!response.ok) throw new Error('El servidor no pudo borrar el archivo.');
                     
-                    console.log('Archivo "' + filename + '" borrado.');
-                    fetchFileList(); 
+                    console.log(`Archivo "${filename}" borrado.`);
+                    fetchFileList(currentPath); 
                 } catch (error) {
-                    console.error('Error al borrar el archivo:', error);
-                    alert('No se pudo borrar el archivo: ' + filename);
+                    console.error('Error al borrar:', error);
+                    alert(`No se pudo borrar: ${filename}`);
                 }
             }
 
-            function renderFileList(files) {
+            function renderFileList(files, path) {
+                let html = '';
+                if (path !== '/') {
+                    const parentPath = path.substring(0, path.lastIndexOf('/')) || '/';
+                    html += `
+                        <div class="file-item">
+                          <div class="file-info">
+                            <span style="font-size: 1.2em;">⤴️</span>
+                            <a href="#" class="dir-link" data-path="${parentPath}">.. (Subir un nivel)</a>
+                          </div>
+                        </div>`;
+                }
+
                 if (!files || files.length === 0) {
-                    fileListDiv.innerHTML = '<p>No hay archivos en la tarjeta SD.</p>';
+                    fileListDiv.innerHTML = html + '<p style="padding:15px;">Este directorio está vacío.</p>';
                     return;
                 }
                 
-                let html = '';
                 files.sort((a, b) => {
                     if (a.type === b.type) return a.name.localeCompare(b.name);
                     return a.type === 'dir' ? -1 : 1;
                 }).forEach(file => {
                     const icon = file.type === 'dir' ? '📁' : '📄';
                     const sizeFormatted = file.type === 'file' ? formatBytes(file.size) : '';
+                    const fullPath = path === '/' ? `/${file.name}` : `${path}/${file.name}`;
+                    const nameHtml = file.type === 'dir' 
+                        ? `<a href="#" class="dir-link" data-path="${fullPath}">${file.name}</a>`
+                        : `<span>${file.name} <small style="color:#888">(${sizeFormatted})</small></span>`;
+                        
                     html += `
                         <div class="file-item">
                           <div class="file-info">
                             <span style="font-size: 1.2em;">${icon}</span>
-                            <span>${file.name} <small style="color:#888">(${sizeFormatted})</small></span>
+                            ${nameHtml}
                           </div>
                           <div class="file-actions">
-                            <button class="btn btn-small btn-danger" data-filename="${file.name}">🗑️ Borrar</button>
+                            <button class="btn btn-small btn-danger" data-path="${path}" data-filename="${file.name}">🗑️ Borrar</button>
                           </div>
                         </div>`;
                 });
@@ -195,27 +211,28 @@ static const char* INDEX_HTML_CONTENT = R"rawliteral(
             uploadArea.addEventListener('click', () => fileInput.click());
             fileInput.addEventListener('change', (e) => handleFileUpload(e.target.files));
 
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                uploadArea.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); });
-            });
-            ['dragenter', 'dragover'].forEach(eventName => {
-                uploadArea.addEventListener(eventName, () => uploadArea.classList.add('dragover'));
-            });
-            ['dragleave', 'drop'].forEach(eventName => {
-                uploadArea.addEventListener(eventName, () => uploadArea.classList.remove('dragover'));
-            });
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => uploadArea.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); }));
+            ['dragenter', 'dragover'].forEach(evt => uploadArea.addEventListener(evt, () => uploadArea.classList.add('dragover')));
+            ['dragleave', 'drop'].forEach(evt => uploadArea.addEventListener(evt, () => uploadArea.classList.remove('dragover')));
             uploadArea.addEventListener('drop', e => handleFileUpload(e.dataTransfer.files));
 
             fileListDiv.addEventListener('click', e => {
-                if (e.target && e.target.matches('button.btn-danger')) {
-                    const filename = e.target.getAttribute('data-filename');
-                    if (filename) deleteFile(filename);
+                if (e.target && e.target.closest('a.dir-link')) {
+                    e.preventDefault();
+                    const path = e.target.closest('a.dir-link').getAttribute('data-path');
+                    fetchFileList(path);
+                }
+                if (e.target && e.target.closest('button.btn-danger')) {
+                    const btn = e.target.closest('button.btn-danger');
+                    const path = btn.getAttribute('data-path');
+                    const filename = btn.getAttribute('data-filename');
+                    if (path && filename) deleteFile(path, filename);
                 }
             });
 
-            refreshBtn.addEventListener('click', fetchFileList);
+            refreshBtn.addEventListener('click', () => fetchFileList(currentPath));
             
-            fetchFileList();
+            fetchFileList(currentPath);
         });
     </script>
 </body>
