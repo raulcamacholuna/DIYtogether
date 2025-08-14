@@ -1,8 +1,8 @@
 /*
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\actions.c
-# Fecha: $timestamp
-# Último cambio: Reducido el tiempo de reinicio para el modo servidor de archivos a 500ms.
-# Descripción: Orquestador de acciones de la UI. Se ha reducido el retardo antes de reiniciar al activar el modo de servidor de archivos para que la transición sea más rápida y la experiencia de usuario más fluida.
+# Fecha: `$timestamp
+# Último cambio: Acortada la clave NVS a 'file_server' para evitar error de longitud.
+# Descripción: Orquestador de acciones de la UI. Gestiona la lógica que se ejecuta al interactuar con los botones, como cambiar el brillo, evolucionar la mascota o activar modos especiales.
 */
 #include "actions.h"
 #include "ui_action_animations.h" 
@@ -36,7 +36,7 @@ void execute_diymon_action(diymon_action_id_t action_id) {
         case ACTION_ID_COMER:
         case ACTION_ID_EJERCICIO:
         case ACTION_ID_ATACAR:
-            ESP_LOGD(TAG, "Accion de jugador. Delegando a reproductor.");
+            ESP_LOGI(TAG, "Accion de jugador. Delegando a reproductor.");
             ui_action_animations_play(action_id);
             break;
 
@@ -73,15 +73,22 @@ void execute_diymon_action(diymon_action_id_t action_id) {
             esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
             if (err == ESP_OK) {
                 err = nvs_set_str(nvs_handle, "file_server", "1");
-                if (err == ESP_OK) {
-                    err = nvs_commit(nvs_handle);
-                    if (err == ESP_OK) {
-                        ESP_LOGI(TAG, "Marca de modo servidor de archivos guardada. Reiniciando en 500ms...");
-                    }
+                if (err != ESP_OK) {
+                    ESP_LOGE(TAG, "Error (%s) al establecer la bandera 'file_server' en NVS.", esp_err_to_name(err));
                 }
+
+                err = nvs_commit(nvs_handle);
+                if (err != ESP_OK) {
+                    ESP_LOGE(TAG, "Error (%s) al hacer commit de la bandera 'file_server' en NVS.", esp_err_to_name(err));
+                } else {
+                    ESP_LOGI(TAG, "Marca de modo servidor de archivos guardada y commit realizado. Reiniciando en 2 segundos...");
+                }
+                
                 nvs_close(nvs_handle);
+            } else {
+                ESP_LOGE(TAG, "Error (%s) abriendo NVS para habilitar modo servidor de archivos.", esp_err_to_name(err));
             }
-            vTaskDelay(pdMS_TO_TICKS(500)); // <-- CAMBIO DE 2000 a 500
+            vTaskDelay(pdMS_TO_TICKS(2000));
             esp_restart();
             break;
         }

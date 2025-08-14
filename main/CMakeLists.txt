@@ -1,7 +1,7 @@
 # Fichero: Z:\DIYTOGETHER\DIYtogether\main\CMakeLists.txt
 # Fecha: $timestamp
-# Último cambio: Añadida la dependencia `esp_lvgl_port` que faltaba.
-# Descripción: CMakeLists para el componente principal 'main'. Se ha añadido `esp_lvgl_port` a la lista de dependencias para que el compilador pueda encontrar la cabecera que declara `lvgl_port_register_fs_drv`, solucionando el error de compilación.
+# Último cambio: Eliminada la dependencia del componente obsoleto `service_screen`.
+# Descripción: CMakeLists para el componente principal. Se elimina la dependencia de `service_screen` ya que su funcionalidad ha sido reemplazada por la nueva pantalla de configuración `ui_config_screen` dentro del componente `diymon_ui`.
 
 idf_component_register(
     SRCS 
@@ -16,10 +16,9 @@ idf_component_register(
         wifi_portal
         web_server
         screen_manager
-        service_screen
 
         lvgl
-        esp_lvgl_port # <-- DEPENDENCIA AÑADIDA
+        esp_lvgl_port
         esp_lcd
         esp_lcd_touch
         driver
