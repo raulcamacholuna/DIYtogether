@@ -1,8 +1,8 @@
 /*
 Fichero: Z:\DIYTOGETHER\DIYtogether\main\main.c
 Fecha: $timestamp
-Último cambio: Añadida la flag 'swap_bytes' a la configuración de LVGL para los modos de servicio.
-Descripción: Orquestador principal de la aplicación. Decide en qué modo arrancar (Aplicación principal, Portal WiFi, Servidor de archivos) basándose en las credenciales guardadas en NVS y en los flags de modo de servicio. Ahora se encarga de preparar un entorno LVGL mínimo para mostrar la nueva pantalla de configuración, asegurando la correcta inversión de bytes de color para que coincida con el modo de aplicación principal.
+Último cambio: Añadida la inicialización del driver táctil a los modos de servicio.
+Descripción: Orquestador principal de la aplicación. Se ha añadido la inicialización y registro del driver táctil en la función `init_lvgl_for_service_screen`. Esto es crucial para que los elementos interactivos de la pantalla de configuración, como el botón de reinicio, puedan recibir eventos de toque y funcionar correctamente.
 */
 #include <stdio.h>
 #include <string.h>
@@ -10,6 +10,7 @@ Descripción: Orquestador principal de la aplicación. Decide en qué modo arran
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
+#include "nvs.h"
 #include "esp_system.h"
 #include "esp_lvgl_port.h"
 
@@ -35,6 +36,8 @@ static void run_main_application_mode(void);
 static bool check_file_server_mode_flag(void);
 static void erase_file_server_mode_flag(void);
 static void init_lvgl_for_service_screen(void);
+static void display_network_status_on_screen(bool is_connected, const char* ip_addr);
+
 
 void app_main(void)
 {
@@ -72,10 +75,17 @@ static void init_lvgl_for_service_screen(void)
         .hres = bsp_get_display_hres(),
         .vres = bsp_get_display_vres(),
         .flags = {
-            .swap_bytes = true, // <-- CORRECCIÓN: Esta flag es la que invierte el orden de bytes del color, haciendo que coincida con la configuración del modo principal.
+            .swap_bytes = true,
         }
     };
-    lvgl_port_add_disp(&disp_cfg);
+    lv_disp_t * disp = lvgl_port_add_disp(&disp_cfg);
+
+    ESP_LOGI(TAG, "Añadiendo driver de touch a LVGL para modos de servicio...");
+    const lvgl_port_touch_cfg_t touch_cfg = {
+        .disp = disp,
+        .handle = bsp_get_touch_handle(),
+    };
+    lvgl_port_add_touch(&touch_cfg);
 }
 
 static void run_file_server_mode(void) {
@@ -85,7 +95,7 @@ static void run_file_server_mode(void) {
     init_lvgl_for_service_screen();
     
     if (lvgl_port_lock(0)) {
-        ui_config_screen_show(); 
+        ui_config_screen_show();
         lvgl_port_unlock();
     }
 
@@ -93,8 +103,8 @@ static void run_file_server_mode(void) {
     bsp_wifi_init_sta_from_nvs();
     bool ip_ok = bsp_wifi_wait_for_ip(15000);
 
+    char ip_addr_buffer[16] = "N/A";
     if (ip_ok) {
-        char ip_addr_buffer[16] = "0.0.0.0";
         bsp_wifi_get_ip(ip_addr_buffer);
         ESP_LOGI(TAG, "Dispositivo conectado. IP: %s. Iniciando servidor web.", ip_addr_buffer);
     } else {
@@ -102,6 +112,8 @@ static void run_file_server_mode(void) {
         bsp_wifi_start_ap();
         ESP_LOGI(TAG, "Punto de Acceso iniciado. Conéctate a 'DIYTogether' (pass: MakeItYours) y navega a http://192.168.4.1");
     }
+
+    display_network_status_on_screen(ip_ok, ip_addr_buffer);
     
     ESP_LOGI(TAG, "Iniciando servidor web...");
     web_server_start();
@@ -117,6 +129,8 @@ static void run_wifi_portal_mode(void) {
         ui_config_screen_show();
         lvgl_port_unlock();
     }
+    
+    display_network_status_on_screen(false, NULL);
 
     bsp_wifi_init_stack();
     wifi_portal_start();
@@ -161,5 +175,49 @@ static void erase_file_server_mode_flag(void) {
         nvs_erase_key(nvs_handle, "file_server");
         nvs_commit(nvs_handle);
         nvs_close(nvs_handle);
+    }
+}
+
+static void display_network_status_on_screen(bool is_connected, const char* ip_addr) {
+    if (lvgl_port_lock(0)) {
+        lv_obj_t *scr = lv_screen_active();
+        if (!scr) {
+            lvgl_port_unlock();
+            return;
+        }
+
+        static lv_style_t style_text;
+        lv_style_init(&style_text);
+        lv_style_set_text_color(&style_text, lv_color_white());
+        lv_style_set_text_align(&style_text, LV_TEXT_ALIGN_CENTER);
+        lv_style_set_text_font(&style_text, &lv_font_montserrat_14);
+
+        lv_obj_t *line1 = lv_label_create(scr);
+        lv_obj_t *line2 = lv_label_create(scr);
+        lv_obj_add_style(line1, &style_text, 0);
+        lv_obj_add_style(line2, &style_text, 0);
+        lv_obj_set_width(line1, 160);
+        lv_obj_set_width(line2, 160);
+
+        if (is_connected) {
+            char ssid[33] = "N/A";
+            size_t len = sizeof(ssid);
+            nvs_handle_t nvs;
+            if (nvs_open("storage", NVS_READONLY, &nvs) == ESP_OK) {
+                nvs_get_str(nvs, "wifi_ssid", ssid, &len);
+                nvs_close(nvs);
+            }
+            lv_label_set_text_fmt(line1, "Conectado a:\n\"%s\"", ssid);
+            lv_label_set_text_fmt(line2, "IP: %s", ip_addr);
+            lv_obj_align(line1, LV_ALIGN_CENTER, 0, -50);
+            lv_obj_align(line2, LV_ALIGN_CENTER, 0, -20);
+        } else {
+            lv_label_set_text(line1, "Modo AP Activo");
+            lv_label_set_text(line2, "SSID: DIYTogether\nPass: MakeItYours");
+            lv_obj_align(line1, LV_ALIGN_CENTER, 0, -50);
+            lv_obj_align(line2, LV_ALIGN_CENTER, 0, -25);
+        }
+
+        lvgl_port_unlock();
     }
 }
