@@ -1,8 +1,8 @@
 /*
 Fichero: Z:\DIYTOGETHER\DIYtogether\main\main.c
 Fecha: $timestamp
-Último cambio: Implementado el temporizador de inactividad para atenuar y apagar la pantalla.
-Descripción: Orquestador principal de la aplicación. Se ha añadido una lógica de gestión de inactividad que atenúa el brillo de la pantalla al 10% tras 30 segundos sin interacción y la apaga por completo tras 60 segundos. Esta funcionalidad se aplica tanto al modo de aplicación principal como a los modos de servicio (portal WiFi, servidor de archivos).
+Último cambio: Implementada secuencia de despertar con doble-doble-toque.
+Descripción: Orquestador principal de la aplicación. Se ha implementado una nueva lógica de despertar de pantalla que requiere una secuencia de dos dobles-toques para encenderla desde el estado apagado, evitando activaciones accidentales. Se ha centralizado esta lógica en main.c, y se ha ajustado para que un solo toque siga restaurando el brillo si la pantalla está solo atenuada.
 */
 #include <stdio.h>
 #include <string.h>
@@ -39,10 +39,21 @@ static void init_lvgl_for_service_screen(void);
 static void display_network_status_on_screen(bool is_connected, const char* ip_addr);
 static void setup_inactivity_handling(void);
 
-// --- Lógica de Gestión de Inactividad de Pantalla ---
+// --- Lógica de Gestión de Inactividad y Despertar ---
+typedef enum {
+    WAKE_STATE_OFF,
+    WAKE_STATE_PRIMED, // Esperando el segundo doble-toque
+} wake_up_state_t;
+
 static bool s_is_dimmed = false;
 static int s_user_brightness = 100;
 static bool s_user_brightness_known = false;
+
+static wake_up_state_t s_wake_state = WAKE_STATE_OFF;
+static uint8_t s_wake_click_count = 0;
+static lv_timer_t *s_double_click_timer = NULL;
+static lv_timer_t *s_wake_prime_timer = NULL;
+
 
 static void read_user_brightness_from_nvs(void) {
     if (s_user_brightness_known) return;
@@ -56,15 +67,73 @@ static void read_user_brightness_from_nvs(void) {
     }
 }
 
+static void double_click_timer_cb(lv_timer_t * timer) {
+    ESP_LOGD(TAG, "Temporizador de doble-toque expirado. Reiniciando contador de toques.");
+    s_wake_click_count = 0;
+    s_double_click_timer = NULL;
+}
+
+static void wake_prime_timer_cb(lv_timer_t * timer) {
+    ESP_LOGI(TAG, "Ventana de 3s para segundo doble-toque expirada. Secuencia de despertar cancelada.");
+    s_wake_state = WAKE_STATE_OFF;
+    s_wake_click_count = 0;
+    s_wake_prime_timer = NULL;
+}
+
 static void screen_touch_event_cb(lv_event_t * e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_PRESSED) {
-        if (screen_manager_is_off() || s_is_dimmed) {
-            read_user_brightness_from_nvs();
-            ESP_LOGI(TAG, "Actividad detectada, restaurando brillo a %d%%", s_user_brightness);
-            screen_manager_turn_on(); // Enciende y restaura brillo
-            screen_manager_set_brightness(s_user_brightness); // Asegura el brillo correcto
-            s_is_dimmed = false;
+    lv_disp_t * disp = lv_display_get_default();
+    if (!disp) return;
+
+    // Cualquier tipo de presión resetea el temporizador de inactividad de LVGL
+    lv_display_trigger_activity(disp);
+    
+    // Si la pantalla está atenuada pero no apagada, un solo toque la restaura
+    if (code == LV_EVENT_PRESSED && s_is_dimmed && !screen_manager_is_off()) {
+        ESP_LOGI(TAG, "Actividad detectada en pantalla atenuada, restaurando brillo.");
+        read_user_brightness_from_nvs();
+        screen_manager_set_brightness(s_user_brightness);
+        s_is_dimmed = false;
+        return; // Evento gestionado
+    }
+
+    // Lógica de despertar con doble-doble-toque SÓLO si la pantalla está apagada
+    if (code == LV_EVENT_CLICKED && screen_manager_is_off()) {
+        switch (s_wake_state) {
+            case WAKE_STATE_OFF:
+                s_wake_click_count++;
+                if (s_wake_click_count == 1) { // Primer toque de un posible doble-toque
+                    s_double_click_timer = lv_timer_create(double_click_timer_cb, 500, NULL);
+                    lv_timer_set_repeat_count(s_double_click_timer, 1);
+                } else if (s_wake_click_count == 2) { // Doble-toque detectado
+                    if (s_double_click_timer) lv_timer_del(s_double_click_timer);
+                    s_double_click_timer = NULL;
+                    ESP_LOGI(TAG, "Secuencia de despertar: PRIMER doble-toque detectado. Esperando el segundo...");
+                    s_wake_state = WAKE_STATE_PRIMED;
+                    s_wake_click_count = 0;
+                    s_wake_prime_timer = lv_timer_create(wake_prime_timer_cb, 3000, NULL);
+                    lv_timer_set_repeat_count(s_wake_prime_timer, 1);
+                }
+                break;
+
+            case WAKE_STATE_PRIMED: // Esperando el segundo doble-toque
+                s_wake_click_count++;
+                 if (s_wake_click_count == 1) {
+                    s_double_click_timer = lv_timer_create(double_click_timer_cb, 500, NULL);
+                    lv_timer_set_repeat_count(s_double_click_timer, 1);
+                } else if (s_wake_click_count >= 2) { // Segundo doble-toque detectado
+                    if (s_double_click_timer) lv_timer_del(s_double_click_timer);
+                    if (s_wake_prime_timer) lv_timer_del(s_wake_prime_timer);
+                    s_double_click_timer = NULL;
+                    s_wake_prime_timer = NULL;
+                    
+                    ESP_LOGI(TAG, "Secuencia de despertar: SEGUNDO doble-toque detectado. ¡Encendiendo pantalla!");
+                    screen_manager_turn_on(); // Enciende y restaura brillo
+                    s_is_dimmed = false;
+                    s_wake_state = WAKE_STATE_OFF;
+                    s_wake_click_count = 0;
+                }
+                break;
         }
     }
 }
@@ -76,8 +145,10 @@ static void inactivity_timer_cb(lv_timer_t * timer) {
     uint32_t inactivity_ms = lv_display_get_inactive_time(disp);
     bool is_off = screen_manager_is_off();
     
+    // Si el usuario interactúa, lv_display_send_activity resetea el contador,
+    // por lo que este callback se ejecutará de nuevo y s_is_dimmed se pondrá a false.
     if (inactivity_ms < 30000 && s_is_dimmed) {
-        s_is_dimmed = false; // El usuario ha interactuado, resetear flag
+        s_is_dimmed = false;
     }
 
     if (!is_off && inactivity_ms > 60000) {
@@ -96,9 +167,10 @@ static void setup_inactivity_handling(void) {
     lv_timer_create(inactivity_timer_cb, 5000, NULL);
     lv_obj_t * scr = lv_screen_active();
     if (scr) {
-        lv_obj_add_event_cb(scr, screen_touch_event_cb, LV_EVENT_PRESSED, NULL);
+        // Usamos LV_EVENT_ALL para capturar tanto PRESS como CLICK
+        lv_obj_add_event_cb(scr, screen_touch_event_cb, LV_EVENT_ALL, NULL);
     }
-    ESP_LOGI(TAG, "Gestor de inactividad de pantalla configurado (30s atenuar, 60s apagar).");
+    ESP_LOGI(TAG, "Gestor de inactividad y despertar configurado.");
 }
 
 // --- Flujo Principal de la Aplicación ---

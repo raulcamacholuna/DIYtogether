@@ -1,8 +1,8 @@
 /*
-# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\screens.c
-# Fecha: $timestamp
-# Último cambio: Reactivada la detección de gestos habilitando el scroll.
-# Descripción: Se ha corregido el problema que impedía la detección de gestos. La línea `lv_obj_clear_flag(..., LV_OBJ_FLAG_SCROLLABLE)` deshabilitaba el mecanismo de scroll de LVGL, que es necesario para generar eventos de deslizamiento. Se ha reemplazado por una configuración que permite el scroll para la detección de gestos pero oculta la barra de desplazamiento visual.
+Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\screens.c
+Fecha: $timestamp
+Último cambio: Eliminada la lógica de despertar por toque, que ha sido centralizada en main.c.
+Descripción: Gestor de la pantalla principal. Se ha eliminado el manejador del evento `LV_EVENT_CLICKED` y las variables asociadas que gestionaban el despertar de la pantalla. Esta responsabilidad ahora recae exclusivamente en el gestor de inactividad de `main.c` para evitar conflictos y centralizar el control.
 */
 #include "screens.h"
 #include "ui_idle_animation.h"
@@ -17,8 +17,6 @@
 
 static const char *TAG = "SCREENS";
 
-static uint8_t g_click_count = 0;
-static lv_timer_t *g_double_click_timer = NULL;
 static lv_timer_t *s_resume_idle_timer = NULL; // Temporizador para reanudar el idle
 
 lv_obj_t *g_idle_animation_obj = NULL;
@@ -28,11 +26,6 @@ static lv_coord_t touch_start_x = -1;
 static lv_coord_t touch_start_y = -1;
 
 static void main_screen_event_cb(lv_event_t *e);
-
-static void double_click_timer_cb(lv_timer_t *timer) {
-    g_click_count = 0;
-    g_double_click_timer = NULL;
-}
 
 static void resume_idle_timer_cb(lv_timer_t *timer) {
     ESP_LOGD(TAG, "Temporizador de reanudación de idle disparado.");
@@ -46,8 +39,7 @@ void create_screen_main(void) {
     lv_obj_add_flag(g_main_screen_obj, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(g_main_screen_obj, main_screen_event_cb, LV_EVENT_ALL, NULL);
     
-    // [CORRECCIÓN] Habilitar la detección de gestos permitiendo el scroll, pero sin mostrar la barra.
-    // La línea `lv_obj_clear_flag(g_main_screen_obj, LV_OBJ_FLAG_SCROLLABLE);` impedía los gestos.
+    // Habilitar la detección de gestos permitiendo el scroll, pero sin mostrar la barra.
     lv_obj_set_scroll_dir(g_main_screen_obj, LV_DIR_ALL);
     lv_obj_set_scrollbar_mode(g_main_screen_obj, LV_SCROLLBAR_MODE_OFF);
 
@@ -100,24 +92,7 @@ static void main_screen_event_cb(lv_event_t *e) {
             }
             break;
         }
-        case LV_EVENT_CLICKED: {
-            if (screen_manager_is_off()) {
-                g_click_count++;
-                if (g_click_count == 1) {
-                    g_double_click_timer = lv_timer_create(double_click_timer_cb, 300, NULL);
-                    lv_timer_set_repeat_count(g_double_click_timer, 1);
-                } else if (g_click_count == 2) {
-                    if (g_double_click_timer) {
-                        lv_timer_del(g_double_click_timer);
-                        g_double_click_timer = NULL;
-                    }
-                    ESP_LOGI(TAG, "Doble toque detectado. Encendiendo pantalla...");
-                    screen_manager_turn_on();
-                    g_click_count = 0;
-                }
-            }
-            break;
-        }
+        // La lógica de LV_EVENT_CLICKED para despertar la pantalla ha sido movida a main.c
         default:
             break;
     }

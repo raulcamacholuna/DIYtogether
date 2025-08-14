@@ -1,9 +1,9 @@
 /*
- * Fichero: ./components/diymon_bsp/WS1.9TS/bsp_display.c
- * Fecha: 13/08/2025 - 08:03 
- * Último cambio: Eliminado 'swap_color_bytes' obsoleto para compatibilidad con ESP-IDF 5.x.
- * Descripción: Driver del display. Se elimina la propiedad 'swap_color_bytes' de la configuración del panel IO SPI, ya que es obsoleta en la versión actual de ESP-IDF. La inversión de bytes se gestionará en una capa superior (LVGL port).
- */
+Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_bsp\WS1.9TS\bsp_display.c
+Fecha: $timestamp
+Último cambio: Modificada la lógica de `bsp_display_set_brightness` para no guardar el estado de atenuación (10%) en NVS.
+Descripción: Driver del display. Se ha modificado la función de ajuste de brillo para que los cambios automáticos de atenuación (al 10%) no sobrescriban el brillo configurado por el usuario en la NVS ni el último nivel de brillo conocido. Esto asegura que al reactivar la pantalla, esta vuelva al estado deseado por el usuario y no al 10%.
+*/
 #include "bsp_api.h"
 #include "esp_log.h"
 #include "driver/spi_master.h"
@@ -95,15 +95,22 @@ void bsp_display_set_brightness(int percentage) {
     if (percentage > 100) percentage = 100;
     if (percentage < 0) percentage = 0;
 
-    // Guarda el último nivel de brillo (si es mayor a 0) para la función de re-encendido.
-    if (percentage > 0) {
-        s_last_brightness_percentage = percentage;
-    }
-
     // Calcula y establece el ciclo de trabajo del PWM para el backlight.
     uint32_t duty = 255 - ((255 * percentage) / 100);
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
+
+    // El valor 10% es el nivel de atenuación automática por inactividad.
+    // No se debe guardar en NVS ni como último brillo conocido del usuario.
+    if (percentage == 10) {
+        ESP_LOGD(TAG, "Atenuando pantalla temporalmente a 10%%. No se guarda el estado.");
+        return;
+    }
+
+    // Guarda el último nivel de brillo (si es > 0) para la función de re-encendido.
+    if (percentage > 0) {
+        s_last_brightness_percentage = percentage;
+    }
 
     // Guarda el nuevo nivel de brillo en la memoria no volátil (NVS).
     nvs_handle_t nvs_handle;
@@ -112,7 +119,7 @@ void bsp_display_set_brightness(int percentage) {
         err = nvs_set_i32(nvs_handle, "brightness", (int32_t)percentage);
         if (err == ESP_OK) {
             nvs_commit(nvs_handle);
-            ESP_LOGD(TAG, "Brillo (%d%%) guardado en NVS.", percentage);
+            ESP_LOGD(TAG, "Brillo de usuario (%d%%) guardado en NVS.", percentage);
         } else {
             ESP_LOGE(TAG, "Error al guardar brillo en NVS: %s", esp_err_to_name(err));
         }
@@ -124,8 +131,10 @@ void bsp_display_set_brightness(int percentage) {
 
 void bsp_display_turn_on(void) {
     ESP_LOGI(TAG, "Turning display ON and restoring brightness to %d%%", s_last_brightness_percentage);
-    // 1. Restaurar el brillo
-    bsp_display_set_brightness(s_last_brightness_percentage);
+    // 1. Restaurar el brillo (sin guardar estado, ya que se restaura uno existente)
+    uint32_t duty = 255 - ((255 * s_last_brightness_percentage) / 100);
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty);
+    ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
     // 2. Encender el panel
     esp_lcd_panel_disp_on_off(g_panel_handle, true);
 }
@@ -134,7 +143,7 @@ void bsp_display_turn_off(void) {
     ESP_LOGI(TAG, "Turning display and backlight OFF");
     // 1. Apagar el panel
     esp_lcd_panel_disp_on_off(g_panel_handle, false);
-    // 2. Apagar el backlight (sin guardar el 0% como último brillo)
+    // 2. Apagar el backlight directamente para no llamar a set_brightness
     uint32_t duty = 255; // Duty 255 es 0% de brillo en mi configuración invertida
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
