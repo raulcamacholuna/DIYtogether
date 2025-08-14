@@ -1,8 +1,8 @@
 /*
-Fichero: ./main/main.c
+Fichero: Z:\DIYTOGETHER\DIYtogether\main\main.c
 Fecha: $timestamp
-Último cambio: Añadida la inicialización de LVGL para los modos de servicio y la llamada a `ui_config_screen_show` para mostrar el fondo de configuración estático, reemplazando la carga de imágenes .bin desde la SD.
-Descripción: Orquestador principal de la aplicación. Decide en qué modo arrancar (Aplicación principal, Portal WiFi, Servidor de archivos) basándose en las credenciales guardadas en NVS y en los flags de modo de servicio. Ahora se encarga de preparar un entorno LVGL mínimo para mostrar la nueva pantalla de configuración.
+Último cambio: Añadida la flag 'swap_bytes' a la configuración de LVGL para los modos de servicio.
+Descripción: Orquestador principal de la aplicación. Decide en qué modo arrancar (Aplicación principal, Portal WiFi, Servidor de archivos) basándose en las credenciales guardadas en NVS y en los flags de modo de servicio. Ahora se encarga de preparar un entorno LVGL mínimo para mostrar la nueva pantalla de configuración, asegurando la correcta inversión de bytes de color para que coincida con el modo de aplicación principal.
 */
 #include <stdio.h>
 #include <string.h>
@@ -20,7 +20,7 @@ Descripción: Orquestador principal de la aplicación. Decide en qué modo arran
 #include "wifi_portal.h"
 #include "web_server.h"
 #include "screen_manager.h"
-#include "ui_config_screen.h" // <-- Añadido para la nueva pantalla
+#include "ui_config_screen.h"
 #include "ui_asset_loader.h" 
 
 #include "esp_err.h"
@@ -34,7 +34,7 @@ static void run_wifi_portal_mode(void);
 static void run_main_application_mode(void);
 static bool check_file_server_mode_flag(void);
 static void erase_file_server_mode_flag(void);
-static void init_lvgl_for_service_screen(void); // <-- Nueva función de ayuda
+static void init_lvgl_for_service_screen(void);
 
 void app_main(void)
 {
@@ -71,6 +71,9 @@ static void init_lvgl_for_service_screen(void)
         .double_buffer = 1,
         .hres = bsp_get_display_hres(),
         .vres = bsp_get_display_vres(),
+        .flags = {
+            .swap_bytes = true, // <-- CORRECCIÓN: Esta flag es la que invierte el orden de bytes del color, haciendo que coincida con la configuración del modo principal.
+        }
     };
     lvgl_port_add_disp(&disp_cfg);
 }
@@ -82,7 +85,7 @@ static void run_file_server_mode(void) {
     init_lvgl_for_service_screen();
     
     if (lvgl_port_lock(0)) {
-        ui_config_screen_show(); // Muestra la nueva pantalla estática
+        ui_config_screen_show(); 
         lvgl_port_unlock();
     }
 
@@ -101,7 +104,7 @@ static void run_file_server_mode(void) {
     }
     
     ESP_LOGI(TAG, "Iniciando servidor web...");
-    web_server_start(); // Esta función es bloqueante
+    web_server_start();
 }
 
 static void run_wifi_portal_mode(void) {
@@ -111,12 +114,12 @@ static void run_wifi_portal_mode(void) {
     init_lvgl_for_service_screen();
     
     if (lvgl_port_lock(0)) {
-        ui_config_screen_show(); // Muestra la nueva pantalla estática
+        ui_config_screen_show();
         lvgl_port_unlock();
     }
 
     bsp_wifi_init_stack();
-    wifi_portal_start(); // Esta función es bloqueante y reinicia al final
+    wifi_portal_start();
 }
 
 static void run_main_application_mode(void) {
