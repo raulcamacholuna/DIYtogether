@@ -1,8 +1,8 @@
 /*
-  Fichero: ./components/diymon_ui/screens.c
-  Fecha: 13/08/2025 - 06:14 
-  Último cambio: Añadido un retardo de 500ms para reanudar la animación de reposo.
-  Descripción: Se ha implementado un temporizador que espera 500ms después de que el usuario levanta el dedo de la pantalla (LV_EVENT_RELEASED) antes de reanudar la animación de reposo. Cualquier nueva pulsación cancela este temporizador, mejorando la experiencia de usuario durante interacciones rápidas.
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\screens.c
+# Fecha: $timestamp
+# Último cambio: Añadida la llamada a `ui_assets_deinit` para liberar memoria.
+# Descripción: Se ha añadido la llamada a la función de desinicialización del cargador de assets en el callback de borrado de la pantalla. Esto asegura que la memoria RAM reservada para los iconos de los botones se libere correctamente al cerrar la UI, completando el ciclo de vida de los assets dinámicos.
 */
 #include "screens.h"
 #include "ui_idle_animation.h"
@@ -13,6 +13,7 @@
 #include "esp_log.h"
 #include "bsp_api.h"
 #include "screen_manager.h"
+#include "ui_asset_loader.h"
 
 static const char *TAG = "SCREENS";
 
@@ -129,6 +130,7 @@ void delete_screen_main(void) {
     ui_idle_animation_stop();
     ui_action_animations_destroy();
     ui_telemetry_destroy();
+    ui_assets_deinit(); // Liberar memoria de los iconos de botones
 }
 
 void create_screens(void) {

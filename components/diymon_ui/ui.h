@@ -1,10 +1,9 @@
 /*
- * Fichero: ./components/diymon_ui/ui.h
- * Fecha: 09/08/2025 - 06:55
- * Último cambio: Sin cambios en la interfaz pública.
- * Descripción: Interfaz PÚBLICA del componente de la UI.
- *              Define las funciones de alto nivel para controlar la UI desde el exterior.
- */
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui.h
+# Fecha: $timestamp
+# Último cambio: Añadida la declaración de ui_preinit para la pre-reserva de memoria.
+# Descripción: Interfaz PÚBLICA del componente de la UI. Define las funciones de alto nivel para controlar la UI desde el exterior. Se añade la declaración de `ui_preinit` para permitir la reserva del buffer de animación antes que cualquier otra inicialización, solucionando el error de compilación.
+*/
 #ifndef UI_H
 #define UI_H
 
@@ -22,6 +21,15 @@ enum ScreensEnum {
 
 
 // --- FUNCIONES PÚBLICAS DE LA UI ---
+
+/**
+ * @brief Pre-inicializa la UI reservando los buffers de memoria más grandes.
+ *
+ * Esta función debe llamarse al principio de app_main para evitar la fragmentación
+ * de la memoria RAM, asegurando que la asignación de memoria más grande (el buffer
+ * de animación) tenga éxito.
+ */
+void ui_preinit(void);
 
 /**
  * @brief Inicializa y configura toda la interfaz de usuario.

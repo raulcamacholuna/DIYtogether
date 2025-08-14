@@ -1,7 +1,7 @@
-# Fichero: ./components/diymon_ui/CMakeLists.txt
-# Fecha: 13/08/2025 - 12:43 
-# Último cambio: Compilando los assets .c y eliminando referencias a ficheros obsoletos.
-# Descripción: Se añaden los ficheros de la carpeta 'assets' al GLOB para que se compilen como código fuente. Se elimina el fichero 'images.c' que ya no es necesario.
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\CMakeLists.txt
+# Fecha: $timestamp
+# Último cambio: Eliminada la referencia al directorio 'assets' que ya no existe.
+# Descripción: CMakeLists para el componente de UI. Se elimina `PRIV_INCLUDE_DIRS "assets"` para resolver el error de compilación, ya que el directorio 'assets' ha sido borrado.
 
 file(GLOB component_sources
     "*.c"
@@ -9,15 +9,12 @@ file(GLOB component_sources
     "actions/*.c"
     "styles/*.c"
     "ui_telemetry.c"
-    "assets/*.c" # <-- AÑADIDO: Compilar los nuevos assets en formato .c
 )
-
-# La sección COMPONENT_EMBED_FILES y la referencia a images.c se eliminan.
 
 idf_component_register(
     SRCS ${component_sources}
     INCLUDE_DIRS "."
-    PRIV_INCLUDE_DIRS "." "assets"
+    PRIV_INCLUDE_DIRS "."
     REQUIRES 
         lvgl
         diymon_bsp

@@ -1,9 +1,9 @@
 /*
- * Fichero: ./components/diymon_ui/ui_action_animations.c
- * Fecha: 13/08/2025 - 07:54 
- * Último cambio: Corregidos los prefijos de las animaciones de acción.
- * Descripción: Se han actualizado los prefijos de las animaciones de acción para que coincidan con el nuevo esquema de nombres (ANIM_EAT_, ANIM_GYM_, ANIM_ATK_).
- */
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_action_animations.c
+# Fecha: $timestamp
+# Último cambio: Implementada la función de pre-reserva de buffer y refactorizada la creación.
+# Descripción: Se define la función `ui_action_animations_preinit_buffer` para reservar el buffer de animación compartido al inicio de la aplicación. La función `ui_action_animations_create` ahora solo crea el objeto de imagen LVGL, utilizando el buffer ya reservado. Esto soluciona el error de enlazado 'undefined reference' y previene la fragmentación del heap.
+*/
 #include "ui_action_animations.h"
 #include "animation_loader.h"
 #include "diymon_ui_helpers.h"
@@ -15,8 +15,8 @@
 static const char *TAG = "UI_ACTION_ANIM";
 
 // --- Variables Globales y Estáticas ---
-lv_obj_t *g_animation_img_obj;
-animation_t g_animation_player; // Player global que contiene el búfer compartido
+lv_obj_t *g_animation_img_obj = NULL;
+static animation_t g_animation_player; // Player global que contiene el búfer compartido
 
 static lv_timer_t *s_anim_timer;
 static bool s_is_action_in_progress = false;
@@ -31,15 +31,22 @@ static const char* get_anim_prefix(diymon_action_id_t action_id);
 
 // --- Implementación de Funciones Públicas ---
 
-void ui_action_animations_create(lv_obj_t *parent) {
+void ui_action_animations_preinit_buffer(void) {
     // Reservar el búfer de animación compartido UNA SOLA VEZ.
     g_animation_player = animation_loader_init(NULL, 150, 230, 0);
     if (g_animation_player.img_dsc.data == NULL) {
         ESP_LOGE(TAG, "FALLO CRÍTICO: No se pudo reservar memoria para el búfer de animación compartido.");
+    } else {
+        ESP_LOGI(TAG, "Búfer de animación compartido (150x230) pre-reservado correctamente.");
+    }
+}
+
+void ui_action_animations_create(lv_obj_t *parent) {
+    if (g_animation_player.img_dsc.data == NULL) {
+        ESP_LOGE(TAG, "El búfer de animación compartido no fue pre-reservado. No se puede crear el objeto de animación.");
         return;
     }
-    ESP_LOGI(TAG, "Búfer de animación compartido (150x230) pre-reservado correctamente.");
-
+    
     g_animation_img_obj = lv_image_create(parent);
     lv_image_set_src(g_animation_img_obj, &g_animation_player.img_dsc);
     
@@ -73,7 +80,6 @@ void ui_action_animations_play(diymon_action_id_t action_id) {
     
     ESP_LOGI(TAG, "Reproduciendo animación '%s' (%d fotogramas) a %dms/frame.", prefix, frame_count, FRAME_INTERVAL_MS);
 
-    // Reutilizar el reproductor global, solo actualizar sus propiedades.
     if (g_animation_player.base_path) free(g_animation_player.base_path);
     g_animation_player.base_path = strdup(path_buffer);
     g_animation_player.frame_count = frame_count;
@@ -121,7 +127,6 @@ static void animation_finished(void) {
         s_anim_timer = NULL;
     }
     
-    // No liberar el reproductor completo, solo la ruta. El búfer de datos persiste.
     if (g_animation_player.base_path) {
         free(g_animation_player.base_path);
         g_animation_player.base_path = NULL;

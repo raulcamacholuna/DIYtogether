@@ -1,14 +1,15 @@
 /*
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui.c
-# Fecha: `$timestamp
-# Último cambio: Reasignadas las acciones de los botones 6, 7, 8 y 9.
-# Descripción: Se ha modificado el callback de los botones para que las acciones del jugador (Comer, Ejercicio, Atacar) se disparen con el evento LV_EVENT_PRESSED. Además, se han eliminado las acciones de los botones 7 y 9, y la acción del botón 8 (activar servidor de archivos) se ha movido al botón 6.
+# Fecha: $timestamp
+# Último cambio: Añadida la definición de `ui_preinit` para resolver el error de enlazado.
+# Descripción: Se implementa la función `ui_preinit`, que llama a una nueva función en el módulo de animaciones para pre-reservar el buffer de memoria más grande. Esto resuelve el error de 'undefined reference' y previene la fragmentación del heap que causaba el fallo de la aplicación.
 */
 #include "ui.h"
 #include "screens.h"
 #include "actions.h"
 #include "ui_actions_panel.h"
 #include "ui_asset_loader.h"
+#include "ui_action_animations.h" // Se necesita para la pre-reserva
 #include "esp_log.h"
 
 extern lv_obj_t *g_main_screen_obj; 
@@ -50,9 +51,6 @@ static void ui_connect_actions(void) {
     
     // Panel 3: Configuración
     // El botón 7 (reset), 8 (file server) y 9 (placeholder) ya no tienen acción asignada aquí.
-    // lv_obj_add_event_cb(ui_actions_panel_get_reset_all_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_RESET_ALL);
-    // lv_obj_add_event_cb(ui_actions_panel_get_enable_file_server_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_ENABLE_FILE_SERVER);
-    // lv_obj_add_event_cb(ui_actions_panel_get_config_placeholder_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_CONFIG_PLACEHOLDER);
     
     // Panel Lateral: Evolución
     lv_obj_add_event_cb(ui_actions_panel_get_evo_fire_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EVO_FIRE);
@@ -62,6 +60,11 @@ static void ui_connect_actions(void) {
     lv_obj_add_event_cb(ui_actions_panel_get_evo_back_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EVO_BACK);
 
     ESP_LOGI(TAG, "Eventos de todos los botones de acción conectados.");
+}
+
+void ui_preinit(void) {
+    ESP_LOGI(TAG, "Pre-inicializando UI: reservando buffer de animación...");
+    ui_action_animations_preinit_buffer();
 }
 
 void ui_init(void) {

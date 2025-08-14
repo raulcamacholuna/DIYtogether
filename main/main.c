@@ -1,8 +1,8 @@
 /*
 # Fichero: Z:\DIYTOGETHER\DIYtogether\main\main.c
-# Fecha: `$timestamp
-# Último cambio: Implementado fallback a modo AP para el servidor de archivos.
-# Descripción: Fichero principal de la aplicación DIYMON. Se ha modificado la lógica para que si el modo 'servidor de archivos' no logra conectar a una red WiFi guardada, inicie un Punto de Acceso y ofrezca el servicio desde allí, garantizando siempre el acceso.
+# Fecha: $timestamp
+# Último cambio: Reordenada la inicialización para pre-reservar el buffer de animación.
+# Descripción: Se ha modificado el flujo de arranque para llamar a una nueva función `ui_preinit` justo después de inicializar la NVS. Esta función reserva el buffer de animación (el bloque de memoria más grande) antes de que otros módulos como el cargador de assets puedan fragmentar el heap, solucionando así el fallo crítico de asignación de memoria.
 */
 #include <stdio.h>
 #include <string.h>
@@ -48,6 +48,10 @@ void app_main(void)
     ESP_ERROR_CHECK(ret);
     ESP_LOGI(TAG, "Sistema NVS inicializado.");
 
+    // Pre-reserva del buffer de animación para evitar fragmentación de memoria.
+    // Esta es la asignación de memoria más grande y debe hacerse lo antes posible.
+    ui_preinit();
+
     if (check_file_server_mode_flag()) {
         erase_file_server_mode_flag();
         run_file_server_mode();
@@ -78,7 +82,6 @@ static void run_file_server_mode(void) {
         ESP_LOGI(TAG, "Punto de Acceso iniciado. Conéctate a 'DIYTogether' (pass: MakeItYours) y navega a http://192.168.4.1");
     }
     
-    // El servidor web se inicia tanto si se conecta a una red como si crea la suya propia.
     ESP_LOGI(TAG, "Iniciando servidor web...");
     web_server_start(); // Esta función es bloqueante y no retorna.
 }
