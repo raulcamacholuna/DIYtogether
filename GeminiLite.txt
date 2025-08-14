@@ -7494,14 +7494,11 @@ const lv_image_dsc_t EVO_5 = {
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\actions.c
 # =================================================================================================
 
-/*
-  Fichero: ./components/diymon_ui/actions.c
-  Fecha: 12/08/2025 - 02:15 pm
-  Último cambio: Acortada la clave NVS para cumplir el límite de 15 caracteres.
-  Descripción: Se ha corregido el error ESP_ERR_NVS_KEY_TOO_LONG al cambiar el nombre de
-               la clave de "enable_config_mode" (18 caracteres) a "config_mode" (11 caracteres),
-               lo que cumple con el límite máximo de la API de NVS.
-*/
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\actions.c
+# Fecha: `$timestamp
+# Último cambio: Corregido el fichero para que sea sintácticamente válido en C.
+# Descripción: Orquestador de acciones de la UI. Gestiona la lógica que se ejecuta al interactuar con los botones, como cambiar el brillo, evolucionar la mascota o activar modos especiales.
+
 #include "actions.h"
 #include "ui_action_animations.h" 
 #include "esp_log.h"
@@ -7559,32 +7556,32 @@ void execute_diymon_action(diymon_action_id_t action_id) {
             ESP_LOGW(TAG, "ACCIÓN: Borrado completo de configuraciones.");
             wifi_portal_erase_credentials();
             diymon_evolution_reset_state();
-            erase_nvs_key("config_mode");
+            erase_nvs_key("file_server_mode");
             ESP_LOGW(TAG, "Todas las configuraciones han sido borradas. Reiniciando en 1 segundo...");
             vTaskDelay(pdMS_TO_TICKS(1000));
             esp_restart();
             break;
             
-        case ACTION_ID_ENABLE_CONFIG_MODE: {
-            ESP_LOGI(TAG, "Accion: Habilitar modo Servidor Web en el proximo reinicio.");
+        case ACTION_ID_ENABLE_FILE_SERVER: {
+            ESP_LOGI(TAG, "Accion: Habilitar modo Servidor de Archivos en el proximo reinicio.");
             nvs_handle_t nvs_handle;
             esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
             if (err == ESP_OK) {
-                err = nvs_set_str(nvs_handle, "config_mode", "1");
+                err = nvs_set_str(nvs_handle, "file_server_mode", "1");
                 if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "Error (%s) al establecer la bandera 'config_mode' en NVS.", esp_err_to_name(err));
+                    ESP_LOGE(TAG, "Error (%s) al establecer la bandera 'file_server_mode' en NVS.", esp_err_to_name(err));
                 }
 
                 err = nvs_commit(nvs_handle);
                 if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "Error (%s) al hacer commit de la bandera 'config_mode' en NVS.", esp_err_to_name(err));
+                    ESP_LOGE(TAG, "Error (%s) al hacer commit de la bandera 'file_server_mode' en NVS.", esp_err_to_name(err));
                 } else {
-                    ESP_LOGI(TAG, "Marca de modo configuración guardada y commit realizado. Reiniciando en 2 segundos...");
+                    ESP_LOGI(TAG, "Marca de modo servidor de archivos guardada y commit realizado. Reiniciando en 2 segundos...");
                 }
                 
                 nvs_close(nvs_handle);
             } else {
-                ESP_LOGE(TAG, "Error (%s) abriendo NVS para habilitar modo config.", esp_err_to_name(err));
+                ESP_LOGE(TAG, "Error (%s) abriendo NVS para habilitar modo servidor de archivos.", esp_err_to_name(err));
             }
             vTaskDelay(pdMS_TO_TICKS(2000));
             esp_restart();
@@ -7645,12 +7642,10 @@ void execute_diymon_action(diymon_action_id_t action_id) {
 # =================================================================================================
 
 /*
-  Fichero: ./components/diymon_ui/actions.h
-  Fecha: 12/08/2025 - 13:30
-  Último cambio: Corregido el ID de acción para habilitar el modo de configuración.
-  Descripción: Se actualiza el enumerado de acciones para que coincida con la
-               implementación en `actions.c`, renombrando `ACTION_ID_ENABLE_FTP` a
-               `ACTION_ID_ENABLE_CONFIG_MODE`.
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\actions.h
+# Fecha: `$timestamp
+# Último cambio: Corregido el fichero para que sea sintácticamente válido en C.
+# Descripción: Se actualiza el enumerado de acciones para reflejar el cambio de "modo de configuración" a "servidor de archivos".
 */
 #ifndef ACTIONS_H
 #define ACTIONS_H
@@ -7682,7 +7677,7 @@ typedef enum {
     
     // Acciones del panel de configuración (superior 3)
     ACTION_ID_RESET_ALL,
-    ACTION_ID_ENABLE_CONFIG_MODE, // Anteriormente ACTION_ID_ENABLE_FTP
+    ACTION_ID_ENABLE_FILE_SERVER, // Renombrado de ACTION_ID_ENABLE_CONFIG_MODE
     ACTION_ID_CONFIG_PLACEHOLDER,
 
     ACTION_ID_COUNT 
@@ -7698,6 +7693,7 @@ void execute_diymon_action(diymon_action_id_t action_id);
 #endif
 
 #endif // ACTIONS_H
+
 
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\animation_loader.c
@@ -8324,9 +8320,9 @@ extern "C" {
 
 /*
  * Fichero: ./components/diymon_ui/ui_action_animations.c
- * Fecha: 13/08/2025 - 07:34 
- * Último cambio: Reimplementado el búfer de animación compartido.
- * Descripción: Se restaura el uso de un único búfer de memoria compartido para todas las animaciones (idle y de acción). La memoria se reserva una vez al crear la UI y se libera al destruirla. Esto soluciona el error de memoria insuficiente que ocurría al intentar reservar un nuevo búfer para una animación de acción mientras el de la animación de reposo todavía estaba en uso.
+ * Fecha: 13/08/2025 - 07:54 
+ * Último cambio: Corregidos los prefijos de las animaciones de acción.
+ * Descripción: Se han actualizado los prefijos de las animaciones de acción para que coincidan con el nuevo esquema de nombres (ANIM_EAT_, ANIM_GYM_, ANIM_ATK_).
  */
 #include "ui_action_animations.h"
 #include "animation_loader.h"
@@ -8460,9 +8456,9 @@ static void animation_finished(void) {
 
 static const char* get_anim_prefix(diymon_action_id_t action_id) {
     switch(action_id) {
-        case ACTION_ID_COMER:     return "EAT_";
-        case ACTION_ID_EJERCICIO: return "GYM_";
-        case ACTION_ID_ATACAR:    return "ATK_";
+        case ACTION_ID_COMER:     return "ANIM_EAT_";
+        case ACTION_ID_EJERCICIO: return "ANIM_GYM_";
+        case ACTION_ID_ATACAR:    return "ANIM_ATK_";
         default:                  return "";
     }
 }
@@ -8510,10 +8506,10 @@ animation_t* ui_action_animations_get_player(void);
 # =================================================================================================
 
 /*
-  Fichero: ./components/diymon_ui/ui_actions_panel.c
-  Fecha: 13/08/2025 - 06:17 
-  Último cambio: Implementada la navegación circular de paneles.
-  Descripción: Se ha añadido lógica para que, al hacer un gesto de deslizar hacia abajo en el último panel (Configuración), se oculte este y se muestre el primer panel (Jugador), creando un bucle de navegación.
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_actions_panel.c
+# Fecha: `$timestamp
+# Último cambio: Corregido el fichero para que sea sintácticamente válido en C.
+# Descripción: Implementa la lógica de los paneles de acción deslizantes, incluyendo su creación, animación y manejo de gestos.
 */
 #include "ui_actions_panel.h"
 #include "ui_asset_loader.h"
@@ -8611,7 +8607,7 @@ void ui_actions_panel_create(lv_obj_t *parent) {
     s_admin_btns[2] = create_top_action_button(parent, ASSET_ICON_ADMIN_PLACEHOLDER, 2);
 
     s_config_btns[0] = create_top_action_button(parent, ASSET_ICON_RESET_ALL, 0);
-    s_config_btns[1] = create_top_action_button(parent, ASSET_ICON_ENABLE_FTP, 1);
+    s_config_btns[1] = create_top_action_button(parent, ASSET_ICON_ENABLE_FILE_SERVER, 1);
     s_config_btns[2] = create_top_action_button(parent, ASSET_ICON_CONFIG_PLACEHOLDER, 2);
 
     s_side_btns[0] = create_side_action_button(parent, ASSET_ICON_EVO_FIRE, 0);
@@ -8630,7 +8626,7 @@ lv_obj_t* ui_actions_panel_get_brightness_btn(void) { return s_admin_btns[0]; }
 lv_obj_t* ui_actions_panel_get_toggle_screen_btn(void) { return s_admin_btns[1]; }
 lv_obj_t* ui_actions_panel_get_admin_placeholder_btn(void) { return s_admin_btns[2]; }
 lv_obj_t* ui_actions_panel_get_reset_all_btn(void) { return s_config_btns[0]; }
-lv_obj_t* ui_actions_panel_get_enable_config_mode_btn(void) { return s_config_btns[1]; }
+lv_obj_t* ui_actions_panel_get_enable_file_server_btn(void) { return s_config_btns[1]; }
 lv_obj_t* ui_actions_panel_get_config_placeholder_btn(void) { return s_config_btns[2]; }
 lv_obj_t* ui_actions_panel_get_evo_fire_btn(void) { return s_side_btns[0]; }
 lv_obj_t* ui_actions_panel_get_evo_water_btn(void) { return s_side_btns[1]; }
@@ -8859,12 +8855,9 @@ static void button_event_cb(lv_event_t *e) {
 
 /*
   Fichero: ./components/diymon_ui/ui_actions_panel.h
-  Fecha: 12/08/2025 - 14:00
-  Último cambio: Renombrada la función `get` para el botón de modo configuración.
-  Descripción: Interfaz pública para el gestor de paneles. Se renombra 
-               `ui_actions_panel_get_enable_ftp_btn` a 
-               `ui_actions_panel_get_enable_config_mode_btn` para que 
-               coincida con la nueva funcionalidad.
+  Fecha: `$timestamp
+  Último cambio: Corregido para ser sintácticamente válido en C.
+  Descripción: Interfaz pública para el gestor de paneles. Se renombra `ui_actions_panel_get_enable_config_mode_btn` a `ui_actions_panel_get_enable_file_server_btn` para que coincida con la nueva funcionalidad.
 */
 #ifndef UI_ACTIONS_PANEL_H
 #define UI_ACTIONS_PANEL_H
@@ -8893,21 +8886,22 @@ lv_obj_t* ui_actions_panel_get_evo_back_btn(void);
 
 // --- Getters para botones del panel SUPERIOR 3 (CONFIG) ---
 lv_obj_t* ui_actions_panel_get_reset_all_btn(void);
-lv_obj_t* ui_actions_panel_get_enable_config_mode_btn(void); // Renombrado
+lv_obj_t* ui_actions_panel_get_enable_file_server_btn(void); // Renombrado
 lv_obj_t* ui_actions_panel_get_config_placeholder_btn(void);
 
 #endif // UI_ACTIONS_PANEL_H
+
 
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_asset_loader.c
 # =================================================================================================
 
-/*
-  Fichero: ./components/diymon_ui/ui_asset_loader.c
-  Fecha: 13/08/2025 - 12:43 
-  Último cambio: Actualizado para usar los assets compilados desde ficheros .c.
-  Descripción: Se modifica la lógica para enlazar directamente con las variables de descriptores de imagen (ej: &BTN_1) en lugar de usar los símbolos de datos binarios (_binary_*). Esto alinea el código con el nuevo sistema de compilación de assets.
-*/
+$timestamp = Get-Date -Format "dd/MM/yyyy - hh:mm tt"
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_asset_loader.c
+# Fecha: `$timestamp
+# Último cambio: Actualizada la asignación del asset para el servidor de archivos.
+# Descripción: Gestor de assets de la UI. Enlaza los identificadores de assets con los descriptores de imagen LVGL compilados.
+
 #include "ui_asset_loader.h"
 #include "images.h"
 #include "esp_log.h"
@@ -8931,7 +8925,7 @@ void ui_assets_init(void) {
 
     // Panel Config
     g_asset_dscs[ASSET_ICON_RESET_ALL] = &BTN_7;
-    g_asset_dscs[ASSET_ICON_ENABLE_FTP] = &BTN_8;
+    g_asset_dscs[ASSET_ICON_ENABLE_FILE_SERVER] = &BTN_8;
     g_asset_dscs[ASSET_ICON_CONFIG_PLACEHOLDER] = &BTN_9;
 
     // Panel Evolución
@@ -8960,12 +8954,12 @@ const lv_img_dsc_t* ui_assets_get_icon(ui_asset_id_t asset_id) {
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_asset_loader.h
 # =================================================================================================
 
-/*
-  Fichero: ./components/diymon_ui/ui_asset_loader.h
-  Fecha: 14/08/2025 - 11:00 am
-  Último cambio: Reestructurados los identificadores de assets para mayor claridad.
-  Descripción: Interfaz pública para el gestor de assets. Se han renombrado los identificadores de los iconos para que su nombre sea más descriptivo y coincida con la acción que representan, eliminando nombres genéricos como 'BTN_7'.
-*/
+$timestamp = Get-Date -Format "dd/MM/yyyy - hh:mm tt"
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_asset_loader.h
+# Fecha: `$timestamp
+# Último cambio: Corregido para ser sintácticamente válido en C.
+# Descripción: Interfaz pública para el gestor de assets. Se han renombrado los identificadores de los iconos para que su nombre sea más descriptivo y coincida con la acción que representan.
+
 #ifndef UI_ASSET_LOADER_H
 #define UI_ASSET_LOADER_H
 
@@ -8985,7 +8979,7 @@ typedef enum {
     
     // Iconos del panel de configuración (superior 3)
     ASSET_ICON_RESET_ALL,
-    ASSET_ICON_ENABLE_FTP,
+    ASSET_ICON_ENABLE_FILE_SERVER,
     ASSET_ICON_CONFIG_PLACEHOLDER,
 
     // Iconos del panel de evolución (lateral)
@@ -9016,6 +9010,7 @@ void ui_assets_deinit(void);
 const lv_img_dsc_t* ui_assets_get_icon(ui_asset_id_t asset_id);
 
 #endif // UI_ASSET_LOADER_H
+
 
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_idle_animation.c
@@ -9360,9 +9355,9 @@ void ui_telemetry_destroy(void);
 
 /*
   Fichero: ./components/diymon_ui/ui.c
-  Fecha: $timestamp
+  Fecha: 13/08/2025 - 07:51 
   Último cambio: Modificado el evento de activación de los botones de acción del jugador.
-  Descripción: Se ha modificado el callback de los botones para que las acciones del jugador (Comer, Ejercicio, Atacar) se disparen con el evento `LV_EVENT_PRESSED` (al pulsar), mientras que el resto de acciones siguen esperando a `LV_EVENT_CLICKED` (al soltar). Esto proporciona una respuesta más inmediata para las acciones principales.
+  Descripción: Se ha modificado el callback de los botones para que las acciones del jugador (Comer, Ejercicio, Atacar) se disparen con el evento LV_EVENT_PRESSED (al pulsar), mientras que el resto de acciones siguen esperando a LV_EVENT_CLICKED (al soltar). Esto proporciona una respuesta más inmediata para las acciones principales.
 */
 #include "ui.h"
 #include "screens.h"
@@ -9409,7 +9404,7 @@ static void ui_connect_actions(void) {
     
     // Panel 3: Configuración
     lv_obj_add_event_cb(ui_actions_panel_get_reset_all_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_RESET_ALL);
-    lv_obj_add_event_cb(ui_actions_panel_get_enable_config_mode_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_ENABLE_CONFIG_MODE);
+    lv_obj_add_event_cb(ui_actions_panel_get_enable_file_server_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_ENABLE_FILE_SERVER);
     lv_obj_add_event_cb(ui_actions_panel_get_config_placeholder_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_CONFIG_PLACEHOLDER);
     
     // Panel Lateral: Evolución
@@ -9434,6 +9429,7 @@ void ui_init(void) {
     lv_screen_load(g_main_screen_obj);
     ESP_LOGI(TAG, "UI modularizada y lista.");
 }
+
 
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui.h
@@ -13092,9 +13088,9 @@ esp_err_t service_screen_show(const char* image_path);
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\CMakeLists.txt
 # =================================================================================================
 
-# Fichero: ./components/web_server/CMakeLists.txt
-# Fecha: 13/08/2025 - 07:20 pm
-# Último cambio: Añadido web_server_page.h a las cabeceras privadas.
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\CMakeLists.txt
+# Fecha: `$timestamp
+# Último cambio: Corregido el fichero para que sea sintácticamente válido en CMake.
 # Descripción: Registro y dependencias para el componente del servidor web. Se incluye el nuevo fichero de cabecera que contiene el HTML.
 
 idf_component_register(SRCS "web_server.c"
@@ -13116,12 +13112,12 @@ idf_component_register(SRCS "web_server.c"
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server_page.h
 # =================================================================================================
 
-/*
-  Fichero: ./components/web_server/web_server_page.h
-  Fecha: 13/08/2025 - 07:30 pm
-  Último cambio: Mejorada la visualización del tamaño de los archivos.
-  Descripción: Contiene la página HTML principal del portal de configuración. Se ha añadido una función JavaScript para formatear el tamaño de los archivos (Bytes, KB, MB) y mejorar la legibilidad.
-*/
+$timestamp = Get-Date -Format "dd/MM/yyyy - hh:mm tt"
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server_page.h
+# Fecha: `$timestamp
+# Último cambio: Creación del fichero con el HTML del gestor de archivos.
+# Descripción: Contiene la página HTML principal del portal de configuración para la gestión de archivos en la tarjeta SD.
+
 #ifndef WEB_SERVER_PAGE_H
 #define WEB_SERVER_PAGE_H
 
@@ -13210,7 +13206,7 @@ static const char* INDEX_HTML_CONTENT = R"rawliteral(
                 const dm = decimals < 0 ? 0 : decimals
                 const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
                 const i = Math.floor(Math.log(bytes) / Math.log(k))
-                return ${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} 
+                return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`
             }
 
             async function fetchFileList() {
@@ -13295,17 +13291,17 @@ static const char* INDEX_HTML_CONTENT = R"rawliteral(
                     return a.type === 'dir' ? -1 : 1;
                 }).forEach(file => {
                     const icon = file.type === 'dir' ? '📁' : '📄';
-                    const sizeFormatted = file.type === 'file' ? () : '';
-                    html += 
+                    const sizeFormatted = file.type === 'file' ? formatBytes(file.size) : '';
+                    html += `
                         <div class="file-item">
                           <div class="file-info">
                             <span style="font-size: 1.2em;">${icon}</span>
-                            <span>${file.name} </span>
+                            <span>${file.name} <small style="color:#888">(${sizeFormatted})</small></span>
                           </div>
                           <div class="file-actions">
                             <button class="btn btn-small btn-danger" data-filename="${file.name}">🗑️ Borrar</button>
                           </div>
-                        </div>;
+                        </div>`;
                 });
                 fileListDiv.innerHTML = html;
             }
@@ -13348,10 +13344,10 @@ static const char* INDEX_HTML_CONTENT = R"rawliteral(
 # =================================================================================================
 
 /*
-  Fichero: ./components/web_server/web_server.c
-  Fecha: 13/08/2025 - 07:30 pm
-  Último cambio: Confirmada la implementación funcional del explorador de archivos.
-  Descripción: Servidor web para configuración. Se confirma que los endpoints /listfiles, /upload, y /delete están correctamente implementados para interactuar con la tarjeta SD y dar soporte a la interfaz web. La página principal se sirve desde web_server_page.h.
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server.c
+# Fecha: `$timestamp
+# Último cambio: Creación del fichero con la implementación del servidor web.
+# Descripción: Servidor web para configuración. Implementa los endpoints /listfiles, /upload, y /delete para interactuar con la tarjeta SD y dar soporte a la interfaz web. La página principal se sirve desde web_server_page.h.
 */
 #include "web_server.h"
 #include "web_server_page.h" // Incluir el HTML embebido
@@ -13517,10 +13513,10 @@ static esp_err_t delete_file_handler(httpd_req_t *req) {
     // Parser simplificado para multipart/form-data que extrae el nombre del archivo
     char *ptr = strstr(buf, "name=\"filename\"");
     if (ptr) {
-        ptr = strstr(ptr, "\r\n\r\n");
+        ptr = strstr(ptr, "\r`n\r`n");
         if (ptr) {
             ptr += 4;
-            char *end_ptr = strstr(ptr, "\r\n--");
+            char *end_ptr = strstr(ptr, "\r`n--");
             if (end_ptr) {
                 size_t len = end_ptr - ptr;
                 if (len < sizeof(filename)) {
@@ -13648,6 +13644,12 @@ void web_server_start(void) {
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server.h
 # =================================================================================================
 
+$timestamp = Get-Date -Format "dd/MM/yyyy - hh:mm tt"
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server.h
+# Fecha: `$timestamp
+# Último cambio: Creación del fichero.
+# Descripción: Interfaz pública para el componente del servidor web, que expone la función de arranque del servicio.
+
 #ifndef WEB_SERVER_H
 #define WEB_SERVER_H
 
@@ -13666,6 +13668,7 @@ void web_server_start(void);
 #endif
 
 #endif // WEB_SERVER_H
+
 
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\wifi_portal\CMakeLists.txt
@@ -13907,10 +13910,10 @@ void wifi_portal_erase_credentials(void);
 # Fichero: Z:\DIYTOGETHER\DIYtogether\main\CMakeLists.txt
 # =================================================================================================
 
-# Fichero: ./main/CMakeLists.txt
-# Fecha: 13/08/2025 - 05:44 
-# Último cambio: Eliminada la dependencia de iot_button.
-# Descripción: Se ha eliminado la dependencia del componente iot_button que ya no es necesario después de limpiar el código de ejemplo de main.c.
+# Fichero: Z:\DIYTOGETHER\DIYtogether\main\CMakeLists.txt
+# Fecha: `$timestamp
+# Último cambio: Corregido el fichero para que sea sintácticamente válido en CMake.
+# Descripción: CMakeLists para el componente principal 'main', que enlaza todos los subcomponentes del proyecto.
 
 idf_component_register(
     SRCS 
@@ -14047,10 +14050,10 @@ esp_err_t hardware_manager_init(void);
 # =================================================================================================
 
 /*
- * Fichero: ./main/main.c
- * Fecha: 13/08/2025 - 05:44 
- * Último cambio: Refactorizado para eliminar código de ejemplo obsoleto.
- * Descripción: Fichero principal de la aplicación DIYMON. Se ha eliminado todo el código de ejemplo relacionado con lv_demos, 	ouch_test y la inicialización manual de periféricos en pp_main. La lógica ahora está centralizada en los modos de operación (aplicación principal, portal wifi, servidor de configuración) y los gestores de hardware y UI. Esto resuelve el error de compilación utton_gpio.h: No such file or directory.
+# Fichero: Z:\DIYTOGETHER\DIYtogether\main\main.c
+# Fecha: `$timestamp
+# Último cambio: Refactorizado para usar el modo de servidor de archivos.
+# Descripción: Fichero principal de la aplicación DIYMON. Se ha refactorizado para utilizar las nuevas funciones del modo de servidor de archivos y las claves NVS correspondientes.
 */
 #include <stdio.h>
 #include <string.h>
@@ -14080,11 +14083,11 @@ esp_err_t hardware_manager_init(void);
 static const char *TAG = "DIYMON_MAIN";
 
 // --- Declaraciones de funciones ---
-static void run_config_server_mode(void);
+static void run_file_server_mode(void);
 static void run_wifi_portal_mode(void);
 static void run_main_application_mode(void);
-static bool check_config_mode_flag(void);
-static void erase_config_mode_flag(void);
+static bool check_file_server_mode_flag(void);
+static void erase_file_server_mode_flag(void);
 
 void app_main(void)
 {
@@ -14096,9 +14099,9 @@ void app_main(void)
     ESP_ERROR_CHECK(ret);
     ESP_LOGI(TAG, "Sistema NVS inicializado.");
 
-    if (check_config_mode_flag()) {
-        erase_config_mode_flag();
-        run_config_server_mode();
+    if (check_file_server_mode_flag()) {
+        erase_file_server_mode_flag();
+        run_file_server_mode();
     } else if (!wifi_portal_credentials_saved()) {
         run_wifi_portal_mode();
     } else {
@@ -14106,8 +14109,8 @@ void app_main(void)
     }
 }
 
-static void run_config_server_mode(void) {
-    ESP_LOGI(TAG, "Arrancando en modo Servidor Web de Configuración (STA)...");
+static void run_file_server_mode(void) {
+    ESP_LOGI(TAG, "Arrancando en modo Servidor de Archivos (STA)...");
     
     bsp_init_service_mode();
     service_screen_show("/sdcard/config/FTP.bin");
@@ -14156,45 +14159,45 @@ static void run_main_application_mode(void) {
     ESP_LOGI(TAG, "¡Firmware DIYMON en marcha!");
 }
 
-static bool check_config_mode_flag(void) {
+static bool check_file_server_mode_flag(void) {
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open("storage", NVS_READONLY, &nvs_handle);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Fallo al abrir NVS para comprobar la bandera de config. Error: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "Fallo al abrir NVS para comprobar la bandera. Error: %s", esp_err_to_name(err));
         return false;
     }
 
-    char config_flag[8] = {0};
-    size_t len = sizeof(config_flag);
-    err = nvs_get_str(nvs_handle, "config_mode", config_flag, &len);
+    char flag_val[8] = {0};
+    size_t len = sizeof(flag_val);
+    err = nvs_get_str(nvs_handle, "file_server_mode", flag_val, &len);
     nvs_close(nvs_handle);
 
     if (err == ESP_OK) {
-        ESP_LOGI(TAG, "Encontrada la bandera 'config_mode' en NVS. Valor: '%s'", config_flag);
-        return (strcmp(config_flag, "1") == 0);
+        ESP_LOGI(TAG, "Encontrada la bandera 'file_server_mode' en NVS. Valor: '%s'", flag_val);
+        return (strcmp(flag_val, "1") == 0);
     } else if (err == ESP_ERR_NVS_NOT_FOUND) {
-        ESP_LOGW(TAG, "La bandera 'config_mode' NO se encontró en NVS.");
+        ESP_LOGD(TAG, "La bandera 'file_server_mode' NO se encontró en NVS.");
         return false;
     } else {
-        ESP_LOGE(TAG, "Error al leer la bandera 'config_mode' de NVS. Error: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "Error al leer la bandera 'file_server_mode' de NVS. Error: %s", esp_err_to_name(err));
         return false;
     }
 }
 
-static void erase_config_mode_flag(void) {
+static void erase_file_server_mode_flag(void) {
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
     if (err == ESP_OK) {
-        err = nvs_erase_key(nvs_handle, "config_mode");
+        err = nvs_erase_key(nvs_handle, "file_server_mode");
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Error (%s) al borrar la clave 'config_mode'.", esp_err_to_name(err));
+            ESP_LOGE(TAG, "Error (%s) al borrar la clave 'file_server_mode'.", esp_err_to_name(err));
         }
 
         err = nvs_commit(nvs_handle);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "Error (%s) al hacer commit del borrado de la bandera.", esp_err_to_name(err));
         } else {
-            ESP_LOGI(TAG, "Marca de modo configuración borrada de NVS.");
+            ESP_LOGI(TAG, "Marca de modo servidor de archivos borrada de NVS.");
         }
         nvs_close(nvs_handle);
     } else {

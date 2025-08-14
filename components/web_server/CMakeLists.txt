@@ -1,6 +1,6 @@
-# Fichero: ./components/web_server/CMakeLists.txt
-# Fecha: 13/08/2025 - 07:20 pm
-# Último cambio: Añadido web_server_page.h a las cabeceras privadas.
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\CMakeLists.txt
+# Fecha: `$timestamp
+# Último cambio: Corregido el fichero para que sea sintácticamente válido en CMake.
 # Descripción: Registro y dependencias para el componente del servidor web. Se incluye el nuevo fichero de cabecera que contiene el HTML.
 
 idf_component_register(SRCS "web_server.c"

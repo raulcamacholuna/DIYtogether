@@ -49,7 +49,7 @@ static void ui_connect_actions(void) {
     
     // Panel 3: Configuración
     lv_obj_add_event_cb(ui_actions_panel_get_reset_all_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_RESET_ALL);
-    lv_obj_add_event_cb(ui_actions_panel_get_enable_config_mode_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_ENABLE_CONFIG_MODE);
+    lv_obj_add_event_cb(ui_actions_panel_get_enable_file_server_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_ENABLE_FILE_SERVER);
     lv_obj_add_event_cb(ui_actions_panel_get_config_placeholder_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_CONFIG_PLACEHOLDER);
     
     // Panel Lateral: Evolución

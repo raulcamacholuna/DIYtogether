@@ -1,8 +1,8 @@
 /*
-  Fichero: ./components/web_server/web_server_page.h
-  Fecha: 13/08/2025 - 07:30 pm
-  Último cambio: Mejorada la visualización del tamaño de los archivos.
-  Descripción: Contiene la página HTML principal del portal de configuración. Se ha añadido una función JavaScript para formatear el tamaño de los archivos (Bytes, KB, MB) y mejorar la legibilidad.
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server_page.h
+# Fecha: `$timestamp
+# Último cambio: Corregido el fichero para que sea sintácticamente válido en C.
+# Descripción: Contiene la página HTML principal del portal de configuración para la gestión de archivos en la tarjeta SD.
 */
 #ifndef WEB_SERVER_PAGE_H
 #define WEB_SERVER_PAGE_H
@@ -92,7 +92,7 @@ static const char* INDEX_HTML_CONTENT = R"rawliteral(
                 const dm = decimals < 0 ? 0 : decimals
                 const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
                 const i = Math.floor(Math.log(bytes) / Math.log(k))
-                return ${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} 
+                return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`
             }
 
             async function fetchFileList() {
@@ -177,17 +177,17 @@ static const char* INDEX_HTML_CONTENT = R"rawliteral(
                     return a.type === 'dir' ? -1 : 1;
                 }).forEach(file => {
                     const icon = file.type === 'dir' ? '📁' : '📄';
-                    const sizeFormatted = file.type === 'file' ? () : '';
-                    html += 
+                    const sizeFormatted = file.type === 'file' ? formatBytes(file.size) : '';
+                    html += `
                         <div class="file-item">
                           <div class="file-info">
                             <span style="font-size: 1.2em;">${icon}</span>
-                            <span>${file.name} </span>
+                            <span>${file.name} <small style="color:#888">(${sizeFormatted})</small></span>
                           </div>
                           <div class="file-actions">
                             <button class="btn btn-small btn-danger" data-filename="${file.name}">🗑️ Borrar</button>
                           </div>
-                        </div>;
+                        </div>`;
                 });
                 fileListDiv.innerHTML = html;
             }

@@ -1,10 +1,8 @@
 /*
-  Fichero: ./components/diymon_ui/actions.c
-  Fecha: 12/08/2025 - 02:15 pm
-  Último cambio: Acortada la clave NVS para cumplir el límite de 15 caracteres.
-  Descripción: Se ha corregido el error ESP_ERR_NVS_KEY_TOO_LONG al cambiar el nombre de
-               la clave de "enable_config_mode" (18 caracteres) a "config_mode" (11 caracteres),
-               lo que cumple con el límite máximo de la API de NVS.
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\actions.c
+# Fecha: `$timestamp
+# Último cambio: Acortada la clave NVS a 'file_server' para evitar error de longitud.
+# Descripción: Orquestador de acciones de la UI. Gestiona la lógica que se ejecuta al interactuar con los botones, como cambiar el brillo, evolucionar la mascota o activar modos especiales.
 */
 #include "actions.h"
 #include "ui_action_animations.h" 
@@ -63,32 +61,32 @@ void execute_diymon_action(diymon_action_id_t action_id) {
             ESP_LOGW(TAG, "ACCIÓN: Borrado completo de configuraciones.");
             wifi_portal_erase_credentials();
             diymon_evolution_reset_state();
-            erase_nvs_key("config_mode");
+            erase_nvs_key("file_server");
             ESP_LOGW(TAG, "Todas las configuraciones han sido borradas. Reiniciando en 1 segundo...");
             vTaskDelay(pdMS_TO_TICKS(1000));
             esp_restart();
             break;
             
-        case ACTION_ID_ENABLE_CONFIG_MODE: {
-            ESP_LOGI(TAG, "Accion: Habilitar modo Servidor Web en el proximo reinicio.");
+        case ACTION_ID_ENABLE_FILE_SERVER: {
+            ESP_LOGI(TAG, "Accion: Habilitar modo Servidor de Archivos en el proximo reinicio.");
             nvs_handle_t nvs_handle;
             esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
             if (err == ESP_OK) {
-                err = nvs_set_str(nvs_handle, "config_mode", "1");
+                err = nvs_set_str(nvs_handle, "file_server", "1");
                 if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "Error (%s) al establecer la bandera 'config_mode' en NVS.", esp_err_to_name(err));
+                    ESP_LOGE(TAG, "Error (%s) al establecer la bandera 'file_server' en NVS.", esp_err_to_name(err));
                 }
 
                 err = nvs_commit(nvs_handle);
                 if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "Error (%s) al hacer commit de la bandera 'config_mode' en NVS.", esp_err_to_name(err));
+                    ESP_LOGE(TAG, "Error (%s) al hacer commit de la bandera 'file_server' en NVS.", esp_err_to_name(err));
                 } else {
-                    ESP_LOGI(TAG, "Marca de modo configuración guardada y commit realizado. Reiniciando en 2 segundos...");
+                    ESP_LOGI(TAG, "Marca de modo servidor de archivos guardada y commit realizado. Reiniciando en 2 segundos...");
                 }
                 
                 nvs_close(nvs_handle);
             } else {
-                ESP_LOGE(TAG, "Error (%s) abriendo NVS para habilitar modo config.", esp_err_to_name(err));
+                ESP_LOGE(TAG, "Error (%s) abriendo NVS para habilitar modo servidor de archivos.", esp_err_to_name(err));
             }
             vTaskDelay(pdMS_TO_TICKS(2000));
             esp_restart();

@@ -1,8 +1,8 @@
 /*
-  Fichero: ./components/diymon_ui/ui_asset_loader.h
-  Fecha: 14/08/2025 - 11:00 am
-  Último cambio: Reestructurados los identificadores de assets para mayor claridad.
-  Descripción: Interfaz pública para el gestor de assets. Se han renombrado los identificadores de los iconos para que su nombre sea más descriptivo y coincida con la acción que representan, eliminando nombres genéricos como 'BTN_7'.
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_asset_loader.h
+# Fecha: `$timestamp
+# Último cambio: Corregido para ser sintácticamente válido en C.
+# Descripción: Interfaz pública para el gestor de assets. Se han renombrado los identificadores de los iconos para que su nombre sea más descriptivo y coincida con la acción que representan.
 */
 #ifndef UI_ASSET_LOADER_H
 #define UI_ASSET_LOADER_H
@@ -23,7 +23,7 @@ typedef enum {
     
     // Iconos del panel de configuración (superior 3)
     ASSET_ICON_RESET_ALL,
-    ASSET_ICON_ENABLE_FTP,
+    ASSET_ICON_ENABLE_FILE_SERVER,
     ASSET_ICON_CONFIG_PLACEHOLDER,
 
     // Iconos del panel de evolución (lateral)

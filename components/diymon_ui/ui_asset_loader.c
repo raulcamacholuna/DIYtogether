@@ -1,8 +1,8 @@
 /*
-  Fichero: ./components/diymon_ui/ui_asset_loader.c
-  Fecha: 13/08/2025 - 12:43 
-  Último cambio: Actualizado para usar los assets compilados desde ficheros .c.
-  Descripción: Se modifica la lógica para enlazar directamente con las variables de descriptores de imagen (ej: &BTN_1) en lugar de usar los símbolos de datos binarios (_binary_*). Esto alinea el código con el nuevo sistema de compilación de assets.
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_asset_loader.c
+# Fecha: `$timestamp
+# Último cambio: Corregido para ser sintácticamente válido en C.
+# Descripción: Gestor de assets de la UI. Enlaza los identificadores de assets con los descriptores de imagen LVGL compilados.
 */
 #include "ui_asset_loader.h"
 #include "images.h"
@@ -27,7 +27,7 @@ void ui_assets_init(void) {
 
     // Panel Config
     g_asset_dscs[ASSET_ICON_RESET_ALL] = &BTN_7;
-    g_asset_dscs[ASSET_ICON_ENABLE_FTP] = &BTN_8;
+    g_asset_dscs[ASSET_ICON_ENABLE_FILE_SERVER] = &BTN_8;
     g_asset_dscs[ASSET_ICON_CONFIG_PLACEHOLDER] = &BTN_9;
 
     // Panel Evolución

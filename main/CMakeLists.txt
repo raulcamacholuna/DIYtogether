@@ -1,7 +1,7 @@
-# Fichero: ./main/CMakeLists.txt
-# Fecha: 13/08/2025 - 05:44 
-# Último cambio: Eliminada la dependencia de iot_button.
-# Descripción: Se ha eliminado la dependencia del componente iot_button que ya no es necesario después de limpiar el código de ejemplo de main.c.
+# Fichero: Z:\DIYTOGETHER\DIYtogether\main\CMakeLists.txt
+# Fecha: `$timestamp
+# Último cambio: Corregido el fichero para que sea sintácticamente válido en CMake.
+# Descripción: CMakeLists para el componente principal 'main', que enlaza todos los subcomponentes del proyecto.
 
 idf_component_register(
     SRCS 

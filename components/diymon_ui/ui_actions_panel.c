@@ -1,8 +1,8 @@
 /*
-  Fichero: ./components/diymon_ui/ui_actions_panel.c
-  Fecha: 13/08/2025 - 06:17 
-  Último cambio: Implementada la navegación circular de paneles.
-  Descripción: Se ha añadido lógica para que, al hacer un gesto de deslizar hacia abajo en el último panel (Configuración), se oculte este y se muestre el primer panel (Jugador), creando un bucle de navegación.
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_actions_panel.c
+# Fecha: `$timestamp
+# Último cambio: Corregido el fichero para que sea sintácticamente válido en C.
+# Descripción: Implementa la lógica de los paneles de acción deslizantes, incluyendo su creación, animación y manejo de gestos.
 */
 #include "ui_actions_panel.h"
 #include "ui_asset_loader.h"
@@ -100,7 +100,7 @@ void ui_actions_panel_create(lv_obj_t *parent) {
     s_admin_btns[2] = create_top_action_button(parent, ASSET_ICON_ADMIN_PLACEHOLDER, 2);
 
     s_config_btns[0] = create_top_action_button(parent, ASSET_ICON_RESET_ALL, 0);
-    s_config_btns[1] = create_top_action_button(parent, ASSET_ICON_ENABLE_FTP, 1);
+    s_config_btns[1] = create_top_action_button(parent, ASSET_ICON_ENABLE_FILE_SERVER, 1);
     s_config_btns[2] = create_top_action_button(parent, ASSET_ICON_CONFIG_PLACEHOLDER, 2);
 
     s_side_btns[0] = create_side_action_button(parent, ASSET_ICON_EVO_FIRE, 0);
@@ -119,7 +119,7 @@ lv_obj_t* ui_actions_panel_get_brightness_btn(void) { return s_admin_btns[0]; }
 lv_obj_t* ui_actions_panel_get_toggle_screen_btn(void) { return s_admin_btns[1]; }
 lv_obj_t* ui_actions_panel_get_admin_placeholder_btn(void) { return s_admin_btns[2]; }
 lv_obj_t* ui_actions_panel_get_reset_all_btn(void) { return s_config_btns[0]; }
-lv_obj_t* ui_actions_panel_get_enable_config_mode_btn(void) { return s_config_btns[1]; }
+lv_obj_t* ui_actions_panel_get_enable_file_server_btn(void) { return s_config_btns[1]; }
 lv_obj_t* ui_actions_panel_get_config_placeholder_btn(void) { return s_config_btns[2]; }
 lv_obj_t* ui_actions_panel_get_evo_fire_btn(void) { return s_side_btns[0]; }
 lv_obj_t* ui_actions_panel_get_evo_water_btn(void) { return s_side_btns[1]; }

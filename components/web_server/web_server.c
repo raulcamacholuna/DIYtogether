@@ -1,8 +1,8 @@
 /*
-  Fichero: ./components/web_server/web_server.c
-  Fecha: 13/08/2025 - 07:30 pm
-  Último cambio: Confirmada la implementación funcional del explorador de archivos.
-  Descripción: Servidor web para configuración. Se confirma que los endpoints /listfiles, /upload, y /delete están correctamente implementados para interactuar con la tarjeta SD y dar soporte a la interfaz web. La página principal se sirve desde web_server_page.h.
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server.c
+# Fecha: `$timestamp
+# Último cambio: Corregido el fichero para que sea sintácticamente válido en C.
+# Descripción: Servidor web para configuración. Implementa los endpoints /listfiles, /upload, y /delete para interactuar con la tarjeta SD y dar soporte a la interfaz web. La página principal se sirve desde web_server_page.h.
 */
 #include "web_server.h"
 #include "web_server_page.h" // Incluir el HTML embebido

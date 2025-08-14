@@ -1,11 +1,8 @@
 /*
   Fichero: ./components/diymon_ui/ui_actions_panel.h
-  Fecha: 12/08/2025 - 14:00
-  Último cambio: Renombrada la función `get` para el botón de modo configuración.
-  Descripción: Interfaz pública para el gestor de paneles. Se renombra 
-               `ui_actions_panel_get_enable_ftp_btn` a 
-               `ui_actions_panel_get_enable_config_mode_btn` para que 
-               coincida con la nueva funcionalidad.
+  Fecha: `$timestamp
+  Último cambio: Corregido para ser sintácticamente válido en C.
+  Descripción: Interfaz pública para el gestor de paneles. Se renombra `ui_actions_panel_get_enable_config_mode_btn` a `ui_actions_panel_get_enable_file_server_btn` para que coincida con la nueva funcionalidad.
 */
 #ifndef UI_ACTIONS_PANEL_H
 #define UI_ACTIONS_PANEL_H
@@ -34,7 +31,7 @@ lv_obj_t* ui_actions_panel_get_evo_back_btn(void);
 
 // --- Getters para botones del panel SUPERIOR 3 (CONFIG) ---
 lv_obj_t* ui_actions_panel_get_reset_all_btn(void);
-lv_obj_t* ui_actions_panel_get_enable_config_mode_btn(void); // Renombrado
+lv_obj_t* ui_actions_panel_get_enable_file_server_btn(void); // Renombrado
 lv_obj_t* ui_actions_panel_get_config_placeholder_btn(void);
 
 #endif // UI_ACTIONS_PANEL_H

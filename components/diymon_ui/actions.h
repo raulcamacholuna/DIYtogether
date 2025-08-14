@@ -1,10 +1,8 @@
 /*
-  Fichero: ./components/diymon_ui/actions.h
-  Fecha: 12/08/2025 - 13:30
-  Último cambio: Corregido el ID de acción para habilitar el modo de configuración.
-  Descripción: Se actualiza el enumerado de acciones para que coincida con la
-               implementación en `actions.c`, renombrando `ACTION_ID_ENABLE_FTP` a
-               `ACTION_ID_ENABLE_CONFIG_MODE`.
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\actions.h
+# Fecha: `$timestamp
+# Último cambio: Corregido el fichero para que sea sintácticamente válido en C.
+# Descripción: Se actualiza el enumerado de acciones para reflejar el cambio de "modo de configuración" a "servidor de archivos".
 */
 #ifndef ACTIONS_H
 #define ACTIONS_H
@@ -36,7 +34,7 @@ typedef enum {
     
     // Acciones del panel de configuración (superior 3)
     ACTION_ID_RESET_ALL,
-    ACTION_ID_ENABLE_CONFIG_MODE, // Anteriormente ACTION_ID_ENABLE_FTP
+    ACTION_ID_ENABLE_FILE_SERVER, // Renombrado de ACTION_ID_ENABLE_CONFIG_MODE
     ACTION_ID_CONFIG_PLACEHOLDER,
 
     ACTION_ID_COUNT 
