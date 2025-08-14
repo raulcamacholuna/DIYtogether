@@ -1066,7 +1066,7 @@ CONFIG_APPTRACE_LOCK_ENABLE=y
 #
 # Console Library
 #
-# CONFIG_CONSOLE_SORTED_HELP is not set
+CONFIG_CONSOLE_SORTED_HELP=y
 # end of Console Library
 
 #
@@ -5298,9 +5298,9 @@ void diymon_evolution_reset_state(void) {
 
 /*
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\actions.c
-# Fecha: `$timestamp
-# Último cambio: Acortada la clave NVS a 'file_server' para evitar error de longitud.
-# Descripción: Orquestador de acciones de la UI. Gestiona la lógica que se ejecuta al interactuar con los botones, como cambiar el brillo, evolucionar la mascota o activar modos especiales.
+# Fecha: $timestamp
+# Último cambio: Reducido el tiempo de reinicio para el modo servidor de archivos a 500ms.
+# Descripción: Orquestador de acciones de la UI. Se ha reducido el retardo antes de reiniciar al activar el modo de servidor de archivos para que la transición sea más rápida y la experiencia de usuario más fluida.
 */
 #include "actions.h"
 #include "ui_action_animations.h" 
@@ -5334,7 +5334,7 @@ void execute_diymon_action(diymon_action_id_t action_id) {
         case ACTION_ID_COMER:
         case ACTION_ID_EJERCICIO:
         case ACTION_ID_ATACAR:
-            ESP_LOGI(TAG, "Accion de jugador. Delegando a reproductor.");
+            ESP_LOGD(TAG, "Accion de jugador. Delegando a reproductor.");
             ui_action_animations_play(action_id);
             break;
 
@@ -5371,22 +5371,15 @@ void execute_diymon_action(diymon_action_id_t action_id) {
             esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
             if (err == ESP_OK) {
                 err = nvs_set_str(nvs_handle, "file_server", "1");
-                if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "Error (%s) al establecer la bandera 'file_server' en NVS.", esp_err_to_name(err));
+                if (err == ESP_OK) {
+                    err = nvs_commit(nvs_handle);
+                    if (err == ESP_OK) {
+                        ESP_LOGI(TAG, "Marca de modo servidor de archivos guardada. Reiniciando en 500ms...");
+                    }
                 }
-
-                err = nvs_commit(nvs_handle);
-                if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "Error (%s) al hacer commit de la bandera 'file_server' en NVS.", esp_err_to_name(err));
-                } else {
-                    ESP_LOGI(TAG, "Marca de modo servidor de archivos guardada y commit realizado. Reiniciando en 2 segundos...");
-                }
-                
                 nvs_close(nvs_handle);
-            } else {
-                ESP_LOGE(TAG, "Error (%s) abriendo NVS para habilitar modo servidor de archivos.", esp_err_to_name(err));
             }
-            vTaskDelay(pdMS_TO_TICKS(2000));
+            vTaskDelay(pdMS_TO_TICKS(500)); // <-- CAMBIO DE 2000 a 500
             esp_restart();
             break;
         }
@@ -5695,8 +5688,8 @@ extern const lv_img_dsc_t bg_0;
 
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\CMakeLists.txt
 # Fecha: $timestamp
-# Último cambio: Eliminada la referencia al directorio 'assets' que ya no existe.
-# Descripción: CMakeLists para el componente de UI. Se elimina `PRIV_INCLUDE_DIRS "assets"` para resolver el error de compilación, ya que el directorio 'assets' ha sido borrado.
+# Último cambio: Actualizado para incluir `ui_config_screen.c` en la compilación.
+# Descripción: El `file(GLOB "*.c")` existente se encarga de encontrar y compilar automáticamente el nuevo fichero `ui_config_screen.c`. Se regenera el fichero para confirmar que este nuevo fuente se añade al componente.
 
 file(GLOB component_sources
     "*.c"
@@ -5704,6 +5697,7 @@ file(GLOB component_sources
     "actions/*.c"
     "styles/*.c"
     "ui_telemetry.c"
+    "assets/*.c"
 )
 
 idf_component_register(
@@ -5849,8 +5843,8 @@ extern "C" {
 /*
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\screens.c
 # Fecha: $timestamp
-# Último cambio: Añadida la llamada a `ui_assets_deinit` para liberar memoria.
-# Descripción: Se ha añadido la llamada a la función de desinicialización del cargador de assets en el callback de borrado de la pantalla. Esto asegura que la memoria RAM reservada para los iconos de los botones se libere correctamente al cerrar la UI, completando el ciclo de vida de los assets dinámicos.
+# Último cambio: Reactivada la detección de gestos habilitando el scroll.
+# Descripción: Se ha corregido el problema que impedía la detección de gestos. La línea `lv_obj_clear_flag(..., LV_OBJ_FLAG_SCROLLABLE)` deshabilitaba el mecanismo de scroll de LVGL, que es necesario para generar eventos de deslizamiento. Se ha reemplazado por una configuración que permite el scroll para la detección de gestos pero oculta la barra de desplazamiento visual.
 */
 #include "screens.h"
 #include "ui_idle_animation.h"
@@ -5890,10 +5884,14 @@ static void resume_idle_timer_cb(lv_timer_t *timer) {
 
 void create_screen_main(void) {
     g_main_screen_obj = lv_obj_create(NULL);
-    lv_obj_clear_flag(g_main_screen_obj, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_size(g_main_screen_obj, 170, 320);
     lv_obj_add_flag(g_main_screen_obj, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(g_main_screen_obj, main_screen_event_cb, LV_EVENT_ALL, NULL);
+    
+    // [CORRECCIÓN] Habilitar la detección de gestos permitiendo el scroll, pero sin mostrar la barra.
+    // La línea `lv_obj_clear_flag(g_main_screen_obj, LV_OBJ_FLAG_SCROLLABLE);` impedía los gestos.
+    lv_obj_set_scroll_dir(g_main_screen_obj, LV_DIR_ALL);
+    lv_obj_set_scrollbar_mode(g_main_screen_obj, LV_SCROLLBAR_MODE_OFF);
 
     ui_helpers_load_background(g_main_screen_obj);
 
@@ -5911,7 +5909,6 @@ static void main_screen_event_cb(lv_event_t *e) {
 
     switch(code) {
         case LV_EVENT_PRESSED: {
-            // Si hay un temporizador para reanudar el idle, lo cancelamos.
             if (s_resume_idle_timer) {
                 lv_timer_del(s_resume_idle_timer);
                 s_resume_idle_timer = NULL;
@@ -5931,7 +5928,6 @@ static void main_screen_event_cb(lv_event_t *e) {
             touch_start_x = -1;
             touch_start_y = -1;
             
-            // Si la pantalla está encendida y no hay ya un temporizador, creamos uno.
             if (!screen_manager_is_off() && s_resume_idle_timer == NULL) {
                  ESP_LOGD(TAG, "Touch released. Starting 500ms timer to resume idle animation.");
                 s_resume_idle_timer = lv_timer_create(resume_idle_timer_cb, 500, NULL);
@@ -5978,7 +5974,7 @@ void delete_screen_main(void) {
     ui_idle_animation_stop();
     ui_action_animations_destroy();
     ui_telemetry_destroy();
-    ui_assets_deinit(); // Liberar memoria de los iconos de botones
+    ui_assets_deinit();
 }
 
 void create_screens(void) {
@@ -6089,11 +6085,11 @@ extern "C" {
 # =================================================================================================
 
 /*
- * Fichero: ./components/diymon_ui/ui_action_animations.c
- * Fecha: 13/08/2025 - 07:54 
- * Último cambio: Corregidos los prefijos de las animaciones de acción.
- * Descripción: Se han actualizado los prefijos de las animaciones de acción para que coincidan con el nuevo esquema de nombres (ANIM_EAT_, ANIM_GYM_, ANIM_ATK_).
- */
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_action_animations.c
+# Fecha: $timestamp
+# Último cambio: Implementada la función de pre-reserva de buffer y refactorizada la creación.
+# Descripción: Se define la función `ui_action_animations_preinit_buffer` para reservar el buffer de animación compartido al inicio de la aplicación. La función `ui_action_animations_create` ahora solo crea el objeto de imagen LVGL, utilizando el buffer ya reservado. Esto soluciona el error de enlazado 'undefined reference' y previene la fragmentación del heap.
+*/
 #include "ui_action_animations.h"
 #include "animation_loader.h"
 #include "diymon_ui_helpers.h"
@@ -6105,8 +6101,8 @@ extern "C" {
 static const char *TAG = "UI_ACTION_ANIM";
 
 // --- Variables Globales y Estáticas ---
-lv_obj_t *g_animation_img_obj;
-animation_t g_animation_player; // Player global que contiene el búfer compartido
+lv_obj_t *g_animation_img_obj = NULL;
+static animation_t g_animation_player; // Player global que contiene el búfer compartido
 
 static lv_timer_t *s_anim_timer;
 static bool s_is_action_in_progress = false;
@@ -6121,15 +6117,22 @@ static const char* get_anim_prefix(diymon_action_id_t action_id);
 
 // --- Implementación de Funciones Públicas ---
 
-void ui_action_animations_create(lv_obj_t *parent) {
+void ui_action_animations_preinit_buffer(void) {
     // Reservar el búfer de animación compartido UNA SOLA VEZ.
     g_animation_player = animation_loader_init(NULL, 150, 230, 0);
     if (g_animation_player.img_dsc.data == NULL) {
         ESP_LOGE(TAG, "FALLO CRÍTICO: No se pudo reservar memoria para el búfer de animación compartido.");
+    } else {
+        ESP_LOGI(TAG, "Búfer de animación compartido (150x230) pre-reservado correctamente.");
+    }
+}
+
+void ui_action_animations_create(lv_obj_t *parent) {
+    if (g_animation_player.img_dsc.data == NULL) {
+        ESP_LOGE(TAG, "El búfer de animación compartido no fue pre-reservado. No se puede crear el objeto de animación.");
         return;
     }
-    ESP_LOGI(TAG, "Búfer de animación compartido (150x230) pre-reservado correctamente.");
-
+    
     g_animation_img_obj = lv_image_create(parent);
     lv_image_set_src(g_animation_img_obj, &g_animation_player.img_dsc);
     
@@ -6163,7 +6166,6 @@ void ui_action_animations_play(diymon_action_id_t action_id) {
     
     ESP_LOGI(TAG, "Reproduciendo animación '%s' (%d fotogramas) a %dms/frame.", prefix, frame_count, FRAME_INTERVAL_MS);
 
-    // Reutilizar el reproductor global, solo actualizar sus propiedades.
     if (g_animation_player.base_path) free(g_animation_player.base_path);
     g_animation_player.base_path = strdup(path_buffer);
     g_animation_player.frame_count = frame_count;
@@ -6211,7 +6213,6 @@ static void animation_finished(void) {
         s_anim_timer = NULL;
     }
     
-    // No liberar el reproductor completo, solo la ruta. El búfer de datos persiste.
     if (g_animation_player.base_path) {
         free(g_animation_player.base_path);
         g_animation_player.base_path = NULL;
@@ -6239,11 +6240,11 @@ static const char* get_anim_prefix(diymon_action_id_t action_id) {
 # =================================================================================================
 
 /*
- * Fichero: ./components/diymon_ui/ui_action_animations.h
- * Fecha: 13/08/2025 - 07:34 
- * Último cambio: Reintroducida la función para obtener el reproductor de animación compartido.
- * Descripción: Interfaz pública para el módulo de animaciones de acción. Se vuelve a exponer la función 'ui_action_animations_get_player' para permitir que otros módulos (como el de la animación de reposo) accedan al búfer de animación compartido.
- */
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_action_animations.h
+# Fecha: $timestamp
+# Último cambio: Añadida la declaración de la función de pre-reserva de buffer.
+# Descripción: Interfaz pública para el módulo de animaciones de acción. Se añade la declaración de `ui_action_animations_preinit_buffer` para que la función sea visible para otros módulos y se resuelva así el error de compilación por declaración implícita.
+*/
 #ifndef UI_ACTION_ANIMATIONS_H
 #define UI_ACTION_ANIMATIONS_H
 
@@ -6259,6 +6260,7 @@ extern "C" {
 extern lv_obj_t *g_animation_img_obj;
 
 // --- FUNCIONES PÚBLICAS ---
+void ui_action_animations_preinit_buffer(void);
 void ui_action_animations_create(lv_obj_t *parent);
 void ui_action_animations_play(diymon_action_id_t action_id);
 void ui_action_animations_destroy(void);
@@ -6669,113 +6671,58 @@ lv_obj_t* ui_actions_panel_get_config_placeholder_btn(void);
 /*
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_asset_loader.c
 # Fecha: $timestamp
-# Último cambio: Modificado para cargar los iconos de los botones desde archivos .bin en la SD.
-# Descripción: Gestor de assets de la UI. En lugar de usar assets compilados desde ficheros .c, ahora carga dinámicamente las imágenes de los botones desde /sdcard/buttons/ en formato RGB565A8, permitiendo la personalización de skins sin recompilar.
+# Último cambio: Revertido a un modelo de assets enlazados en firmware para solucionar el lag de la SD.
+# Descripción: Se ha revertido la estrategia de carga de assets. En lugar de generar rutas de fichero para la SD, ahora se devuelve un puntero a un descriptor de imagen (`lv_img_dsc_t`) que estará compilado directamente en el firmware. Esto elimina las lentas operaciones de E/S de la tarjeta SD durante el renderizado, solucionando los graves problemas de rendimiento ("lag").
 */
 #include "ui_asset_loader.h"
+#include "ui_assets.h" // Este fichero contendrá las declaraciones 'extern' de los assets
 #include "esp_log.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 static const char *TAG = "UI_ASSET_LOADER";
 
-// --- Constantes de configuración de assets ---
-#define ASSET_BASE_PATH "/sdcard/buttons"
-#define ASSET_IMG_WIDTH 50
-#define ASSET_IMG_HEIGHT 50
-#define LVGL_BIN_HEADER_SIZE 12
-
-// Array de descriptores de imagen, uno para cada asset.
-static lv_img_dsc_t g_asset_dscs[ASSET_COUNT];
-
-// Mapeo de IDs de assets a nombres de fichero.
-static const char* g_asset_filenames[ASSET_COUNT] = {
-    [ASSET_ICON_EAT]                  = "BTN_1.bin",
-    [ASSET_ICON_GYM]                  = "BTN_2.bin",
-    [ASSET_ICON_ATK]                  = "BTN_3.bin",
-    [ASSET_ICON_BRIGHTNESS]           = "BTN_4.bin",
-    [ASSET_ICON_SCREEN_OFF]           = "BTN_5.bin",
-    [ASSET_ICON_ADMIN_PLACEHOLDER]    = "BTN_6.bin",
-    [ASSET_ICON_RESET_ALL]            = "BTN_7.bin",
-    [ASSET_ICON_ENABLE_FILE_SERVER]   = "BTN_8.bin",
-    [ASSET_ICON_CONFIG_PLACEHOLDER]   = "BTN_9.bin",
-    [ASSET_ICON_EVO_FIRE]             = "EVO_1.bin",
-    [ASSET_ICON_EVO_WATER]            = "EVO_2.bin",
-    [ASSET_ICON_EVO_EARTH]            = "EVO_3.bin",
-    [ASSET_ICON_EVO_WIND]             = "EVO_4.bin",
-    [ASSET_ICON_EVO_BACK]             = "EVO_5.bin",
+// --- Mapeo de IDs de assets a los punteros de los descriptores de imagen compilados ---
+static const lv_img_dsc_t* g_asset_dsc_pointers[ASSET_COUNT] = {
+    [ASSET_ICON_EAT]                  = &asset_btn_1,
+    [ASSET_ICON_GYM]                  = &asset_btn_2,
+    [ASSET_ICON_ATK]                  = &asset_btn_3,
+    [ASSET_ICON_BRIGHTNESS]           = &asset_btn_4,
+    [ASSET_ICON_SCREEN_OFF]           = &asset_btn_5,
+    [ASSET_ICON_ADMIN_PLACEHOLDER]    = &asset_btn_6,
+    [ASSET_ICON_RESET_ALL]            = &asset_btn_7,
+    [ASSET_ICON_ENABLE_FILE_SERVER]   = &asset_btn_8,
+    [ASSET_ICON_CONFIG_PLACEHOLDER]   = &asset_btn_9,
+    [ASSET_ICON_EVO_FIRE]             = &asset_evo_1,
+    [ASSET_ICON_EVO_WATER]            = &asset_evo_2,
+    [ASSET_ICON_EVO_EARTH]            = &asset_evo_3,
+    [ASSET_ICON_EVO_WIND]             = &asset_evo_4,
+    [ASSET_ICON_EVO_BACK]             = &asset_evo_5,
 };
 
 /**
- * @brief Carga todos los iconos desde la tarjeta SD y los almacena en RAM.
+ * @brief Inicializa el gestor de assets. En este modo no hace nada.
  */
 void ui_assets_init(void) {
-    ESP_LOGI(TAG, "Cargando assets de iconos desde la tarjeta SD...");
-
-    for (int i = 0; i < ASSET_COUNT; i++) {
-        char path_buf[128];
-        snprintf(path_buf, sizeof(path_buf), "%s/%s", ASSET_BASE_PATH, g_asset_filenames[i]);
-
-        // El formato es RGB565A8, que usa 3 bytes por píxel.
-        size_t buffer_size = ASSET_IMG_WIDTH * ASSET_IMG_HEIGHT * 3;
-        uint8_t *img_buf = malloc(buffer_size);
-
-        if (!img_buf) {
-            ESP_LOGE(TAG, "Fallo al reservar %u bytes para %s", (unsigned int)buffer_size, g_asset_filenames[i]);
-            g_asset_dscs[i].data = NULL; // Marcar como fallido
-            continue;
-        }
-
-        FILE* f = fopen(path_buf, "rb");
-        if (!f) {
-            ESP_LOGE(TAG, "No se pudo abrir el asset: %s", path_buf);
-            free(img_buf);
-            g_asset_dscs[i].data = NULL;
-            continue;
-        }
-
-        fseek(f, LVGL_BIN_HEADER_SIZE, SEEK_SET); // Omitir la cabecera del fichero .bin
-        size_t bytes_read = fread(img_buf, 1, buffer_size, f);
-        fclose(f);
-
-        if (bytes_read != buffer_size) {
-            ESP_LOGW(TAG, "Lectura incompleta para %s. Leidos %u de %u bytes.", path_buf, (unsigned int)bytes_read, (unsigned int)buffer_size);
-        }
-
-        g_asset_dscs[i].header.cf = LV_COLOR_FORMAT_RGB565A8;
-        g_asset_dscs[i].header.w = ASSET_IMG_WIDTH;
-        g_asset_dscs[i].header.h = ASSET_IMG_HEIGHT;
-        g_asset_dscs[i].header.stride = ASSET_IMG_WIDTH * 2; // Stride para la parte de color (RGB565)
-        g_asset_dscs[i].data_size = buffer_size;
-        g_asset_dscs[i].data = img_buf;
-    }
-
-    ESP_LOGI(TAG, "Carga de assets desde SD finalizada.");
+    ESP_LOGI(TAG, "Asset loader inicializado en modo 'firmware-linked'.");
 }
 
 /**
- * @brief Libera la memoria de todos los iconos cargados.
+ * @brief Desinicializa el gestor de assets. No hace nada en este modo.
  */
 void ui_assets_deinit(void) {
-    ESP_LOGI(TAG, "Liberando memoria de los assets de iconos.");
-    for (int i = 0; i < ASSET_COUNT; i++) {
-        if (g_asset_dscs[i].data) {
-            free((void*)g_asset_dscs[i].data);
-            g_asset_dscs[i].data = NULL;
-        }
-    }
+    // No hay memoria dinámica que liberar.
 }
 
 /**
- * @brief Obtiene un puntero al descriptor de imagen de un icono ya cargado.
+ * @brief Obtiene un puntero al descriptor de imagen de un icono compilado en el firmware.
+ * @param asset_id El identificador del icono.
+ * @return Un puntero constante al descriptor de imagen LVGL.
  */
 const lv_img_dsc_t* ui_assets_get_icon(ui_asset_id_t asset_id) {
-    if (asset_id < ASSET_COUNT && asset_id >= 0 && g_asset_dscs[asset_id].data != NULL) {
-        return &g_asset_dscs[asset_id];
+    if (asset_id < 0 || asset_id >= ASSET_COUNT) {
+        ESP_LOGE(TAG, "Asset ID %d solicitado está fuera de rango.", asset_id);
+        return NULL;
     }
-    ESP_LOGE(TAG, "Asset ID %d solicitado es invalido o no se pudo cargar.", asset_id);
-    return NULL; // Devuelve NULL si el asset no se pudo cargar o el ID es inválido.
+    return g_asset_dsc_pointers[asset_id];
 }
 
 
@@ -6785,9 +6732,9 @@ const lv_img_dsc_t* ui_assets_get_icon(ui_asset_id_t asset_id) {
 
 /*
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_asset_loader.h
-# Fecha: `$timestamp
-# Último cambio: Corregido para ser sintácticamente válido en C.
-# Descripción: Interfaz pública para el gestor de assets. Se han renombrado los identificadores de los iconos para que su nombre sea más descriptivo y coincida con la acción que representan.
+# Fecha: $timestamp
+# Último cambio: Corregido el tipo de retorno de `ui_assets_get_icon` a `const lv_img_dsc_t*`.
+# Descripción: Se corrige la declaración de `ui_assets_get_icon` para que devuelva un puntero a un descriptor de imagen (`const lv_img_dsc_t*`), coincidiendo con la nueva implementación que utiliza assets compilados en el firmware. Esto resuelve el error de compilación por tipos conflictivos.
 */
 #ifndef UI_ASSET_LOADER_H
 #define UI_ASSET_LOADER_H
@@ -6822,23 +6769,164 @@ typedef enum {
 } ui_asset_id_t;
 
 /**
- * @brief Inicializa el gestor y precarga todos los assets en memoria.
+ * @brief Inicializa el gestor de assets.
  */
 void ui_assets_init(void);
 
 /**
- * @brief Libera la memoria utilizada por los assets precargados.
+ * @brief Desinicializa el gestor de assets.
  */
 void ui_assets_deinit(void);
 
 /**
- * @brief Obtiene un puntero al descriptor de imagen de un icono ya cargado.
+ * @brief Obtiene un puntero al descriptor de imagen de un icono compilado en el firmware.
  * @param asset_id El identificador del icono a obtener.
  * @return Un puntero constante al descriptor de imagen LVGL.
  */
 const lv_img_dsc_t* ui_assets_get_icon(ui_asset_id_t asset_id);
 
 #endif // UI_ASSET_LOADER_H
+
+
+# =================================================================================================
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_assets.h
+# =================================================================================================
+
+/*
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_assets.h
+# Fecha: $timestamp
+# Último cambio: Creado para declarar todos los assets de iconos del firmware.
+# Descripción: Este fichero de cabecera centraliza las declaraciones de todas las imágenes de los botones que se compilan en el firmware. Permite que `ui_asset_loader.c` acceda a ellas de forma segura.
+*/
+
+#ifndef UI_ASSETS_H
+#define UI_ASSETS_H
+
+#include "lvgl.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// --- Declaración de Assets de Botones (BTN) ---
+extern const lv_img_dsc_t asset_btn_1;
+extern const lv_img_dsc_t asset_btn_2;
+extern const lv_img_dsc_t asset_btn_3;
+extern const lv_img_dsc_t asset_btn_4;
+extern const lv_img_dsc_t asset_btn_5;
+extern const lv_img_dsc_t asset_btn_6;
+extern const lv_img_dsc_t asset_btn_7;
+extern const lv_img_dsc_t asset_btn_8;
+extern const lv_img_dsc_t asset_btn_9;
+
+// --- Declaración de Assets de Evolución (EVO) ---
+extern const lv_img_dsc_t asset_evo_1;
+extern const lv_img_dsc_t asset_evo_2;
+extern const lv_img_dsc_t asset_evo_3;
+extern const lv_img_dsc_t asset_evo_4;
+extern const lv_img_dsc_t asset_evo_5;
+
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // UI_ASSETS_H
+
+
+# =================================================================================================
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_config_screen.c
+# =================================================================================================
+
+/*
+Fichero: ./components/diymon_ui/ui_config_screen.c
+Fecha: $timestamp
+Último cambio: Modificado para mostrar una imagen de fondo I8 estática (bg_config_img) y un único botón de reinicio, eliminando la visualización dinámica de datos de red.
+Descripción: Implementa la pantalla de servicio para los modos de configuración. Ahora muestra una imagen de fondo fija y un botón de reinicio, simplificando la interfaz para el usuario.
+*/
+#include "ui_config_screen.h"
+#include "esp_log.h"
+#include "esp_system.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+static const char *TAG = "UI_CONFIG_SCREEN";
+
+// Declaración externa del descriptor de la imagen de fondo compilada en el firmware.
+// Se espera que este símbolo esté definido en otro fichero .c (ej: BG_config.c).
+extern const lv_img_dsc_t bg_config_img;
+
+/**
+ * @brief Callback que se ejecuta al presionar el botón de reinicio.
+ */
+static void reset_button_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        ESP_LOGW(TAG, "Botón de reinicio presionado. Reiniciando el dispositivo...");
+        vTaskDelay(pdMS_TO_TICKS(500)); // Pequeña pausa para que el log se envíe
+        esp_restart();
+    }
+}
+
+/**
+ * @brief Crea y muestra la pantalla de configuración estática.
+ */
+void ui_config_screen_show(void) {
+    // Crear una pantalla nueva y limpia
+    lv_obj_t *scr = lv_obj_create(NULL);
+    lv_obj_remove_style_all(scr); // Empezamos sin estilos por defecto
+    lv_obj_set_size(scr, 170, 320);
+
+    // Crear un objeto de imagen para el fondo de pantalla
+    lv_obj_t *bg_img = lv_image_create(scr);
+    lv_image_set_src(bg_img, &bg_config_img);
+    lv_obj_set_pos(bg_img, 0, 0);
+    lv_obj_add_flag(bg_img, LV_OBJ_FLAG_IGNORE_LAYOUT); // Asegura que no afecte a otros elementos
+
+    // Botón de Reinicio
+    lv_obj_t *btn_reset = lv_btn_create(scr);
+    lv_obj_add_event_cb(btn_reset, reset_button_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_align(btn_reset, LV_ALIGN_BOTTOM_MID, 0, -20); // Centrado abajo con padding
+
+    lv_obj_t *lbl_btn = lv_label_create(btn_reset);
+    lv_label_set_text(lbl_btn, "Reiniciar");
+    lv_obj_center(lbl_btn);
+
+    // Cargar la nueva pantalla
+    lv_screen_load(scr);
+    ESP_LOGI(TAG, "Pantalla de configuración estática con fondo I8 mostrada.");
+}
+
+
+# =================================================================================================
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_config_screen.h
+# =================================================================================================
+
+/*
+Fichero: ./components/diymon_ui/ui_config_screen.h
+Fecha: $timestamp
+Último cambio: Modificada la firma de la función 'ui_config_screen_show' para que no acepte argumentos, reflejando su nueva implementación estática que muestra una imagen de fondo.
+Descripción: Interfaz pública para la pantalla de configuración. Muestra una pantalla estática con una imagen de fondo y un botón de reinicio.
+*/
+#ifndef UI_CONFIG_SCREEN_H
+#define UI_CONFIG_SCREEN_H
+
+#include "lvgl.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Crea y muestra la pantalla de configuración estática con una imagen de fondo y un botón de reinicio.
+ */
+void ui_config_screen_show(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // UI_CONFIG_SCREEN_H
 
 
 # =================================================================================================
@@ -7185,15 +7273,15 @@ void ui_telemetry_destroy(void);
 /*
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui.c
 # Fecha: $timestamp
-# Último cambio: Añadida la definición de `ui_preinit` para resolver el error de enlazado.
-# Descripción: Se implementa la función `ui_preinit`, que llama a una nueva función en el módulo de animaciones para pre-reservar el buffer de memoria más grande. Esto resuelve el error de 'undefined reference' y previene la fragmentación del heap que causaba el fallo de la aplicación.
+# Último cambio: Eliminada la llamada a `ui_assets_init`.
+# Descripción: Se elimina la llamada a la inicialización de assets de esta función. La responsabilidad de cargar los assets ahora recae en el orquestador principal (`main.c`), asegurando que solo se carguen cuando se entra en el modo de aplicación principal y no en los modos de servicio.
 */
 #include "ui.h"
 #include "screens.h"
 #include "actions.h"
 #include "ui_actions_panel.h"
 #include "ui_asset_loader.h"
-#include "ui_action_animations.h" // Se necesita para la pre-reserva
+#include "ui_action_animations.h"
 #include "esp_log.h"
 
 extern lv_obj_t *g_main_screen_obj; 
@@ -7206,43 +7294,31 @@ static void button_event_cb(lv_event_t *e) {
     
     bool is_player_action = (action_id >= ACTION_ID_COMER && action_id <= ACTION_ID_ATACAR);
 
-    // Acciones del jugador se ejecutan al presionar para una respuesta inmediata.
     if (is_player_action) {
         if (code == LV_EVENT_PRESSED) {
-            ESP_LOGI(TAG, "Evento de botón PRESSED para la acción de jugador ID: %d", action_id);
+            ESP_LOGD(TAG, "Evento de botón PRESSED para la acción de jugador ID: %d", action_id);
             execute_diymon_action(action_id);
         }
-    // El resto de acciones esperan al clic completo para evitar activaciones accidentales.
     } else {
         if (code == LV_EVENT_CLICKED || code == LV_EVENT_LONG_PRESSED) {
-            ESP_LOGI(TAG, "Evento de botón CLICK/LONG_PRESS para la acción ID: %d", action_id);
+            ESP_LOGD(TAG, "Evento de botón CLICK/LONG_PRESS para la acción ID: %d", action_id);
             execute_diymon_action(action_id);
         }
     }
 }
 
 static void ui_connect_actions(void) {
-    // Panel 1: Jugador
     lv_obj_add_event_cb(ui_actions_panel_get_eat_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_COMER);
     lv_obj_add_event_cb(ui_actions_panel_get_gym_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EJERCICIO);
     lv_obj_add_event_cb(ui_actions_panel_get_atk_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_ATACAR);
-
-    // Panel 2: Admin
     lv_obj_add_event_cb(ui_actions_panel_get_brightness_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_BRIGHTNESS_CYCLE);
     lv_obj_add_event_cb(ui_actions_panel_get_toggle_screen_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_TOGGLE_SCREEN);
-    // Botón 6 (admin placeholder) ahora activa el servidor de archivos
     lv_obj_add_event_cb(ui_actions_panel_get_admin_placeholder_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_ENABLE_FILE_SERVER);
-    
-    // Panel 3: Configuración
-    // El botón 7 (reset), 8 (file server) y 9 (placeholder) ya no tienen acción asignada aquí.
-    
-    // Panel Lateral: Evolución
     lv_obj_add_event_cb(ui_actions_panel_get_evo_fire_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EVO_FIRE);
     lv_obj_add_event_cb(ui_actions_panel_get_evo_water_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EVO_WATER);
     lv_obj_add_event_cb(ui_actions_panel_get_evo_earth_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EVO_EARTH);
     lv_obj_add_event_cb(ui_actions_panel_get_evo_wind_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EVO_WIND);
     lv_obj_add_event_cb(ui_actions_panel_get_evo_back_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EVO_BACK);
-
     ESP_LOGI(TAG, "Eventos de todos los botones de acción conectados.");
 }
 
@@ -7252,7 +7328,7 @@ void ui_preinit(void) {
 }
 
 void ui_init(void) {
-    ui_assets_init();
+    // La inicialización de assets (ui_assets_init) ya no se hace aquí.
     create_screens();
     
     if (g_main_screen_obj) {
@@ -11815,9 +11891,9 @@ void wifi_portal_erase_credentials(void);
 # =================================================================================================
 
 # Fichero: Z:\DIYTOGETHER\DIYtogether\main\CMakeLists.txt
-# Fecha: `$timestamp
-# Último cambio: Corregido el fichero para que sea sintácticamente válido en CMake.
-# Descripción: CMakeLists para el componente principal 'main', que enlaza todos los subcomponentes del proyecto.
+# Fecha: $timestamp
+# Último cambio: Eliminada la dependencia del componente obsoleto `service_screen`.
+# Descripción: CMakeLists para el componente principal. Se elimina la dependencia de `service_screen` ya que su funcionalidad ha sido reemplazada por la nueva pantalla de configuración `ui_config_screen` dentro del componente `diymon_ui`.
 
 idf_component_register(
     SRCS 
@@ -11832,9 +11908,9 @@ idf_component_register(
         wifi_portal
         web_server
         screen_manager
-        service_screen
 
         lvgl
+        esp_lvgl_port
         esp_lcd
         esp_lcd_touch
         driver
@@ -11846,11 +11922,11 @@ idf_component_register(
 # =================================================================================================
 
 /*
- * Fichero: ./main/hardware_manager.c
- * Fecha: 13/08/2025 - 05:33 
- * Último cambio: Establecido el formato de color del display a RGB565.
- * Descripción: Orquestador de hardware. Se ha añadido la llamada lv_display_set_color_format para configurar explícitamente el display en modo RGB565. Esto es crucial para que LVGL v9 realice correctamente la mezcla de canales alfa de las imágenes RGB565A8.
- */
+# Fichero: Z:\DIYTOGETHER\DIYtogether\main\hardware_manager.c
+# Fecha: $timestamp
+# Último cambio: Eliminado el driver de sistema de ficheros personalizado para LVGL.
+# Descripción: Ahora que los iconos de los botones están compilados en el firmware, LVGL ya no necesita acceder a la tarjeta SD. Se ha eliminado todo el código del driver de sistema de ficheros personalizado, simplificando el arranque, reduciendo el tamaño del binario y eliminando código que ya era obsoleto.
+*/
 #include "hardware_manager.h"
 #include "esp_log.h"
 #include "bsp_api.h"
@@ -11874,24 +11950,13 @@ esp_err_t hardware_manager_init(void) {
         .hres = bsp_get_display_hres(),
         .vres = bsp_get_display_vres(),
         .flags = {
-            .swap_bytes = true, // Corregir el orden de bytes de color para RGB565
+            .swap_bytes = true, 
         }
     };
     lv_disp_t * disp = lvgl_port_add_disp(&disp_cfg);
 
-    // Configura el formato de color del framebuffer para la correcta mezcla de alpha.
     lv_display_set_color_format(disp, LV_COLOR_FORMAT_RGB565);
 
-    /*
-     * Configuración de la orientación del panel táctil.
-     * Para alinear el sistema de coordenadas del táctil con la rotación del display (configurada en el BSP),
-     * es necesario aplicar la misma secuencia de transformaciones que el display:
-     * 1. Intercambiar los ejes X e Y (swap_xy en 'true').
-     * 2. No aplicar espejo en el nuevo eje X (mirror_x en 'false').
-     * 3. Aplicar espejo en el nuevo eje Y (mirror_y en 'true').
-     * Esta configuración asegura que un toque en una posición física de la pantalla se corresponda
-     * con la misma posición en el framebuffer de LVGL.
-     */
     ESP_LOGI(TAG, "Configuring touch driver orientation to match display rotation...");
     esp_lcd_touch_handle_t touch_handle = bsp_get_touch_handle();
     
@@ -11904,8 +11969,7 @@ esp_err_t hardware_manager_init(void) {
         .handle = touch_handle,
     };
     lvgl_port_add_touch(&touch_cfg);
-
-    // El brillo ahora se establece automáticamente desde la NVS durante bsp_init().
+    
     return ESP_OK;
 }
 
@@ -11954,10 +12018,10 @@ esp_err_t hardware_manager_init(void);
 # =================================================================================================
 
 /*
-# Fichero: Z:\DIYTOGETHER\DIYtogether\main\main.c
-# Fecha: $timestamp
-# Último cambio: Reordenada la inicialización para pre-reservar el buffer de animación.
-# Descripción: Se ha modificado el flujo de arranque para llamar a una nueva función `ui_preinit` justo después de inicializar la NVS. Esta función reserva el buffer de animación (el bloque de memoria más grande) antes de que otros módulos como el cargador de assets puedan fragmentar el heap, solucionando así el fallo crítico de asignación de memoria.
+Fichero: ./main/main.c
+Fecha: $timestamp
+Último cambio: Añadida la inicialización de LVGL para los modos de servicio y la llamada a `ui_config_screen_show` para mostrar el fondo de configuración estático, reemplazando la carga de imágenes .bin desde la SD.
+Descripción: Orquestador principal de la aplicación. Decide en qué modo arrancar (Aplicación principal, Portal WiFi, Servidor de archivos) basándose en las credenciales guardadas en NVS y en los flags de modo de servicio. Ahora se encarga de preparar un entorno LVGL mínimo para mostrar la nueva pantalla de configuración.
 */
 #include <stdio.h>
 #include <string.h>
@@ -11965,21 +12029,18 @@ esp_err_t hardware_manager_init(void);
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
-#include "esp_wifi.h"
 #include "esp_system.h"
-#include "nvs.h"
 #include "esp_lvgl_port.h"
-#include "esp_timer.h"
 
 #include "bsp_api.h"
 #include "hardware_manager.h"
 #include "diymon_evolution.h"
 #include "ui.h"
-#include "screens.h"
 #include "wifi_portal.h"
 #include "web_server.h"
 #include "screen_manager.h"
-#include "service_screen.h"
+#include "ui_config_screen.h" // <-- Añadido para la nueva pantalla
+#include "ui_asset_loader.h" 
 
 #include "esp_err.h"
 #include "esp_check.h"
@@ -11992,6 +12053,7 @@ static void run_wifi_portal_mode(void);
 static void run_main_application_mode(void);
 static bool check_file_server_mode_flag(void);
 static void erase_file_server_mode_flag(void);
+static void init_lvgl_for_service_screen(void); // <-- Nueva función de ayuda
 
 void app_main(void)
 {
@@ -12003,8 +12065,6 @@ void app_main(void)
     ESP_ERROR_CHECK(ret);
     ESP_LOGI(TAG, "Sistema NVS inicializado.");
 
-    // Pre-reserva del buffer de animación para evitar fragmentación de memoria.
-    // Esta es la asignación de memoria más grande y debe hacerse lo antes posible.
     ui_preinit();
 
     if (check_file_server_mode_flag()) {
@@ -12017,11 +12077,33 @@ void app_main(void)
     }
 }
 
+static void init_lvgl_for_service_screen(void)
+{
+    ESP_LOGI(TAG, "Inicializando LVGL para pantalla de servicio...");
+    const lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
+    ESP_ERROR_CHECK(lvgl_port_init(&lvgl_cfg));
+
+    const lvgl_port_display_cfg_t disp_cfg = {
+        .io_handle = bsp_get_panel_io_handle(),
+        .panel_handle = bsp_get_display_handle(),
+        .buffer_size = bsp_get_display_buffer_size(),
+        .double_buffer = 1,
+        .hres = bsp_get_display_hres(),
+        .vres = bsp_get_display_vres(),
+    };
+    lvgl_port_add_disp(&disp_cfg);
+}
+
 static void run_file_server_mode(void) {
     ESP_LOGI(TAG, "Arrancando en modo Servidor de Archivos...");
     
     bsp_init_service_mode();
-    service_screen_show("/sdcard/config/FTP.bin");
+    init_lvgl_for_service_screen();
+    
+    if (lvgl_port_lock(0)) {
+        ui_config_screen_show(); // Muestra la nueva pantalla estática
+        lvgl_port_unlock();
+    }
 
     bsp_wifi_init_stack();
     bsp_wifi_init_sta_from_nvs();
@@ -12030,26 +12112,30 @@ static void run_file_server_mode(void) {
     if (ip_ok) {
         char ip_addr_buffer[16] = "0.0.0.0";
         bsp_wifi_get_ip(ip_addr_buffer);
-        ESP_LOGI(TAG, "Dispositivo conectado a WiFi. IP: %s. Iniciando servidor web.", ip_addr_buffer);
+        ESP_LOGI(TAG, "Dispositivo conectado. IP: %s. Iniciando servidor web.", ip_addr_buffer);
     } else {
-        ESP_LOGW(TAG, "No se pudo conectar a la red WiFi guardada. Iniciando en modo Punto de Acceso (AP).");
+        ESP_LOGW(TAG, "No se pudo conectar. Iniciando en modo Punto de Acceso (AP).");
         bsp_wifi_start_ap();
         ESP_LOGI(TAG, "Punto de Acceso iniciado. Conéctate a 'DIYTogether' (pass: MakeItYours) y navega a http://192.168.4.1");
     }
     
     ESP_LOGI(TAG, "Iniciando servidor web...");
-    web_server_start(); // Esta función es bloqueante y no retorna.
+    web_server_start(); // Esta función es bloqueante
 }
-
 
 static void run_wifi_portal_mode(void) {
     ESP_LOGI(TAG, "No hay credenciales. Arrancando en modo Portal WiFi...");
     
     bsp_init_service_mode();
-    service_screen_show("/sdcard/config/WIFI.bin");
+    init_lvgl_for_service_screen();
     
+    if (lvgl_port_lock(0)) {
+        ui_config_screen_show(); // Muestra la nueva pantalla estática
+        lvgl_port_unlock();
+    }
+
     bsp_wifi_init_stack();
-    wifi_portal_start();
+    wifi_portal_start(); // Esta función es bloqueante y reinicia al final
 }
 
 static void run_main_application_mode(void) {
@@ -12060,6 +12146,8 @@ static void run_main_application_mode(void) {
     ESP_LOGI(TAG, "El driver WiFi permanece desactivado para ahorrar RAM.");
     
     diymon_evolution_init();
+    
+    ui_assets_init();
 
     if (lvgl_port_lock(0)) {
         ui_init();
@@ -12073,46 +12161,22 @@ static void run_main_application_mode(void) {
 static bool check_file_server_mode_flag(void) {
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open("storage", NVS_READONLY, &nvs_handle);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Fallo al abrir NVS para comprobar la bandera. Error: %s", esp_err_to_name(err));
-        return false;
-    }
+    if (err != ESP_OK) return false;
 
     char flag_val[8] = {0};
     size_t len = sizeof(flag_val);
     err = nvs_get_str(nvs_handle, "file_server", flag_val, &len);
     nvs_close(nvs_handle);
-
-    if (err == ESP_OK) {
-        ESP_LOGI(TAG, "Encontrada la bandera 'file_server' en NVS. Valor: '%s'", flag_val);
-        return (strcmp(flag_val, "1") == 0);
-    } else if (err == ESP_ERR_NVS_NOT_FOUND) {
-        ESP_LOGD(TAG, "La bandera 'file_server' NO se encontró en NVS.");
-        return false;
-    } else {
-        ESP_LOGE(TAG, "Error al leer la bandera 'file_server' de NVS. Error: %s", esp_err_to_name(err));
-        return false;
-    }
+    return (err == ESP_OK && strcmp(flag_val, "1") == 0);
 }
 
 static void erase_file_server_mode_flag(void) {
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
     if (err == ESP_OK) {
-        err = nvs_erase_key(nvs_handle, "file_server");
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Error (%s) al borrar la clave 'file_server'.", esp_err_to_name(err));
-        }
-
-        err = nvs_commit(nvs_handle);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Error (%s) al hacer commit del borrado de la bandera.", esp_err_to_name(err));
-        } else {
-            ESP_LOGI(TAG, "Marca de modo servidor de archivos borrada de NVS.");
-        }
+        nvs_erase_key(nvs_handle, "file_server");
+        nvs_commit(nvs_handle);
         nvs_close(nvs_handle);
-    } else {
-        ESP_LOGE(TAG, "Error (%s) al abrir NVS para borrar la bandera.", esp_err_to_name(err));
     }
 }
 

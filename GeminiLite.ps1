@@ -1,11 +1,12 @@
-# Fichero: ./GeminiLite.ps1
-# Fecha: 12/08/2025 - 02:15 pm
-# Último cambio: Corregido el anidamiento de here-strings y forzada la codificación UTF-8.
-# Descripción: Versión optimizada que recopila solo los ficheros más relevantes del proyecto
-#              (código fuente, APIs públicas y configuraciones clave) para un análisis
-#              eficiente. Excluye ficheros de licencia, configuraciones de editor y
-#              componentes obsoletos para centrarse en la lógica del programa.
-
+<#
+Fichero: ./GeminiLite.ps1
+Fecha: $timestamp
+Último cambio: Corregido ParserError cambiando el bloque de comentarios de C-style (/*...*/) a PowerShell (`<#...#_>`). Corregida la sintaxis del atributo `[Parameter(Mandatory=$true)]` eliminando el escape de la variable booleana $true`.
+Descripción: Versión optimizada que recopila solo los ficheros más relevantes del proyecto
+             (código fuente, APIs públicas y configuraciones clave) para un análisis
+             eficiente. Excluye ficheros de licencia, configuraciones de editor y
+             componentes obsoletos para centrarse en la lógica del programa.
+#>
 # Detiene la ejecución del script si ocurre algún error.
 $ErrorActionPreference = "Stop"
 
@@ -34,7 +35,7 @@ $includePatterns = @(
     "README.md"             # El README principal es muy valioso para el contexto
 )
 
-# Define patrones de ficheros específicos a excluir globalmente.
+# Define patrones de ficheros específicos a excluir globalmente por nombre.
 $excludePatterns = @(
     "sdkconfig.old",        # Excluye copias de seguridad de configuraciones
     "LICENSE*", "COPYING*"  # Excluye ficheros de licencia extensos
@@ -51,8 +52,9 @@ Write-Host " - Raíz ('.')      : No recursivo"
 Write-Host " - 'components/', 'main/': Búsqueda recursiva"
 Write-Host
 Write-Host "[INCLUYENDO]: Patrones: '$($includePatterns -join "', '")'" -ForegroundColor Cyan
-Write-Host "[EXCLUYENDO]: Directorios: '$($excludeDirs -join "', '")'" -ForegroundColor Yellow
-Write-Host "[EXCLUYENDO]: Ficheros: '$($excludePatterns -join "', '")'" -ForegroundColor Yellow
+Write-Host "[EXCLUYENDO]: Directorios (por nombre): '$($excludeDirs -join "', '")'" -ForegroundColor Yellow
+Write-Host "[EXCLUYENDO]: Ficheros (por nombre): '$($excludePatterns -join "', '")'" -ForegroundColor Yellow
+Write-Host "[EXCLUYENDO]: Rutas (por patrón): '*/diymon_ui/assets/*', '*/diymon_ui/BG*.c'" -ForegroundColor Yellow
 Write-Host "[FILTRANDO] : Ficheros > $($maxSizeBytes / 1kb) KB" -ForegroundColor Yellow
 Write-Host
 Write-Host "Salida generada:" -ForegroundColor Green
@@ -76,7 +78,7 @@ function Process-FoundFile {
     if ($file.Length -lt $maxSizeBytes) {
         Write-Host ("  INCLUIDO : " + $file.FullName + " (" + $file.Length + " bytes)")
         
-        # [CORRECCIÓN] Se construye el encabezado con concatenación de cadenas para evitar here-strings anidados.
+        # Se construye el encabezado con concatenación de cadenas.
         $header = "
 # =================================================================================================
 " +
@@ -107,7 +109,13 @@ Write-Host "PROCESANDO: Directorios '$($recursiveSearchPaths -join "', '")' (rec
 foreach ($path in $recursiveSearchPaths) {
     if (Test-Path $path) {
         # Combina las exclusiones de ficheros y directorios para la búsqueda recursiva.
-        Get-ChildItem -Path $path -Recurse -File -Include $includePatterns -Exclude ($excludePatterns + $excludeDirs) -ErrorAction SilentlyContinue | ForEach-Object {
+        Get-ChildItem -Path $path -Recurse -File -Include $includePatterns -Exclude ($excludePatterns + $excludeDirs) -ErrorAction SilentlyContinue | Where-Object {
+            # Normaliza los separadores de ruta para un match consistente en cualquier OS
+            $normalizedPath = $_.FullName.Replace('\', '/')
+            # Aplica filtros de exclusión por ruta completa
+            ($normalizedPath -notlike '*/components/diymon_ui/assets/*') -and 
+            ($normalizedPath -notlike '*/components/diymon_ui/BG*.c')
+        } | ForEach-Object {
             Process-FoundFile -file $_
         }
     } else {

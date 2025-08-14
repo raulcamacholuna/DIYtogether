@@ -1,8 +1,8 @@
 /*
-# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_config_screen.h
-# Fecha: $timestamp
-# Último cambio: Creada la cabecera para la nueva pantalla de configuración.
-# Descripción: Interfaz pública para la pantalla de configuración dinámica. Permite a `main.c` llamar a la función que muestra la pantalla de servicio con información de red.
+Fichero: ./components/diymon_ui/ui_config_screen.h
+Fecha: $timestamp
+Último cambio: Modificada la firma de la función 'ui_config_screen_show' para que no acepte argumentos, reflejando su nueva implementación estática que muestra una imagen de fondo.
+Descripción: Interfaz pública para la pantalla de configuración. Muestra una pantalla estática con una imagen de fondo y un botón de reinicio.
 */
 #ifndef UI_CONFIG_SCREEN_H
 #define UI_CONFIG_SCREEN_H
@@ -14,14 +14,9 @@ extern "C" {
 #endif
 
 /**
- * @brief Crea y muestra la pantalla de configuración con la información de red proporcionada.
- *
- * @param title El título principal de la pantalla.
- * @param ssid  El SSID de la red a mostrar.
- * @param pass  La contraseña de la red.
- * @param ip    La dirección IP del servidor.
+ * @brief Crea y muestra la pantalla de configuración estática con una imagen de fondo y un botón de reinicio.
  */
-void ui_config_screen_show(const char* title, const char* ssid, const char* pass, const char* ip);
+void ui_config_screen_show(void);
 
 #ifdef __cplusplus
 }

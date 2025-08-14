@@ -1,8 +1,8 @@
 /*
-# Fichero: Z:\DIYTOGETHER\DIYtogether\main\main.c
-# Fecha: $timestamp
-# Último cambio: Eliminado el include del obsoleto `service_screen.h`.
-# Descripción: Se elimina la inclusión de la cabecera `service_screen.h` para completar la eliminación del componente obsoleto. Esto resuelve el error de compilación 'file not found' y finaliza la refactorización para que los modos de servicio no dependan de componentes de UI innecesarios.
+Fichero: ./main/main.c
+Fecha: $timestamp
+Último cambio: Añadida la inicialización de LVGL para los modos de servicio y la llamada a `ui_config_screen_show` para mostrar el fondo de configuración estático, reemplazando la carga de imágenes .bin desde la SD.
+Descripción: Orquestador principal de la aplicación. Decide en qué modo arrancar (Aplicación principal, Portal WiFi, Servidor de archivos) basándose en las credenciales guardadas en NVS y en los flags de modo de servicio. Ahora se encarga de preparar un entorno LVGL mínimo para mostrar la nueva pantalla de configuración.
 */
 #include <stdio.h>
 #include <string.h>
@@ -17,11 +17,10 @@
 #include "hardware_manager.h"
 #include "diymon_evolution.h"
 #include "ui.h"
-#include "screens.h"
 #include "wifi_portal.h"
 #include "web_server.h"
 #include "screen_manager.h"
-// #include "service_screen.h" // <-- Obsoleto y eliminado
+#include "ui_config_screen.h" // <-- Añadido para la nueva pantalla
 #include "ui_asset_loader.h" 
 
 #include "esp_err.h"
@@ -35,6 +34,7 @@ static void run_wifi_portal_mode(void);
 static void run_main_application_mode(void);
 static bool check_file_server_mode_flag(void);
 static void erase_file_server_mode_flag(void);
+static void init_lvgl_for_service_screen(void); // <-- Nueva función de ayuda
 
 void app_main(void)
 {
@@ -58,11 +58,33 @@ void app_main(void)
     }
 }
 
+static void init_lvgl_for_service_screen(void)
+{
+    ESP_LOGI(TAG, "Inicializando LVGL para pantalla de servicio...");
+    const lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
+    ESP_ERROR_CHECK(lvgl_port_init(&lvgl_cfg));
+
+    const lvgl_port_display_cfg_t disp_cfg = {
+        .io_handle = bsp_get_panel_io_handle(),
+        .panel_handle = bsp_get_display_handle(),
+        .buffer_size = bsp_get_display_buffer_size(),
+        .double_buffer = 1,
+        .hres = bsp_get_display_hres(),
+        .vres = bsp_get_display_vres(),
+    };
+    lvgl_port_add_disp(&disp_cfg);
+}
+
 static void run_file_server_mode(void) {
     ESP_LOGI(TAG, "Arrancando en modo Servidor de Archivos...");
     
     bsp_init_service_mode();
-    // service_screen_show("/sdcard/config/FTP.bin"); // Ya no se usa
+    init_lvgl_for_service_screen();
+    
+    if (lvgl_port_lock(0)) {
+        ui_config_screen_show(); // Muestra la nueva pantalla estática
+        lvgl_port_unlock();
+    }
 
     bsp_wifi_init_stack();
     bsp_wifi_init_sta_from_nvs();
@@ -79,17 +101,22 @@ static void run_file_server_mode(void) {
     }
     
     ESP_LOGI(TAG, "Iniciando servidor web...");
-    web_server_start();
+    web_server_start(); // Esta función es bloqueante
 }
 
 static void run_wifi_portal_mode(void) {
     ESP_LOGI(TAG, "No hay credenciales. Arrancando en modo Portal WiFi...");
     
     bsp_init_service_mode();
-    // service_screen_show("/sdcard/config/WIFI.bin"); // Ya no se usa
+    init_lvgl_for_service_screen();
     
+    if (lvgl_port_lock(0)) {
+        ui_config_screen_show(); // Muestra la nueva pantalla estática
+        lvgl_port_unlock();
+    }
+
     bsp_wifi_init_stack();
-    wifi_portal_start();
+    wifi_portal_start(); // Esta función es bloqueante y reinicia al final
 }
 
 static void run_main_application_mode(void) {
@@ -110,7 +137,6 @@ static void run_main_application_mode(void) {
     ESP_LOGI(TAG, "Interfaz de Usuario principal inicializada.");
     
     ESP_LOGI(TAG, "¡Firmware DIYMON en marcha!");
-
 }
 
 static bool check_file_server_mode_flag(void) {
