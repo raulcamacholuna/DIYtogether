@@ -1,8 +1,8 @@
 /*
 Fichero: Z:\DIYTOGETHER\DIYtogether\main\main.c
 Fecha: $timestamp
-Último cambio: Añadida la inicialización del driver táctil a los modos de servicio.
-Descripción: Orquestador principal de la aplicación. Se ha añadido la inicialización y registro del driver táctil en la función `init_lvgl_for_service_screen`. Esto es crucial para que los elementos interactivos de la pantalla de configuración, como el botón de reinicio, puedan recibir eventos de toque y funcionar correctamente.
+Último cambio: Implementado el temporizador de inactividad para atenuar y apagar la pantalla.
+Descripción: Orquestador principal de la aplicación. Se ha añadido una lógica de gestión de inactividad que atenúa el brillo de la pantalla al 10% tras 30 segundos sin interacción y la apaga por completo tras 60 segundos. Esta funcionalidad se aplica tanto al modo de aplicación principal como a los modos de servicio (portal WiFi, servidor de archivos).
 */
 #include <stdio.h>
 #include <string.h>
@@ -37,8 +37,71 @@ static bool check_file_server_mode_flag(void);
 static void erase_file_server_mode_flag(void);
 static void init_lvgl_for_service_screen(void);
 static void display_network_status_on_screen(bool is_connected, const char* ip_addr);
+static void setup_inactivity_handling(void);
 
+// --- Lógica de Gestión de Inactividad de Pantalla ---
+static bool s_is_dimmed = false;
+static int s_user_brightness = 100;
+static bool s_user_brightness_known = false;
 
+static void read_user_brightness_from_nvs(void) {
+    if (s_user_brightness_known) return;
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open("storage", NVS_READONLY, &nvs_handle);
+    if (err == ESP_OK) {
+        nvs_get_i32(nvs_handle, "brightness", (int32_t*)&s_user_brightness);
+        nvs_close(nvs_handle);
+        s_user_brightness_known = true;
+        ESP_LOGI(TAG, "Brillo de usuario por defecto guardado: %d%%", s_user_brightness);
+    }
+}
+
+static void screen_touch_event_cb(lv_event_t * e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_PRESSED) {
+        if (screen_manager_is_off() || s_is_dimmed) {
+            read_user_brightness_from_nvs();
+            ESP_LOGI(TAG, "Actividad detectada, restaurando brillo a %d%%", s_user_brightness);
+            screen_manager_turn_on(); // Enciende y restaura brillo
+            screen_manager_set_brightness(s_user_brightness); // Asegura el brillo correcto
+            s_is_dimmed = false;
+        }
+    }
+}
+
+static void inactivity_timer_cb(lv_timer_t * timer) {
+    lv_disp_t * disp = lv_display_get_default();
+    if (!disp) return;
+
+    uint32_t inactivity_ms = lv_display_get_inactive_time(disp);
+    bool is_off = screen_manager_is_off();
+    
+    if (inactivity_ms < 30000 && s_is_dimmed) {
+        s_is_dimmed = false; // El usuario ha interactuado, resetear flag
+    }
+
+    if (!is_off && inactivity_ms > 60000) {
+        ESP_LOGI(TAG, "Inactividad > 60s. Apagando pantalla.");
+        screen_manager_turn_off();
+        s_is_dimmed = false;
+    } else if (!is_off && !s_is_dimmed && inactivity_ms > 30000) {
+        ESP_LOGI(TAG, "Inactividad > 30s. Atenuando pantalla al 10%%.");
+        read_user_brightness_from_nvs();
+        screen_manager_set_brightness(10);
+        s_is_dimmed = true;
+    }
+}
+
+static void setup_inactivity_handling(void) {
+    lv_timer_create(inactivity_timer_cb, 5000, NULL);
+    lv_obj_t * scr = lv_screen_active();
+    if (scr) {
+        lv_obj_add_event_cb(scr, screen_touch_event_cb, LV_EVENT_PRESSED, NULL);
+    }
+    ESP_LOGI(TAG, "Gestor de inactividad de pantalla configurado (30s atenuar, 60s apagar).");
+}
+
+// --- Flujo Principal de la Aplicación ---
 void app_main(void)
 {
     esp_err_t ret = nvs_flash_init();
@@ -86,6 +149,8 @@ static void init_lvgl_for_service_screen(void)
         .handle = bsp_get_touch_handle(),
     };
     lvgl_port_add_touch(&touch_cfg);
+    
+    setup_inactivity_handling();
 }
 
 static void run_file_server_mode(void) {
@@ -149,6 +214,7 @@ static void run_main_application_mode(void) {
 
     if (lvgl_port_lock(0)) {
         ui_init();
+        setup_inactivity_handling();
         lvgl_port_unlock();
     }
     ESP_LOGI(TAG, "Interfaz de Usuario principal inicializada.");
