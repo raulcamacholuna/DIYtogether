@@ -7494,11 +7494,12 @@ const lv_image_dsc_t EVO_5 = {
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\actions.c
 # =================================================================================================
 
+/*
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\actions.c
 # Fecha: `$timestamp
-# Último cambio: Corregido el fichero para que sea sintácticamente válido en C.
+# Último cambio: Acortada la clave NVS a 'file_server' para evitar error de longitud.
 # Descripción: Orquestador de acciones de la UI. Gestiona la lógica que se ejecuta al interactuar con los botones, como cambiar el brillo, evolucionar la mascota o activar modos especiales.
-
+*/
 #include "actions.h"
 #include "ui_action_animations.h" 
 #include "esp_log.h"
@@ -7556,7 +7557,7 @@ void execute_diymon_action(diymon_action_id_t action_id) {
             ESP_LOGW(TAG, "ACCIÓN: Borrado completo de configuraciones.");
             wifi_portal_erase_credentials();
             diymon_evolution_reset_state();
-            erase_nvs_key("file_server_mode");
+            erase_nvs_key("file_server");
             ESP_LOGW(TAG, "Todas las configuraciones han sido borradas. Reiniciando en 1 segundo...");
             vTaskDelay(pdMS_TO_TICKS(1000));
             esp_restart();
@@ -7567,14 +7568,14 @@ void execute_diymon_action(diymon_action_id_t action_id) {
             nvs_handle_t nvs_handle;
             esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
             if (err == ESP_OK) {
-                err = nvs_set_str(nvs_handle, "file_server_mode", "1");
+                err = nvs_set_str(nvs_handle, "file_server", "1");
                 if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "Error (%s) al establecer la bandera 'file_server_mode' en NVS.", esp_err_to_name(err));
+                    ESP_LOGE(TAG, "Error (%s) al establecer la bandera 'file_server' en NVS.", esp_err_to_name(err));
                 }
 
                 err = nvs_commit(nvs_handle);
                 if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "Error (%s) al hacer commit de la bandera 'file_server_mode' en NVS.", esp_err_to_name(err));
+                    ESP_LOGE(TAG, "Error (%s) al hacer commit de la bandera 'file_server' en NVS.", esp_err_to_name(err));
                 } else {
                     ESP_LOGI(TAG, "Marca de modo servidor de archivos guardada y commit realizado. Reiniciando en 2 segundos...");
                 }
@@ -8896,12 +8897,12 @@ lv_obj_t* ui_actions_panel_get_config_placeholder_btn(void);
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_asset_loader.c
 # =================================================================================================
 
-$timestamp = Get-Date -Format "dd/MM/yyyy - hh:mm tt"
+/*
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_asset_loader.c
 # Fecha: `$timestamp
-# Último cambio: Actualizada la asignación del asset para el servidor de archivos.
+# Último cambio: Corregido para ser sintácticamente válido en C.
 # Descripción: Gestor de assets de la UI. Enlaza los identificadores de assets con los descriptores de imagen LVGL compilados.
-
+*/
 #include "ui_asset_loader.h"
 #include "images.h"
 #include "esp_log.h"
@@ -8954,12 +8955,12 @@ const lv_img_dsc_t* ui_assets_get_icon(ui_asset_id_t asset_id) {
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_asset_loader.h
 # =================================================================================================
 
-$timestamp = Get-Date -Format "dd/MM/yyyy - hh:mm tt"
+/*
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_asset_loader.h
 # Fecha: `$timestamp
 # Último cambio: Corregido para ser sintácticamente válido en C.
 # Descripción: Interfaz pública para el gestor de assets. Se han renombrado los identificadores de los iconos para que su nombre sea más descriptivo y coincida con la acción que representan.
-
+*/
 #ifndef UI_ASSET_LOADER_H
 #define UI_ASSET_LOADER_H
 
@@ -13112,12 +13113,12 @@ idf_component_register(SRCS "web_server.c"
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server_page.h
 # =================================================================================================
 
-$timestamp = Get-Date -Format "dd/MM/yyyy - hh:mm tt"
+/*
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server_page.h
 # Fecha: `$timestamp
-# Último cambio: Creación del fichero con el HTML del gestor de archivos.
+# Último cambio: Corregido el fichero para que sea sintácticamente válido en C.
 # Descripción: Contiene la página HTML principal del portal de configuración para la gestión de archivos en la tarjeta SD.
-
+*/
 #ifndef WEB_SERVER_PAGE_H
 #define WEB_SERVER_PAGE_H
 
@@ -13346,7 +13347,7 @@ static const char* INDEX_HTML_CONTENT = R"rawliteral(
 /*
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server.c
 # Fecha: `$timestamp
-# Último cambio: Creación del fichero con la implementación del servidor web.
+# Último cambio: Corregido el fichero para que sea sintácticamente válido en C.
 # Descripción: Servidor web para configuración. Implementa los endpoints /listfiles, /upload, y /delete para interactuar con la tarjeta SD y dar soporte a la interfaz web. La página principal se sirve desde web_server_page.h.
 */
 #include "web_server.h"
@@ -13513,10 +13514,10 @@ static esp_err_t delete_file_handler(httpd_req_t *req) {
     // Parser simplificado para multipart/form-data que extrae el nombre del archivo
     char *ptr = strstr(buf, "name=\"filename\"");
     if (ptr) {
-        ptr = strstr(ptr, "\r`n\r`n");
+        ptr = strstr(ptr, "\r\n\r\n");
         if (ptr) {
             ptr += 4;
-            char *end_ptr = strstr(ptr, "\r`n--");
+            char *end_ptr = strstr(ptr, "\r\n--");
             if (end_ptr) {
                 size_t len = end_ptr - ptr;
                 if (len < sizeof(filename)) {
@@ -13644,12 +13645,12 @@ void web_server_start(void) {
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server.h
 # =================================================================================================
 
-$timestamp = Get-Date -Format "dd/MM/yyyy - hh:mm tt"
+/*
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server.h
 # Fecha: `$timestamp
-# Último cambio: Creación del fichero.
+# Último cambio: Corregido el fichero para que sea sintácticamente válido en C.
 # Descripción: Interfaz pública para el componente del servidor web, que expone la función de arranque del servicio.
-
+*/
 #ifndef WEB_SERVER_H
 #define WEB_SERVER_H
 
@@ -14052,7 +14053,7 @@ esp_err_t hardware_manager_init(void);
 /*
 # Fichero: Z:\DIYTOGETHER\DIYtogether\main\main.c
 # Fecha: `$timestamp
-# Último cambio: Refactorizado para usar el modo de servidor de archivos.
+# Último cambio: Acortada la clave NVS a 'file_server' para evitar error de longitud.
 # Descripción: Fichero principal de la aplicación DIYMON. Se ha refactorizado para utilizar las nuevas funciones del modo de servidor de archivos y las claves NVS correspondientes.
 */
 #include <stdio.h>
@@ -14169,17 +14170,17 @@ static bool check_file_server_mode_flag(void) {
 
     char flag_val[8] = {0};
     size_t len = sizeof(flag_val);
-    err = nvs_get_str(nvs_handle, "file_server_mode", flag_val, &len);
+    err = nvs_get_str(nvs_handle, "file_server", flag_val, &len);
     nvs_close(nvs_handle);
 
     if (err == ESP_OK) {
-        ESP_LOGI(TAG, "Encontrada la bandera 'file_server_mode' en NVS. Valor: '%s'", flag_val);
+        ESP_LOGI(TAG, "Encontrada la bandera 'file_server' en NVS. Valor: '%s'", flag_val);
         return (strcmp(flag_val, "1") == 0);
     } else if (err == ESP_ERR_NVS_NOT_FOUND) {
-        ESP_LOGD(TAG, "La bandera 'file_server_mode' NO se encontró en NVS.");
+        ESP_LOGD(TAG, "La bandera 'file_server' NO se encontró en NVS.");
         return false;
     } else {
-        ESP_LOGE(TAG, "Error al leer la bandera 'file_server_mode' de NVS. Error: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "Error al leer la bandera 'file_server' de NVS. Error: %s", esp_err_to_name(err));
         return false;
     }
 }
@@ -14188,9 +14189,9 @@ static void erase_file_server_mode_flag(void) {
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
     if (err == ESP_OK) {
-        err = nvs_erase_key(nvs_handle, "file_server_mode");
+        err = nvs_erase_key(nvs_handle, "file_server");
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Error (%s) al borrar la clave 'file_server_mode'.", esp_err_to_name(err));
+            ESP_LOGE(TAG, "Error (%s) al borrar la clave 'file_server'.", esp_err_to_name(err));
         }
 
         err = nvs_commit(nvs_handle);

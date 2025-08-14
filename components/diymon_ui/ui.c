@@ -1,8 +1,8 @@
 /*
-  Fichero: ./components/diymon_ui/ui.c
-  Fecha: 13/08/2025 - 07:51 
-  Último cambio: Modificado el evento de activación de los botones de acción del jugador.
-  Descripción: Se ha modificado el callback de los botones para que las acciones del jugador (Comer, Ejercicio, Atacar) se disparen con el evento LV_EVENT_PRESSED (al pulsar), mientras que el resto de acciones siguen esperando a LV_EVENT_CLICKED (al soltar). Esto proporciona una respuesta más inmediata para las acciones principales.
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui.c
+# Fecha: `$timestamp
+# Último cambio: Reasignadas las acciones de los botones 6, 7, 8 y 9.
+# Descripción: Se ha modificado el callback de los botones para que las acciones del jugador (Comer, Ejercicio, Atacar) se disparen con el evento LV_EVENT_PRESSED. Además, se han eliminado las acciones de los botones 7 y 9, y la acción del botón 8 (activar servidor de archivos) se ha movido al botón 6.
 */
 #include "ui.h"
 #include "screens.h"
@@ -45,12 +45,14 @@ static void ui_connect_actions(void) {
     // Panel 2: Admin
     lv_obj_add_event_cb(ui_actions_panel_get_brightness_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_BRIGHTNESS_CYCLE);
     lv_obj_add_event_cb(ui_actions_panel_get_toggle_screen_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_TOGGLE_SCREEN);
-    lv_obj_add_event_cb(ui_actions_panel_get_admin_placeholder_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_ADMIN_PLACEHOLDER);
+    // Botón 6 (admin placeholder) ahora activa el servidor de archivos
+    lv_obj_add_event_cb(ui_actions_panel_get_admin_placeholder_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_ENABLE_FILE_SERVER);
     
     // Panel 3: Configuración
-    lv_obj_add_event_cb(ui_actions_panel_get_reset_all_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_RESET_ALL);
-    lv_obj_add_event_cb(ui_actions_panel_get_enable_file_server_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_ENABLE_FILE_SERVER);
-    lv_obj_add_event_cb(ui_actions_panel_get_config_placeholder_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_CONFIG_PLACEHOLDER);
+    // El botón 7 (reset), 8 (file server) y 9 (placeholder) ya no tienen acción asignada aquí.
+    // lv_obj_add_event_cb(ui_actions_panel_get_reset_all_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_RESET_ALL);
+    // lv_obj_add_event_cb(ui_actions_panel_get_enable_file_server_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_ENABLE_FILE_SERVER);
+    // lv_obj_add_event_cb(ui_actions_panel_get_config_placeholder_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_CONFIG_PLACEHOLDER);
     
     // Panel Lateral: Evolución
     lv_obj_add_event_cb(ui_actions_panel_get_evo_fire_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EVO_FIRE);
