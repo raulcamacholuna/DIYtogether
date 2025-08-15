@@ -12030,9 +12030,9 @@ esp_err_t hardware_manager_init(void);
 
 /*
 Fichero: Z:\DIYTOGETHER\DIYtogether\main\main.c
-Fecha: 14/08/2025 - 08:10 
-Último cambio: Corregido el gestor de inactividad para que la pantalla se atenúe y apague correctamente.
-Descripción: Orquestador principal de la aplicación. Se ha corregido un error en setup_inactivity_handling que registraba el callback de actividad para LV_EVENT_ALL, lo que causaba que eventos de redibujado reiniciaran el temporizador de inactividad. Ahora, el callback solo se registra para eventos de entrada del usuario (PRESSED, CLICKED, etc.), permitiendo que la funcionalidad de auto-atenuación y apagado funcione como se espera.
+Fecha: $timestamp
+Último cambio: Corregido el registro del gestor de inactividad para que se adjunte a la pantalla de servicio correcta, permitiendo que la función de despertar por doble-doble-toque funcione en los modos de configuración.
+Descripción: Orquestador principal de la aplicación. Se ha corregido un error lógico que causaba que el gestor de eventos de toque para despertar la pantalla no se registrara en las pantallas de servicio (portal WiFi, servidor de archivos), impidiendo despertar el dispositivo. Ahora, la inicialización del gestor de inactividad se realiza después de cargar la pantalla correspondiente, asegurando su correcto funcionamiento en todos los modos.
 */
 #include <stdio.h>
 #include <string.h>
@@ -12197,8 +12197,6 @@ static void setup_inactivity_handling(void) {
     lv_timer_create(inactivity_timer_cb, 5000, NULL);
     lv_obj_t * scr = lv_screen_active();
     if (scr) {
-        // CORRECCIÓN: Se registra el callback SOLO para eventos de entrada, no para LV_EVENT_ALL.
-        // LV_EVENT_ALL incluye eventos de redibujado, que reseteaban constantemente el temporizador.
         lv_obj_add_event_cb(scr, screen_touch_event_cb, LV_EVENT_PRESSED, NULL);
         lv_obj_add_event_cb(scr, screen_touch_event_cb, LV_EVENT_CLICKED, NULL);
         lv_obj_add_event_cb(scr, screen_touch_event_cb, LV_EVENT_RELEASED, NULL);
@@ -12255,8 +12253,6 @@ static void init_lvgl_for_service_screen(void)
         .handle = bsp_get_touch_handle(),
     };
     lvgl_port_add_touch(&touch_cfg);
-    
-    setup_inactivity_handling();
 }
 
 static void run_file_server_mode(void) {
@@ -12267,6 +12263,7 @@ static void run_file_server_mode(void) {
     
     if (lvgl_port_lock(0)) {
         ui_config_screen_show();
+        setup_inactivity_handling(); // <-- CORRECCIÓN: Llamar después de cargar la pantalla
         lvgl_port_unlock();
     }
 
@@ -12298,6 +12295,7 @@ static void run_wifi_portal_mode(void) {
     
     if (lvgl_port_lock(0)) {
         ui_config_screen_show();
+        setup_inactivity_handling(); // <-- CORRECCIÓN: Llamar después de cargar la pantalla
         lvgl_port_unlock();
     }
     

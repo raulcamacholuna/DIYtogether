@@ -1,9 +1,7 @@
-/*
- * Fichero: ./components/diymon_core/diymon_evolution.c
- * Fecha: 13/08/2025 - 19:45
- * Último cambio: Implementada la función de reseteo de estado.
- * Descripción: Añadida la lógica para obtener la evolución anterior y para resetear el estado de evolución guardado en la NVS.
- */
+/* Fecha: 15/08/2025 - 08:46  */
+/* Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_core\diymon_evolution.c */
+/* Último cambio: Confirmada la lógica de involución desde la primera etapa ("1", "2", etc.) a la base ("0"). */
+/* Descripción: Implementa la lógica de evolución. La función `diymon_get_previous_evolution_in_sequence` ya gestiona correctamente la involución desde un código sin puntos (como "1", "2", "3", o "4") al estado base "0". No se requieren cambios en el código. */
 
 #include "diymon_evolution.h"
 #include <string.h>
@@ -22,17 +20,27 @@ static const struct {
     // Base
     {"0",       {5, 5, 5, 5}},
     // Etapa 1
-    {"1",       {7, 5, 6, 6}},
-    // Etapa 2 (ramas de "1")
-    {"1.1",     {10, 5, 7, 7}}, // Fuego
-    {"1.2",     {7, 10, 5, 7}}, // Agua
-    {"1.3",     {8, 8, 8, 5}}, // Tierra
-    {"1.4",     {7, 5, 10, 7}}, // Aire
+    {"1",       {8, 5, 6, 5}}, // Fuego
+    {"2",       {5, 8, 5, 6}}, // Agua
+    {"3",       {6, 5, 8, 5}}, // Tierra
+    {"4",       {5, 6, 5, 8}}, // Aire
+    // Etapa 2 (ramas de "1" - Fuego)
+    {"1.1",     {10, 5, 7, 7}}, // Fuego+Fuego
+    {"1.2",     {7, 8, 7, 7}}, // Fuego+Agua
+    {"1.3",     {8, 7, 8, 6}}, // Fuego+Tierra
+    {"1.4",     {7, 7, 6, 8}}, // Fuego+Aire
+    // Etapa 2 (ramas de "2" - Agua)
+    {"2.1",     {8, 7, 7, 7}}, // Agua+Fuego
+    {"2.2",     {5, 10, 7, 7}}, // Agua+Agua
+    // Etapa 2 (ramas de "3" - Tierra)
+    {"3.1",     {8, 6, 8, 7}}, // Tierra+Fuego
+    {"3.3",     {7, 7, 10, 5}}, // Tierra+Tierra
+    // Etapa 2 (ramas de "4" - Aire)
+    {"4.1",     {8, 7, 6, 8}}, // Aire+Fuego
+    {"4.4",     {6, 7, 5, 10}}, // Aire+Aire
     // Etapa 3 (ramas de "1.1")
     {"1.1.1",   {12, 5, 8, 8}},
     {"1.1.2",   {10, 8, 7, 8}},
-    {"1.1.3",   {11, 7, 9, 6}},
-    {"1.1.4",   {10, 5, 9, 9}},
 };
 
 static char G_CURRENT_DIYMON_CODE[16] = "0";
@@ -124,12 +132,12 @@ const char* diymon_get_previous_evolution_in_sequence(const char* current_code) 
 
     const char* last_dot = strrchr(current_code, '.');
     
-    // Si no hay punto, la involución es hacia "0".
+    // Si no hay punto (ej: "1", "2", "3", "4"), la involución es hacia "0".
     if (!last_dot) {
         return "0";
     }
 
-    // Si hay un punto, se trunca el código.
+    // Si hay un punto, se trunca el código para obtener el padre.
     size_t parent_len = last_dot - current_code;
     strncpy(G_EVO_CODE_BUFFER, current_code, parent_len);
     G_EVO_CODE_BUFFER[parent_len] = '\0';
@@ -145,7 +153,13 @@ const char* diymon_get_previous_evolution_in_sequence(const char* current_code) 
 }
 
 const char* diymon_get_branched_evolution(const char* current_code, int branch_id) {
-    snprintf(G_EVO_CODE_BUFFER, sizeof(G_EVO_CODE_BUFFER), "%s.%d", current_code, branch_id);
+    // Si el código actual es "0", la evolución es directamente a la rama, sin prefijo.
+    if (strcmp(current_code, "0") == 0) {
+        snprintf(G_EVO_CODE_BUFFER, sizeof(G_EVO_CODE_BUFFER), "%d", branch_id);
+    } else {
+        // Para cualquier otro estado, la evolución es una sub-rama.
+        snprintf(G_EVO_CODE_BUFFER, sizeof(G_EVO_CODE_BUFFER), "%s.%d", current_code, branch_id);
+    }
 
     // Buscar si el código generado existe en la tabla de evoluciones
     for (int i = 0; i < sizeof(G_MASTER_TABLE) / sizeof(G_MASTER_TABLE[0]); ++i) {
