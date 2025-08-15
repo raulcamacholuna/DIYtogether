@@ -1,7 +1,7 @@
-/* Fecha: 15/08/2025 - 08:46  */
+/* Fecha: 15/08/2025 - 09:54  */
 /* Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_core\diymon_evolution.c */
-/* Último cambio: Confirmada la lógica de involución desde la primera etapa ("1", "2", etc.) a la base ("0"). */
-/* Descripción: Implementa la lógica de evolución. La función `diymon_get_previous_evolution_in_sequence` ya gestiona correctamente la involución desde un código sin puntos (como "1", "2", "3", o "4") al estado base "0". No se requieren cambios en el código. */
+/* Último cambio: Añadidas las evoluciones de la Etapa 3 para resolver el error de "evolución no válida". */
+/* Descripción: Se ha expandido la tabla maestra de evoluciones (`G_MASTER_TABLE`) para incluir las ramificaciones de la Etapa 3 que faltaban (ej: desde "3.3" a "3.3.1"). Esto corrige el error reportado por el usuario y permite que el DIYMON continúe evolucionando. */
 
 #include "diymon_evolution.h"
 #include <string.h>
@@ -41,6 +41,17 @@ static const struct {
     // Etapa 3 (ramas de "1.1")
     {"1.1.1",   {12, 5, 8, 8}},
     {"1.1.2",   {10, 8, 7, 8}},
+    // Etapa 3 (ramas de "2.2")
+    {"2.2.1",   {8, 11, 8, 8}},
+    {"2.2.2",   {5, 13, 8, 9}},
+    // Etapa 3 (ramas de "3.3")
+    {"3.3.1",   {10, 8, 11, 6}},
+    {"3.3.2",   {8, 10, 11, 6}},
+    {"3.3.3",   {9, 8, 13, 5}},
+    {"3.3.4",   {8, 8, 11, 8}},
+    // Etapa 3 (ramas de "4.4")
+    {"4.4.1",   {9, 8, 6, 11}},
+    {"4.4.4",   {6, 8, 5, 13}},
 };
 
 static char G_CURRENT_DIYMON_CODE[16] = "0";

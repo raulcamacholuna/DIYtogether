@@ -1,9 +1,8 @@
-/*
- * Fichero: ./components/diymon_ui/ui_idle_animation.c
- * Fecha: 13/08/2025 - 07:39 
- * Último cambio: Eliminada la llamada que movía la animación al fondo.
- * Descripción: Se ha eliminado la llamada a lv_obj_move_background para el objeto de animación. Esta llamada estaba causando que la animación se renderizara detrás de la imagen de fondo opaca, haciéndola invisible. El orden de creación correcto ya asegura que la animación esté en la capa correcta.
- */
+/* Fecha: 15/08/2025 - 09:49  */
+/* Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_idle_animation.c */
+/* Último cambio: Implementada la detección dinámica del número de fotogramas de la animación de reposo. */
+/* Descripción: Se ha modificado la función `ui_idle_animation_start` para que cuente cuántos ficheros `ANIM_IDLE_*.bin` existen en el directorio de assets actual. Este recuento se utiliza como el número de fotogramas, eliminando la constante `IDLE_ANIM_FRAME_COUNT` y permitiendo que las animaciones de reposo tengan una duración variable. */
+
 #include "ui_idle_animation.h"
 #include "ui_action_animations.h" 
 #include "animation_loader.h"
@@ -15,7 +14,6 @@
 
 static const char *TAG = "UI_IDLE_ANIM";
 
-#define IDLE_ANIM_FRAME_COUNT 3
 #define IDLE_FRAME_INTERVAL 1500
 
 static lv_timer_t *g_anim_timer;
@@ -52,7 +50,17 @@ lv_obj_t* ui_idle_animation_start(lv_obj_t *parent) {
     if (len > 0 && anim_path[len - 1] == '/') anim_path[len - 1] = '\0';
     
     s_idle_animation_player.base_path = strdup(anim_path);
-    s_idle_animation_player.frame_count = IDLE_ANIM_FRAME_COUNT;
+
+    // [CAMBIO CLAVE] Contar dinámicamente los fotogramas de la animación de reposo.
+    uint16_t frame_count = animation_loader_count_frames(anim_path, "ANIM_IDLE_");
+    if (frame_count == 0) {
+        ESP_LOGE(TAG, "No se encontraron fotogramas para la animación de reposo en '%s'. La animación no se iniciará.", anim_path);
+        free(s_idle_animation_player.base_path);
+        s_idle_animation_player.base_path = NULL;
+        return g_animation_img_obj; // Devolver el objeto de imagen aunque esté vacío para no romper la UI.
+    }
+    ESP_LOGI(TAG, "Detectados %d fotogramas para la animación de reposo.", frame_count);
+    s_idle_animation_player.frame_count = frame_count;
 
     // El objeto de imagen ya existe, solo nos aseguramos de que apunte a nuestros datos.
     if(g_animation_img_obj) {
