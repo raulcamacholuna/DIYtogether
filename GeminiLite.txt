@@ -5282,15 +5282,13 @@ void execute_diymon_action(diymon_action_id_t action_id);
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\animation_loader.c
 # =================================================================================================
 
-/*
- * Fichero: ./components/diymon_ui/animation_loader.c
- * Fecha: 13/08/2025 - 06:06 
- * Último cambio: Revertido a un búfer no compartido y corregido el cálculo del tamaño para RGB565A8.
- * Descripción: Se ha corregido el cálculo del tamaño del búfer para el formato RGB565A8 (3 bytes/píxel) y se ha vuelto a un modelo donde cada animación gestiona su propia memoria. El problema de memoria anterior se resolvió moviendo el fondo al firmware, liberando suficiente RAM.
- */
+/* Fecha: 15/08/2025 - 05:27  */
+/* Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\animation_loader.c */
+/* Último cambio: Añadido un log de depuración hexadecimal para la comparación de nombres de fichero. */
+/* Descripción: Se ha añadido un log de diagnóstico avanzado en nimation_loader_count_frames. Ahora, para cada fichero leído del directorio, se imprimirá su nombre en formato de texto y en hexadecimal, y se hará lo mismo con el prefijo buscado. Esto permitirá una comparación byte a byte para identificar la causa raíz del fallo en strncmp, ya sea por nombres 8.3, caracteres ocultos u otros problemas. */
+
 #include "animation_loader.h"
 #include "esp_log.h"
-#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -5305,10 +5303,8 @@ animation_t animation_loader_init(const char *path, uint16_t width, uint16_t hei
     anim.width = width;
     anim.height = height;
     
-    // Para RGB565A8, el stride de la parte de color es width * 2.
-    // El tamaño total del buffer es el plano de color (width * height * 2) más el plano alfa (width * height * 1).
     uint32_t rgb_stride = width * 2; 
-    size_t buffer_size = (size_t)width * height * 3; // Cálculo correcto para 3 bytes por píxel
+    size_t buffer_size = (size_t)width * height * 3;
 
     anim.img_dsc.data = (uint8_t *)malloc(buffer_size);
     if (!anim.img_dsc.data) { 
@@ -5332,12 +5328,17 @@ bool animation_loader_load_frame(animation_t *anim, uint16_t frame_index, const 
     char full_path[128];
     snprintf(full_path, sizeof(full_path), "%s/%s%d.bin", anim->base_path, prefix, frame_index + 1);
 
-    FILE *f = fopen(full_path, "rb");
-    if (!f) { return false; } 
+    lv_fs_file_t f;
+    lv_fs_res_t res = lv_fs_open(&f, full_path, LV_FS_MODE_RD);
+    if (res != LV_FS_RES_OK) {
+        ESP_LOGW(TAG, "Fallo al abrir frame (LVGL): %s", full_path);
+        return false;
+    }
     
-    fseek(f, LVGL_BIN_HEADER_SIZE, SEEK_SET);
-    fread((void *)anim->img_dsc.data, 1, anim->img_dsc.data_size, f);
-    fclose(f);
+    lv_fs_seek(&f, LVGL_BIN_HEADER_SIZE, LV_FS_SEEK_SET);
+    uint32_t bytes_read = 0;
+    lv_fs_read(&f, (void *)anim->img_dsc.data, anim->img_dsc.data_size, &bytes_read);
+    lv_fs_close(&f);
 
     return true;
 }
@@ -5361,22 +5362,46 @@ uint16_t animation_loader_count_frames(const char *path, const char *prefix) {
     }
 
     uint16_t count = 0;
-    DIR *dir = opendir(path);
-    if (!dir) {
-        ESP_LOGE(TAG, "No se pudo abrir el directorio: %s", path);
+    ESP_LOGI(TAG, "Intentando abrir el directorio de animación (LVGL): '%s'", path);
+    
+    lv_fs_dir_t d;
+    lv_fs_res_t res = lv_fs_dir_open(&d, path);
+
+    if(res != LV_FS_RES_OK) {
+        ESP_LOGE(TAG, "No se pudo abrir el directorio (LVGL): %s. Código de error: %d", path, res);
         return 0;
     }
 
-    struct dirent *ent;
+    ESP_LOGI(TAG, "Directorio '%s' abierto. Leyendo y comparando entradas con prefijo '%s'...", path, prefix);
+    char fn[256];
     size_t prefix_len = strlen(prefix);
 
-    while ((ent = readdir(dir)) != NULL) {
-        if (strncmp(ent->d_name, prefix, prefix_len) == 0) {
+    while(lv_fs_dir_read(&d, fn, sizeof(fn)) == LV_FS_RES_OK && fn[0] != '\0') {
+        // --- INICIO DE LOG DE DIAGNÓSTICO AVANZADO ---
+        ESP_LOGI(TAG, "Candidato: '%s'", fn);
+        
+        char hex_buf[128] = {0};
+        size_t name_len = strlen(fn);
+        for(int i = 0; i < name_len && i < 32; i++) {
+            sprintf(hex_buf + strlen(hex_buf), "%02X ", (unsigned char)fn[i]);
+        }
+        ESP_LOGI(TAG, "  -> HEX Fichero: %s", hex_buf);
+
+        memset(hex_buf, 0, sizeof(hex_buf));
+        for(int i = 0; i < prefix_len && i < 32; i++) {
+            sprintf(hex_buf + strlen(hex_buf), "%02X ", (unsigned char)prefix[i]);
+        }
+        ESP_LOGI(TAG, "  -> HEX Prefijo: %s", hex_buf);
+
+        if (strncmp(fn, prefix, prefix_len) == 0) {
+            ESP_LOGI(TAG, "  -> ¡COINCIDENCIA!");
             count++;
         }
+        // --- FIN DE LOG DE DIAGNÓSTICO AVANZADO ---
     }
 
-    closedir(dir);
+    lv_fs_dir_close(&d);
+    ESP_LOGI(TAG, "Cierre de directorio. Total de fotogramas con prefijo '%s': %d", prefix, count);
     return count;
 }
 
@@ -5525,10 +5550,10 @@ idf_component_register(
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\diymon_ui_helpers.c
 # =================================================================================================
 
-/* Fecha: 15/08/2025 - 04:11  */
+/* Fecha: 15/08/2025 - 05:05  */
 /* Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\diymon_ui_helpers.c */
-/* Último cambio: Modificada la construcción de rutas de assets para usar la letra de unidad 'S:' de LVGL. */
-/* Descripción: Funciones de ayuda para la UI. Se ha modificado `ui_helpers_build_asset_path` para que genere rutas compatibles con el sistema de ficheros de LVGL (ej: 'S:/...'), en lugar de rutas VFS de ESP-IDF ('/sdcard/...'). Esto permite a LVGL localizar y cargar correctamente las animaciones desde la tarjeta SD. */
+/* Último cambio: Corregida la construcción de rutas de assets para usar el punto de montaje VFS '/sdcard'. */
+/* Descripción: Se ha modificado ui_helpers_build_asset_path para que genere rutas VFS directas (ej: '/sdcard/...') en lugar de rutas LVGL ('S:/...'). Esto es necesario porque el nimation_loader utiliza funciones de E/S estándar de C (open, opendir) que no entienden el sistema de letras de unidad de LVGL, solucionando el error de 'directorio no encontrado'. */
 
 #include "diymon_ui_helpers.h"
 #include "diymon_evolution.h"
@@ -5557,8 +5582,8 @@ static void get_evolution_dir_name(char* dir_name_buffer, size_t buffer_size) {
 void ui_helpers_build_asset_path(char* buffer, size_t buffer_size, const char* asset_filename) {
     char dir_name[9];
     get_evolution_dir_name(dir_name, sizeof(dir_name));
-    // [CORRECCIÓN] Se utiliza la letra de unidad 'S:' que LVGL entiende, en lugar del punto de montaje VFS.
-    snprintf(buffer, buffer_size, "S:/DIYMON/%s/%s", dir_name, asset_filename);
+    // [CORRECCIÓN] Se usa el punto de montaje VFS real '/sdcard' porque animation_loader usa 'opendir' estándar.
+    snprintf(buffer, buffer_size, "S:/diymon/%s/%s/", dir_name, asset_filename);
 }
 
 // Carga la imagen de fondo desde el firmware creando un objeto de imagen.
@@ -10852,246 +10877,17 @@ idf_component_register(SRCS "web_server.c"
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server_page.h
 # =================================================================================================
 
-/*
-# Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server_page.h
-# Fecha: `$timestamp
-# Último cambio: Implementada navegación por directorios y subida de archivos contextual.
-# Descripción: Contiene la página HTML principal del portal de configuración. Se ha mejorado la interfaz para permitir la navegación por subdirectorios en la tarjeta SD y subir archivos al directorio actual.
-*/
+/* Fecha: 15/08/2025 - 06:34  */
+/* Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server_page.h */
+/* Último cambio: Eliminado el contenido HTML incrustado. */
+/* Descripción: Fichero de cabecera del servidor web. Se ha eliminado el contenido HTML que estaba incrustado en el código, ya que las páginas ahora se sirven dinámicamente desde los ficheros 'index.html' y 'backup.html' en la tarjeta SD. */
+
 #ifndef WEB_SERVER_PAGE_H
 #define WEB_SERVER_PAGE_H
 
-static const char* INDEX_HTML_CONTENT = R"rawliteral(
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestor de Archivos ESP32</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; color: #333; }
-        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
-        .header { text-align: center; margin-bottom: 30px; color: white; }
-        .header h1 { font-size: 2.5em; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
-        .header p { font-size: 1.2em; opacity: 0.9; }
-        .card { background: white; border-radius: 15px; padding: 25px; margin-bottom: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        .card h3 { color: #5a67d8; margin-bottom: 20px; font-size: 1.4em; word-break: break-all; }
-        .btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 12px 25px; border-radius: 25px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
-        .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
-        .btn-secondary { background: linear-gradient(135deg, #4fd1c7 0%, #06b6d4 100%); }
-        .btn-danger { background: linear-gradient(135deg, #fc8181 0%, #f56565 100%); }
-        .file-list { max-height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 10px; margin-top: 10px; }
-        .file-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-bottom: 1px solid #f0f2f5; transition: background 0.3s ease; }
-        .file-item:hover { background: #f7fafc; }
-        .file-item:last-child { border-bottom: none; }
-        .file-info { display: flex; align-items: center; gap: 10px; word-break: break-all; }
-        .file-info a { color: #4a5568; text-decoration: none; font-weight: 600; }
-        .file-info a:hover { color: #5a67d8; }
-        .file-actions { display: flex; gap: 10px; }
-        .btn-small { padding: 6px 12px; font-size: 12px; border-radius: 15px; }
-        .progress-bar { width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin: 10px 0; }
-        .progress-fill { height: 100%; background: linear-gradient(90deg, #48bb78, #38a169); border-radius: 4px; transition: width 0.3s ease; }
-        .upload-area { border: 3px dashed #cbd5e0; border-radius: 15px; padding: 40px 20px; text-align: center; cursor: pointer; transition: all 0.3s ease; background: rgba(90, 103, 216, 0.02); }
-        .upload-area:hover, .upload-area.dragover { border-color: #5a67d8; background: rgba(90, 103, 216, 0.05); }
-        .hidden { display: none !important; }
-        .status { font-size: 0.9em; color: #718096; margin-top: 10px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>📦 Gestor de Archivos</h1>
-            <p>Sube y gestiona los archivos de tu dispositivo</p>
-        </div>
-
-        <div class="card">
-            <h3>📤 Subir a: <span id="upload-path">/</span></h3>
-            <div id="upload-area" class="upload-area">
-                <h4>Arrastra archivos aquí o haz clic para seleccionar</h4>
-            </div>
-            <input type="file" id="file-input" multiple class="hidden">
-            
-            <div style="margin-top: 20px;">
-                <label>Progreso de Subida</label>
-                <div class="progress-bar">
-                    <div class="progress-fill" id="upload-progress" style="width: 0%"></div>
-                </div>
-                <span id="upload-status" class="status">Listo para subir archivos.</span>
-            </div>
-        </div>
-
-        <div class="card">
-            <h3>📁 Archivos en: <span id="current-path">/</span></h3>
-            <div style="margin-bottom: 15px;">
-                <button class="btn btn-secondary" id="refresh-btn">🔄 Actualizar</button>
-            </div>
-            <div class="file-list" id="file-list"></div>
-        </div>
-    </div>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            let currentPath = '/';
-            const uploadArea = document.getElementById('upload-area');
-            const fileInput = document.getElementById('file-input');
-            const fileListDiv = document.getElementById('file-list');
-            const refreshBtn = document.getElementById('refresh-btn');
-            const currentPathSpan = document.getElementById('current-path');
-            const uploadPathSpan = document.getElementById('upload-path');
-
-            function formatBytes(bytes, decimals = 2) {
-                if (!+bytes) return '0 Bytes'
-                const k = 1024
-                const dm = decimals < 0 ? 0 : decimals
-                const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
-                const i = Math.floor(Math.log(bytes) / Math.log(k))
-                return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`
-            }
-
-            async function fetchFileList(path) {
-                currentPath = path;
-                currentPathSpan.textContent = path;
-                uploadPathSpan.textContent = path;
-                fileListDiv.innerHTML = '<p>Cargando lista de archivos...</p>';
-                try {
-                    const response = await fetch(`/listfiles?path=${encodeURIComponent(path)}`);
-                    if (!response.ok) throw new Error('Error del servidor: ' + response.statusText);
-                    const files = await response.json();
-                    renderFileList(files, path);
-                } catch (error) {
-                    console.error('Error al obtener la lista de archivos:', error);
-                    fileListDiv.innerHTML = '<p style="color: red;">No se pudo cargar la lista. Revisa la conexión.</p>';
-                }
-            }
-
-            async function handleFileUpload(files) {
-                const progressBar = document.getElementById('upload-progress');
-                const statusText = document.getElementById('upload-status');
-                if (files.length === 0) return;
-
-                statusText.textContent = `Iniciando subida de ${files.length} archivo(s) a ${currentPath}...`;
-                progressBar.style.width = '0%';
-                let filesUploaded = 0;
-
-                for (const file of files) {
-                    const formData = new FormData();
-                    formData.append('path', currentPath);
-                    formData.append('file', file, file.name);
-
-                    try {
-                        statusText.textContent = `Subiendo ${file.name}...`;
-                        const response = await fetch('/upload', { method: 'POST', body: formData });
-                        if (!response.ok) throw new Error(`Fallo en la subida del archivo ${file.name}`);
-                        filesUploaded++;
-                        progressBar.style.width = `${(filesUploaded / files.length) * 100}%`;
-                    } catch (error) {
-                        console.error(error);
-                        statusText.innerHTML = `<span style="color: red;">❌ Error al subir ${file.name}.</span>`;
-                        await new Promise(resolve => setTimeout(resolve, 3000));
-                    }
-                }
-                
-                statusText.innerHTML = '<span style="color: green;">✅ Subida completada.</span>';
-                fetchFileList(currentPath);
-                setTimeout(() => {
-                    progressBar.style.width = '0%';
-                    statusText.textContent = 'Listo para subir archivos.';
-                }, 2000);
-            }
-            
-            async function deleteFile(path, filename) {
-                if (!confirm(`⚠️ ¿Seguro que quieres borrar "${filename}"?`)) return;
-                
-                try {
-                    const formData = new FormData();
-                    formData.append('path', path);
-                    formData.append('filename', filename);
-                    
-                    const response = await fetch('/delete', { method: 'POST', body: formData });
-                    if (!response.ok) throw new Error('El servidor no pudo borrar el archivo.');
-                    
-                    console.log(`Archivo "${filename}" borrado.`);
-                    fetchFileList(currentPath); 
-                } catch (error) {
-                    console.error('Error al borrar:', error);
-                    alert(`No se pudo borrar: ${filename}`);
-                }
-            }
-
-            function renderFileList(files, path) {
-                let html = '';
-                if (path !== '/') {
-                    const parentPath = path.substring(0, path.lastIndexOf('/')) || '/';
-                    html += `
-                        <div class="file-item">
-                          <div class="file-info">
-                            <span style="font-size: 1.2em;">⤴️</span>
-                            <a href="#" class="dir-link" data-path="${parentPath}">.. (Subir un nivel)</a>
-                          </div>
-                        </div>`;
-                }
-
-                if (!files || files.length === 0) {
-                    fileListDiv.innerHTML = html + '<p style="padding:15px;">Este directorio está vacío.</p>';
-                    return;
-                }
-                
-                files.sort((a, b) => {
-                    if (a.type === b.type) return a.name.localeCompare(b.name);
-                    return a.type === 'dir' ? -1 : 1;
-                }).forEach(file => {
-                    const icon = file.type === 'dir' ? '📁' : '📄';
-                    const sizeFormatted = file.type === 'file' ? formatBytes(file.size) : '';
-                    const fullPath = path === '/' ? `/${file.name}` : `${path}/${file.name}`;
-                    const nameHtml = file.type === 'dir' 
-                        ? `<a href="#" class="dir-link" data-path="${fullPath}">${file.name}</a>`
-                        : `<span>${file.name} <small style="color:#888">(${sizeFormatted})</small></span>`;
-                        
-                    html += `
-                        <div class="file-item">
-                          <div class="file-info">
-                            <span style="font-size: 1.2em;">${icon}</span>
-                            ${nameHtml}
-                          </div>
-                          <div class="file-actions">
-                            <button class="btn btn-small btn-danger" data-path="${path}" data-filename="${file.name}">🗑️ Borrar</button>
-                          </div>
-                        </div>`;
-                });
-                fileListDiv.innerHTML = html;
-            }
-            
-            uploadArea.addEventListener('click', () => fileInput.click());
-            fileInput.addEventListener('change', (e) => handleFileUpload(e.target.files));
-
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => uploadArea.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); }));
-            ['dragenter', 'dragover'].forEach(evt => uploadArea.addEventListener(evt, () => uploadArea.classList.add('dragover')));
-            ['dragleave', 'drop'].forEach(evt => uploadArea.addEventListener(evt, () => uploadArea.classList.remove('dragover')));
-            uploadArea.addEventListener('drop', e => handleFileUpload(e.dataTransfer.files));
-
-            fileListDiv.addEventListener('click', e => {
-                if (e.target && e.target.closest('a.dir-link')) {
-                    e.preventDefault();
-                    const path = e.target.closest('a.dir-link').getAttribute('data-path');
-                    fetchFileList(path);
-                }
-                if (e.target && e.target.closest('button.btn-danger')) {
-                    const btn = e.target.closest('button.btn-danger');
-                    const path = btn.getAttribute('data-path');
-                    const filename = btn.getAttribute('data-filename');
-                    if (path && filename) deleteFile(path, filename);
-                }
-            });
-
-            refreshBtn.addEventListener('click', () => fetchFileList(currentPath));
-            
-            fetchFileList(currentPath);
-        });
-    </script>
-</body>
-</html>
-)rawliteral";
+// El contenido HTML ha sido movido a los ficheros index.html y backup.html
+// en la tarjeta SD para permitir una fácil modificación sin necesidad de recompilar.
+// Este fichero se mantiene por si se necesitan futuras declaraciones, pero ya no exporta variables.
 
 #endif // WEB_SERVER_PAGE_H
 
@@ -11100,10 +10896,10 @@ static const char* INDEX_HTML_CONTENT = R"rawliteral(
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server.c
 # =================================================================================================
 
-/* Fecha: 15/08/2025 - 04:18  */
+/* Fecha: 15/08/2025 - 06:34  */
 /* Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server.c */
-/* Último cambio: Modificado el manejador raíz ('/') para servir la página HTML desde el firmware en lugar de la SD. */
-/* Descripción: El manejador del endpoint raíz ahora envía el contenido del `INDEX_HTML_CONTENT` (definido en `web_server_page.h`) directamente. Esto elimina la dependencia de la tarjeta SD para mostrar el portal de configuración, solucionando el error 404 y haciendo el modo de servicio más robusto. */
+/* Último cambio: Modificados los manejadores raíz y de backup para servir ficheros HTML desde la tarjeta SD. */
+/* Descripción: Servidor web para la configuración del dispositivo. Se ha eliminado el contenido HTML incrustado en el código. Ahora, los endpoints '/' y '/backup' leen y sirven los ficheros 'index.html' y 'backup.html' respectivamente desde el directorio '/sdcard/config/', haciendo el contenido web completamente dinámico y gestionable desde la SD. */
 
 #include "web_server.h"
 #include "esp_http_server.h"
@@ -11122,11 +10918,54 @@ static const char* INDEX_HTML_CONTENT = R"rawliteral(
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "esp_system.h"
-#include "web_server_page.h" // [CORRECCIÓN] Incluir el fichero con el HTML
+#include "web_server_page.h"
 
 static const char *TAG = "WEB_SERVER";
 #define WEB_MOUNT_POINT "/sdcard"
 #define UPLOAD_BUFFER_SIZE 2048
+
+// --- Helper para establecer el Content-Type basado en la extensión del fichero ---
+static esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filename) {
+    if (strstr(filename, ".html")) {
+        return httpd_resp_set_type(req, "text/html");
+    } else if (strstr(filename, ".css")) {
+        return httpd_resp_set_type(req, "text/css");
+    } else if (strstr(filename, ".js")) {
+        return httpd_resp_set_type(req, "application/javascript");
+    }
+    return httpd_resp_set_type(req, "text/plain");
+}
+
+// --- Helper genérico para servir un fichero estático desde el VFS ---
+static esp_err_t serve_file_from_sd(httpd_req_t *req, const char *filepath) {
+    ESP_LOGI(TAG, "Intentando servir fichero: %s", filepath);
+    FILE *f = fopen(filepath, "r");
+    if (f == NULL) {
+        ESP_LOGE(TAG, "Fallo al abrir el fichero para lectura: %s", filepath);
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "El fichero no existe en la SD.");
+        return ESP_FAIL;
+    }
+
+    set_content_type_from_file(req, filepath);
+
+    char chunk[1024];
+    size_t chunksize;
+    do {
+        chunksize = fread(chunk, 1, sizeof(chunk), f);
+        if (chunksize > 0) {
+            if (httpd_resp_send_chunk(req, chunk, chunksize) != ESP_OK) {
+                fclose(f);
+                ESP_LOGE(TAG, "Fallo en el envío del fichero.");
+                return ESP_FAIL;
+            }
+        }
+    } while (chunksize != 0);
+
+    fclose(f);
+    ESP_LOGI(TAG, "Envío de fichero completado.");
+    httpd_resp_send_chunk(req, NULL, 0); // Enviar chunk final
+    return ESP_OK;
+}
 
 // --- Función de decodificación de URL ---
 static void url_decode(char *dst, const char *src) {
@@ -11381,11 +11220,14 @@ static esp_err_t save_post_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-// --- [CORRECCIÓN] Manejador para servir la página principal desde el firmware ---
+// --- Manejador para servir la página principal desde la SD ---
 static esp_err_t root_get_handler(httpd_req_t *req) {
-    ESP_LOGI(TAG, "Sirviendo página principal desde el firmware.");
-    httpd_resp_set_type(req, "text/html");
-    return httpd_resp_send(req, INDEX_HTML_CONTENT, HTTPD_RESP_USE_STRLEN);
+    return serve_file_from_sd(req, "/sdcard/config/index.html");
+}
+
+// --- Manejador para servir la página de backup desde la SD ---
+static esp_err_t backup_get_handler(httpd_req_t *req) {
+    return serve_file_from_sd(req, "/sdcard/config/backup.html");
 }
 
 static httpd_handle_t start_webserver(void) {
@@ -11397,6 +11239,10 @@ static httpd_handle_t start_webserver(void) {
     if (httpd_start(&server, &config) == ESP_OK) {
         httpd_uri_t root_uri = { .uri = "/", .method = HTTP_GET, .handler = root_get_handler };
         httpd_register_uri_handler(server, &root_uri);
+        
+        httpd_uri_t backup_uri = { .uri = "/backup", .method = HTTP_GET, .handler = backup_get_handler };
+        httpd_register_uri_handler(server, &backup_uri);
+        
         httpd_uri_t upload_uri = { .uri = "/upload", .method = HTTP_POST, .handler = upload_post_handler };
         httpd_register_uri_handler(server, &upload_uri);
         httpd_uri_t list_uri = { .uri = "/listfiles*", .method = HTTP_GET, .handler = list_files_handler };
@@ -11412,8 +11258,6 @@ static httpd_handle_t start_webserver(void) {
 void web_server_start(void) {
     ESP_LOGI(TAG, "Iniciando servidor web de configuracion.");
     start_webserver();
-    // No se necesita un bucle infinito aquí, ya que el servidor se ejecuta en su propia tarea.
-    // La función que llama a web_server_start() debe tener el bucle.
 }
 
 
@@ -11725,10 +11569,10 @@ idf_component_register(
 # Fichero: Z:\DIYTOGETHER\DIYtogether\main\hardware_manager.c
 # =================================================================================================
 
-/* Fecha: 15/08/2025 - 04:30  */
+/* Fecha: 15/08/2025 - 04:54  */
 /* Fichero: Z:\DIYTOGETHER\DIYtogether\main\hardware_manager.c */
-/* Último cambio: Corregidas las signaturas de los callbacks del sistema de ficheros para coincidir con la API de LVGL v9. */
-/* Descripción: Se han actualizado las firmas de todas las funciones de callback (fs_open_cb, fs_dir_read_cb, etc.) para que coincidan exactamente con las definidas en la API de LVGL v9. Esto resuelve todas las advertencias de compilación sobre 'incompatible pointer types' y asegura una integración correcta y segura con el sistema de ficheros. */
+/* Último cambio: Corregida la concatenación de rutas en los callbacks del VFS para evitar dobles barras. */
+/* Descripción: Se ha modificado la lógica en los callbacks 'fs_open_cb' y 'fs_dir_open_cb' para construir la ruta VFS completa de forma robusta. Ahora se comprueba si la ruta que llega de LVGL ya empieza con '/', evitando así la creación de rutas inválidas como '/sdcard//diymon/...' y solucionando definitivamente el error de 'directorio no encontrado'. */
 
 #include "hardware_manager.h"
 #include "esp_log.h"
@@ -11736,92 +11580,89 @@ idf_component_register(
 #include "esp_lvgl_port.h"
 #include "lvgl.h"
 
-#include "ff.h"
+#include <stdio.h>
+#include <string.h>
+#include <dirent.h>
+#include <unistd.h>
 
 static const char *TAG = "HW_MANAGER";
+#define BASE_PATH "/sdcard"
 
-// --- Implementación local del driver de LVGL v9 para FatFS ---
+// --- Implementación del driver de LVGL v9 usando el VFS de ESP-IDF ---
 
 static void * fs_open_cb(lv_fs_drv_t * drv, const char * path, lv_fs_mode_t mode) {
-    uint8_t fmode = 0;
-    if(mode == LV_FS_MODE_WR) fmode = FA_WRITE | FA_OPEN_ALWAYS;
-    else if(mode == LV_FS_MODE_RD) fmode = FA_READ;
-    else if(mode == (LV_FS_MODE_WR | LV_FS_MODE_RD)) fmode = FA_READ | FA_WRITE | FA_OPEN_ALWAYS;
-
-    FIL * f = lv_malloc(sizeof(FIL));
-    if(f == NULL) return NULL;
-
-    FRESULT res = f_open(f, path, fmode);
-    if(res == FR_OK) {
-        return f;
+    char vfs_path[256];
+    // [CORRECCIÓN] Se comprueba si la ruta ya tiene un '/' para evitar duplicados.
+    if (path[0] == '/') {
+        snprintf(vfs_path, sizeof(vfs_path), "%s%s", BASE_PATH, path);
     } else {
-        lv_free(f);
-        return NULL;
+        snprintf(vfs_path, sizeof(vfs_path), "%s/%s", BASE_PATH, path);
     }
+
+    const char * fmode_str;
+    if(mode == LV_FS_MODE_WR) fmode_str = "wb";
+    else if(mode == LV_FS_MODE_RD) fmode_str = "rb";
+    else if(mode == (LV_FS_MODE_WR | LV_FS_MODE_RD)) fmode_str = "rb+";
+    else return NULL;
+
+    return fopen(vfs_path, fmode_str);
 }
 
 static lv_fs_res_t fs_close_cb(lv_fs_drv_t * drv, void * file_p) {
-    f_close((FIL *)file_p);
-    lv_free(file_p);
+    fclose((FILE *)file_p);
     return LV_FS_RES_OK;
 }
 
 static lv_fs_res_t fs_read_cb(lv_fs_drv_t * drv, void * file_p, void * buf, uint32_t btr, uint32_t * br) {
-    FRESULT res = f_read((FIL *)file_p, buf, btr, (UINT *)br);
-    return (res == FR_OK) ? LV_FS_RES_OK : LV_FS_RES_FS_ERR;
+    *br = fread(buf, 1, btr, (FILE *)file_p);
+    return LV_FS_RES_OK;
 }
 
 static lv_fs_res_t fs_write_cb(lv_fs_drv_t * drv, void * file_p, const void * buf, uint32_t btw, uint32_t * bw) {
-    FRESULT res = f_write((FIL *)file_p, buf, btw, (UINT *)bw);
-    return (res == FR_OK) ? LV_FS_RES_OK : LV_FS_RES_FS_ERR;
+    *bw = fwrite(buf, 1, btw, (FILE *)file_p);
+    return LV_FS_RES_OK;
 }
 
 static lv_fs_res_t fs_seek_cb(lv_fs_drv_t * drv, void * file_p, uint32_t pos, lv_fs_whence_t whence) {
-    // FatFS solo soporta seek desde el principio del archivo (SEEK_SET)
-    f_lseek((FIL *)file_p, pos);
+    fseek((FILE *)file_p, pos, SEEK_SET);
     return LV_FS_RES_OK;
 }
 
 static lv_fs_res_t fs_tell_cb(lv_fs_drv_t * drv, void * file_p, uint32_t * pos_p) {
-    *pos_p = f_tell((FIL *)file_p);
+    *pos_p = ftell((FILE *)file_p);
     return LV_FS_RES_OK;
 }
 
 static void * fs_dir_open_cb(lv_fs_drv_t * drv, const char *path) {
-    FF_DIR * d = lv_malloc(sizeof(FF_DIR));
-    if(d == NULL) return NULL;
-
-    FRESULT res = f_opendir(d, path);
-    if(res == FR_OK) {
-        return d;
+    char vfs_path[256];
+    // [CORRECCIÓN] Se comprueba si la ruta ya tiene un '/' para evitar duplicados.
+    if (path[0] == '/') {
+        snprintf(vfs_path, sizeof(vfs_path), "%s%s", BASE_PATH, path);
     } else {
-        lv_free(d);
-        return NULL;
+        snprintf(vfs_path, sizeof(vfs_path), "%s/%s", BASE_PATH, path);
     }
+    return opendir(vfs_path);
 }
 
-static lv_fs_res_t fs_dir_read_cb(lv_fs_drv_t * drv, void * rddir_p, char * fn) {
-    FILINFO fno;
-    FRESULT res = f_readdir((FF_DIR *)rddir_p, &fno);
-    if (res != FR_OK) return LV_FS_RES_FS_ERR;
-    if (fno.fname[0] == 0) {
-        fn[0] = 0;
+static lv_fs_res_t fs_dir_read_cb(lv_fs_drv_t * drv, void * rddir_p, char * fn, uint32_t fn_len) {
+    struct dirent *ent = readdir((DIR *)rddir_p);
+    if(ent == NULL) {
+        fn[0] = '\0';
         return LV_FS_RES_OK;
     }
     
-    if(fno.fattrib & AM_DIR) {
-        snprintf(fn, LV_FS_MAX_FN_LEN, "/%s", fno.fname);
+    // Para LVGL, los directorios deben empezar con '/'
+    if(ent->d_type == DT_DIR) {
+        snprintf(fn, fn_len, "/%s", ent->d_name);
     } else {
-        strncpy(fn, fno.fname, LV_FS_MAX_FN_LEN);
-        fn[LV_FS_MAX_FN_LEN - 1] = '\0';
+        snprintf(fn, fn_len, "%s", ent->d_name);
     }
     
     return LV_FS_RES_OK;
 }
 
 static lv_fs_res_t fs_dir_close_cb(lv_fs_drv_t * drv, void * rddir_p) {
-    f_closedir((FF_DIR *)rddir_p);
-    lv_free(rddir_p);
+    closedir((DIR *)rddir_p);
     return LV_FS_RES_OK;
 }
 
@@ -11861,7 +11702,7 @@ esp_err_t hardware_manager_init(void) {
 
 void hardware_manager_mount_lvgl_filesystem(void)
 {
-    ESP_LOGI(TAG, "Registrando el sistema de ficheros FATFS con LVGL...");
+    ESP_LOGI(TAG, "Registrando el sistema de ficheros VFS (/sdcard) con LVGL...");
     
     static lv_fs_drv_t fs_drv;
     lv_fs_drv_init(&fs_drv);
@@ -11879,7 +11720,7 @@ void hardware_manager_mount_lvgl_filesystem(void)
 
     lv_fs_drv_register(&fs_drv);
     
-    ESP_LOGI(TAG, "Sistema de ficheros montado para LVGL en la unidad 'S:'");
+    ESP_LOGI(TAG, "Sistema de ficheros montado para LVGL en la unidad 'S:' (apuntando a %s)", BASE_PATH);
 }
 
 
@@ -11920,10 +11761,10 @@ void hardware_manager_mount_lvgl_filesystem(void);
 # Fichero: Z:\DIYTOGETHER\DIYtogether\main\main.c
 # =================================================================================================
 
-/* Fecha: 15/08/2025 - 04:22  */
+/* Fecha: 15/08/2025 - 05:17  */
 /* Fichero: Z:\DIYTOGETHER\DIYtogether\main\main.c */
-/* Último cambio: Añadida la llamada a `hardware_manager_mount_lvgl_filesystem` para registrar la SD con LVGL. */
-/* Descripción: Orquestador principal. Se ha añadido la llamada a la función que monta el sistema de ficheros de la tarjeta SD para LVGL. Este paso es crucial para que la librería pueda resolver las rutas "S:/..." y encontrar los ficheros de animación, solucionando así el error de "fotogramas no encontrados". */
+/* Último cambio: Modificada la función erify_sdcard_contents para listar el contenido del directorio '/sdcard/diymon' en el log. */
+/* Descripción: Se ha mejorado la función de verificación de la SD para que, en lugar de solo comprobar la existencia del directorio base de assets, liste todos los ficheros y subdirectorios que contiene. Esto proporcionará un log detallado de lo que el dispositivo está viendo realmente en la tarjeta SD, permitiendo un diagnóstico preciso del porqué no se encuentran las animaciones. */
 
 #include <stdio.h>
 #include <string.h>
@@ -11934,6 +11775,8 @@ void hardware_manager_mount_lvgl_filesystem(void);
 #include "nvs.h"
 #include "esp_system.h"
 #include "esp_lvgl_port.h"
+#include "sys/stat.h" // Necesario para stat()
+#include <dirent.h>   // Necesario para opendir/readdir
 
 #include "bsp_api.h"
 #include "hardware_manager.h"
@@ -11960,6 +11803,7 @@ static void init_lvgl_for_service_screen(void);
 static void display_network_status_on_screen(bool is_connected, const char* ip_addr);
 static void display_waiting_for_network_on_screen(void);
 static void setup_inactivity_handling(void);
+static void verify_sdcard_contents(void);
 
 // --- Lógica de Gestión de Inactividad y Despertar ---
 typedef enum {
@@ -12007,27 +11851,24 @@ static void screen_touch_event_cb(lv_event_t * e) {
     lv_disp_t * disp = lv_display_get_default();
     if (!disp) return;
 
-    // Cualquier tipo de presión resetea el temporizador de inactividad de LVGL
     lv_display_trigger_activity(disp);
     
-    // Si la pantalla está atenuada pero no apagada, un solo toque la restaura
     if (code == LV_EVENT_PRESSED && s_is_dimmed && !screen_manager_is_off()) {
         ESP_LOGI(TAG, "Actividad detectada en pantalla atenuada, restaurando brillo.");
         read_user_brightness_from_nvs();
         screen_manager_set_brightness(s_user_brightness);
         s_is_dimmed = false;
-        return; // Evento gestionado
+        return;
     }
 
-    // Lógica de despertar con doble-doble-toque SÓLO si la pantalla está apagada
     if (code == LV_EVENT_CLICKED && screen_manager_is_off()) {
         switch (s_wake_state) {
             case WAKE_STATE_OFF:
                 s_wake_click_count++;
-                if (s_wake_click_count == 1) { // Primer toque de un posible doble-toque
+                if (s_wake_click_count == 1) {
                     s_double_click_timer = lv_timer_create(double_click_timer_cb, 500, NULL);
                     lv_timer_set_repeat_count(s_double_click_timer, 1);
-                } else if (s_wake_click_count == 2) { // Doble-toque detectado
+                } else if (s_wake_click_count == 2) {
                     if (s_double_click_timer) lv_timer_del(s_double_click_timer);
                     s_double_click_timer = NULL;
                     ESP_LOGI(TAG, "Secuencia de despertar: PRIMER doble-toque detectado. Esperando el segundo...");
@@ -12038,19 +11879,19 @@ static void screen_touch_event_cb(lv_event_t * e) {
                 }
                 break;
 
-            case WAKE_STATE_PRIMED: // Esperando el segundo doble-toque
+            case WAKE_STATE_PRIMED:
                 s_wake_click_count++;
                  if (s_wake_click_count == 1) {
                     s_double_click_timer = lv_timer_create(double_click_timer_cb, 500, NULL);
                     lv_timer_set_repeat_count(s_double_click_timer, 1);
-                } else if (s_wake_click_count >= 2) { // Segundo doble-toque detectado
+                } else if (s_wake_click_count >= 2) {
                     if (s_double_click_timer) lv_timer_del(s_double_click_timer);
                     if (s_wake_prime_timer) lv_timer_del(s_wake_prime_timer);
                     s_double_click_timer = NULL;
                     s_wake_prime_timer = NULL;
                     
                     ESP_LOGI(TAG, "Secuencia de despertar: SEGUNDO doble-toque detectado. ¡Encendiendo pantalla!");
-                    screen_manager_turn_on(); // Enciende y restaura brillo
+                    screen_manager_turn_on();
                     s_is_dimmed = false;
                     s_wake_state = WAKE_STATE_OFF;
                     s_wake_click_count = 0;
@@ -12067,8 +11908,6 @@ static void inactivity_timer_cb(lv_timer_t * timer) {
     uint32_t inactivity_ms = lv_display_get_inactive_time(disp);
     bool is_off = screen_manager_is_off();
     
-    // Si el usuario interactúa, lv_display_trigger_activity resetea el contador,
-    // por lo que este callback se ejecutará de nuevo y s_is_dimmed se pondrá a false.
     if (inactivity_ms < 30000 && s_is_dimmed) {
         s_is_dimmed = false;
     }
@@ -12122,6 +11961,31 @@ void app_main(void)
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(10000));
     }
+}
+
+// [DIAGNÓSTICO] Esta función ahora lista el contenido del directorio de assets.
+static void verify_sdcard_contents(void) {
+    const char* dir_path = "/sdcard/diymon";
+    ESP_LOGI(TAG, "Verificando el contenido de la tarjeta SD en '%s'...", dir_path);
+    
+    DIR* dir = opendir(dir_path);
+    if (!dir) {
+        ESP_LOGE(TAG, "--------------------------------------------------------------------");
+        ESP_LOGE(TAG, "¡ERROR CRITICO! No se pudo abrir el directorio '%s'.", dir_path);
+        ESP_LOGE(TAG, "Asegúrate de que la tarjeta SD esté insertada y formateada (FAT32).");
+        ESP_LOGE(TAG, "Y que contenga la carpeta 'diymon' con todos los assets.");
+        ESP_LOGE(TAG, "El dispositivo se detendrá aquí.");
+        ESP_LOGE(TAG, "--------------------------------------------------------------------");
+        while(1) { vTaskDelay(pdMS_TO_TICKS(1000)); }
+    }
+
+    ESP_LOGI(TAG, "Contenido encontrado en '%s':", dir_path);
+    struct dirent* ent;
+    while ((ent = readdir(dir)) != NULL) {
+        ESP_LOGI(TAG, "  - %s", ent->d_name);
+    }
+    closedir(dir);
+    ESP_LOGI(TAG, "Verificación y listado de la SD completado.");
 }
 
 static void init_lvgl_for_service_screen(void)
@@ -12198,7 +12062,7 @@ static void run_wifi_portal_mode(void) {
     }
     
     display_waiting_for_network_on_screen();
-    vTaskDelay(pdMS_TO_TICKS(1500)); // Delay para que el mensaje sea visible
+    vTaskDelay(pdMS_TO_TICKS(1500)); 
 
     display_network_status_on_screen(false, NULL);
 
@@ -12209,9 +12073,11 @@ static void run_wifi_portal_mode(void) {
 static void run_main_application_mode(void) {
     ESP_LOGI(TAG, "Cargando aplicación principal...");
     hardware_manager_init();
+    
+    verify_sdcard_contents();
+
     screen_manager_init();
     
-    // [CORRECCIÓN] Montar el sistema de ficheros para LVGL ANTES de inicializar la UI.
     hardware_manager_mount_lvgl_filesystem();
     
     ESP_LOGI(TAG, "El driver WiFi permanece desactivado para ahorrar RAM.");
@@ -12297,13 +12163,10 @@ static void display_network_status_on_screen(bool is_connected, const char* ip_a
         lv_style_set_text_align(&style_text, LV_TEXT_ALIGN_CENTER);
         lv_style_set_text_font(&style_text, &lv_font_montserrat_14);
 
-        // Limpiar los labels de "espera" si existen, creando nuevos
-        // LVGL es eficiente y no creará fugas de memoria si se hace sobre el mismo padre.
-        lv_obj_clean(scr); // Limpiamos la pantalla para eliminar mensajes previos
+        lv_obj_clean(scr);
         
-        // Recrear el fondo y el botón que ui_config_screen_show() puso
         ui_config_screen_show(); 
-        scr = lv_screen_active(); // ui_config_screen_show() crea una nueva pantalla
+        scr = lv_screen_active();
 
         lv_obj_t *line1 = lv_label_create(scr);
         lv_obj_t *line2 = lv_label_create(scr);

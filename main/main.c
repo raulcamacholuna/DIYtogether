@@ -1,7 +1,7 @@
-/* Fecha: 15/08/2025 - 05:17  */
+/* Fecha: 15/08/2025 - 06:49  */
 /* Fichero: Z:\DIYTOGETHER\DIYtogether\main\main.c */
-/* Último cambio: Modificada la función erify_sdcard_contents para listar el contenido del directorio '/sdcard/diymon' en el log. */
-/* Descripción: Se ha mejorado la función de verificación de la SD para que, en lugar de solo comprobar la existencia del directorio base de assets, liste todos los ficheros y subdirectorios que contiene. Esto proporcionará un log detallado de lo que el dispositivo está viendo realmente en la tarjeta SD, permitiendo un diagnóstico preciso del porqué no se encuentran las animaciones. */
+/* Último cambio: Refactorizada la gestión de pantallas de servicio para que el despertar por doble-toque funcione. */
+/* Descripción: Orquestador principal de la aplicación. Se ha modificado la lógica de las pantallas de servicio (portal WiFi y servidor de archivos) para que no recreen la pantalla al actualizar el estado de la red. Ahora, los labels de estado se crean una vez y solo se actualiza su texto. Esto evita que el objeto de pantalla sea destruido y reemplazado, lo que invalidaba los manejadores de eventos de inactividad y despertaba por toque. Con este cambio, la funcionalidad de "doble-doble toque" para despertar la pantalla ahora funciona de manera consistente en todos los modos de la aplicación. */
 
 #include <stdio.h>
 #include <string.h>
@@ -56,6 +56,10 @@ static wake_up_state_t s_wake_state = WAKE_STATE_OFF;
 static uint8_t s_wake_click_count = 0;
 static lv_timer_t *s_double_click_timer = NULL;
 static lv_timer_t *s_wake_prime_timer = NULL;
+
+// Labels estáticos para las pantallas de servicio
+static lv_obj_t *s_status_line1 = NULL;
+static lv_obj_t *s_status_line2 = NULL;
 
 
 static void read_user_brightness_from_nvs(void) {
@@ -200,7 +204,6 @@ void app_main(void)
     }
 }
 
-// [DIAGNÓSTICO] Esta función ahora lista el contenido del directorio de assets.
 static void verify_sdcard_contents(void) {
     const char* dir_path = "/sdcard/diymon";
     ESP_LOGI(TAG, "Verificando el contenido de la tarjeta SD en '%s'...", dir_path);
@@ -363,24 +366,26 @@ static void display_waiting_for_network_on_screen(void) {
             return;
         }
 
-        static lv_style_t style_text;
-        lv_style_init(&style_text);
-        lv_style_set_text_color(&style_text, lv_color_white());
-        lv_style_set_text_align(&style_text, LV_TEXT_ALIGN_CENTER);
-        lv_style_set_text_font(&style_text, &lv_font_montserrat_14);
+        if (!s_status_line1) { // Create labels only if they don't exist
+            static lv_style_t style_text;
+            lv_style_init(&style_text);
+            lv_style_set_text_color(&style_text, lv_color_white());
+            lv_style_set_text_align(&style_text, LV_TEXT_ALIGN_CENTER);
+            lv_style_set_text_font(&style_text, &lv_font_montserrat_14);
 
-        lv_obj_t *line1 = lv_label_create(scr);
-        lv_obj_t *line2 = lv_label_create(scr);
-        lv_obj_add_style(line1, &style_text, 0);
-        lv_obj_add_style(line2, &style_text, 0);
-        lv_obj_set_width(line1, 160);
-        lv_obj_set_width(line2, 160);
+            s_status_line1 = lv_label_create(scr);
+            s_status_line2 = lv_label_create(scr);
+            lv_obj_add_style(s_status_line1, &style_text, 0);
+            lv_obj_add_style(s_status_line2, &style_text, 0);
+            lv_obj_set_width(s_status_line1, 160);
+            lv_obj_set_width(s_status_line2, 160);
+        }
 
-        lv_label_set_text(line1, "Espera un momento...");
-        lv_label_set_text(line2, "Detectando redes");
+        lv_label_set_text(s_status_line1, "Espera un momento...");
+        lv_label_set_text(s_status_line2, "Detectando redes");
         
-        lv_obj_align(line1, LV_ALIGN_CENTER, 0, -50);
-        lv_obj_align(line2, LV_ALIGN_CENTER, 0, -25);
+        lv_obj_align(s_status_line1, LV_ALIGN_CENTER, 0, -50);
+        lv_obj_align(s_status_line2, LV_ALIGN_CENTER, 0, -25);
 
         lvgl_port_unlock();
     }
@@ -389,29 +394,13 @@ static void display_waiting_for_network_on_screen(void) {
 static void display_network_status_on_screen(bool is_connected, const char* ip_addr) {
     if (lvgl_port_lock(0)) {
         lv_obj_t *scr = lv_screen_active();
-        if (!scr) {
+        // Check if screen and labels are valid before using them
+        if (!scr || !s_status_line1 || !s_status_line2) {
             lvgl_port_unlock();
             return;
         }
 
-        static lv_style_t style_text;
-        lv_style_init(&style_text);
-        lv_style_set_text_color(&style_text, lv_color_white());
-        lv_style_set_text_align(&style_text, LV_TEXT_ALIGN_CENTER);
-        lv_style_set_text_font(&style_text, &lv_font_montserrat_14);
-
-        lv_obj_clean(scr);
-        
-        ui_config_screen_show(); 
-        scr = lv_screen_active();
-
-        lv_obj_t *line1 = lv_label_create(scr);
-        lv_obj_t *line2 = lv_label_create(scr);
-        lv_obj_add_style(line1, &style_text, 0);
-        lv_obj_add_style(line2, &style_text, 0);
-        lv_obj_set_width(line1, 160);
-        lv_obj_set_width(line2, 160);
-
+        // We no longer clean or recreate the screen, just update the labels' text.
         if (is_connected) {
             char ssid[33] = "N/A";
             size_t len = sizeof(ssid);
@@ -420,15 +409,15 @@ static void display_network_status_on_screen(bool is_connected, const char* ip_a
                 nvs_get_str(nvs, "wifi_ssid", ssid, &len);
                 nvs_close(nvs);
             }
-            lv_label_set_text_fmt(line1, "Conectado a:\n\"%s\"", ssid);
-            lv_label_set_text_fmt(line2, "IP: %s", ip_addr);
-            lv_obj_align(line1, LV_ALIGN_CENTER, 0, -50);
-            lv_obj_align(line2, LV_ALIGN_CENTER, 0, -20);
+            lv_label_set_text_fmt(s_status_line1, "Conectado a:\n\"%s\"", ssid);
+            lv_label_set_text_fmt(s_status_line2, "IP: %s", ip_addr);
+            lv_obj_align(s_status_line1, LV_ALIGN_CENTER, 0, -50);
+            lv_obj_align(s_status_line2, LV_ALIGN_CENTER, 0, -20);
         } else {
-            lv_label_set_text(line1, "Modo AP Activo");
-            lv_label_set_text(line2, "SSID: DIYTogether\nPass: MakeItYours");
-            lv_obj_align(line1, LV_ALIGN_CENTER, 0, -50);
-            lv_obj_align(line2, LV_ALIGN_CENTER, 0, -25);
+            lv_label_set_text(s_status_line1, "Modo AP Activo");
+            lv_label_set_text(s_status_line2, "SSID: DIYTogether\nPass: MakeItYours");
+            lv_obj_align(s_status_line1, LV_ALIGN_CENTER, 0, -50);
+            lv_obj_align(s_status_line2, LV_ALIGN_CENTER, 0, -25);
         }
 
         lvgl_port_unlock();

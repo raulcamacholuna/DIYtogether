@@ -1,7 +1,7 @@
-/* Fecha: 15/08/2025 - 04:18  */
+/* Fecha: 15/08/2025 - 06:34  */
 /* Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server.c */
-/* Último cambio: Modificado el manejador raíz ('/') para servir la página HTML desde el firmware en lugar de la SD. */
-/* Descripción: El manejador del endpoint raíz ahora envía el contenido del `INDEX_HTML_CONTENT` (definido en `web_server_page.h`) directamente. Esto elimina la dependencia de la tarjeta SD para mostrar el portal de configuración, solucionando el error 404 y haciendo el modo de servicio más robusto. */
+/* Último cambio: Modificados los manejadores raíz y de backup para servir ficheros HTML desde la tarjeta SD. */
+/* Descripción: Servidor web para la configuración del dispositivo. Se ha eliminado el contenido HTML incrustado en el código. Ahora, los endpoints '/' y '/backup' leen y sirven los ficheros 'index.html' y 'backup.html' respectivamente desde el directorio '/sdcard/config/', haciendo el contenido web completamente dinámico y gestionable desde la SD. */
 
 #include "web_server.h"
 #include "esp_http_server.h"
@@ -20,11 +20,54 @@
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "esp_system.h"
-#include "web_server_page.h" // [CORRECCIÓN] Incluir el fichero con el HTML
+#include "web_server_page.h"
 
 static const char *TAG = "WEB_SERVER";
 #define WEB_MOUNT_POINT "/sdcard"
 #define UPLOAD_BUFFER_SIZE 2048
+
+// --- Helper para establecer el Content-Type basado en la extensión del fichero ---
+static esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filename) {
+    if (strstr(filename, ".html")) {
+        return httpd_resp_set_type(req, "text/html");
+    } else if (strstr(filename, ".css")) {
+        return httpd_resp_set_type(req, "text/css");
+    } else if (strstr(filename, ".js")) {
+        return httpd_resp_set_type(req, "application/javascript");
+    }
+    return httpd_resp_set_type(req, "text/plain");
+}
+
+// --- Helper genérico para servir un fichero estático desde el VFS ---
+static esp_err_t serve_file_from_sd(httpd_req_t *req, const char *filepath) {
+    ESP_LOGI(TAG, "Intentando servir fichero: %s", filepath);
+    FILE *f = fopen(filepath, "r");
+    if (f == NULL) {
+        ESP_LOGE(TAG, "Fallo al abrir el fichero para lectura: %s", filepath);
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "El fichero no existe en la SD.");
+        return ESP_FAIL;
+    }
+
+    set_content_type_from_file(req, filepath);
+
+    char chunk[1024];
+    size_t chunksize;
+    do {
+        chunksize = fread(chunk, 1, sizeof(chunk), f);
+        if (chunksize > 0) {
+            if (httpd_resp_send_chunk(req, chunk, chunksize) != ESP_OK) {
+                fclose(f);
+                ESP_LOGE(TAG, "Fallo en el envío del fichero.");
+                return ESP_FAIL;
+            }
+        }
+    } while (chunksize != 0);
+
+    fclose(f);
+    ESP_LOGI(TAG, "Envío de fichero completado.");
+    httpd_resp_send_chunk(req, NULL, 0); // Enviar chunk final
+    return ESP_OK;
+}
 
 // --- Función de decodificación de URL ---
 static void url_decode(char *dst, const char *src) {
@@ -279,11 +322,14 @@ static esp_err_t save_post_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-// --- [CORRECCIÓN] Manejador para servir la página principal desde el firmware ---
+// --- Manejador para servir la página principal desde la SD ---
 static esp_err_t root_get_handler(httpd_req_t *req) {
-    ESP_LOGI(TAG, "Sirviendo página principal desde el firmware.");
-    httpd_resp_set_type(req, "text/html");
-    return httpd_resp_send(req, INDEX_HTML_CONTENT, HTTPD_RESP_USE_STRLEN);
+    return serve_file_from_sd(req, "/sdcard/config/index.html");
+}
+
+// --- Manejador para servir la página de backup desde la SD ---
+static esp_err_t backup_get_handler(httpd_req_t *req) {
+    return serve_file_from_sd(req, "/sdcard/config/backup.html");
 }
 
 static httpd_handle_t start_webserver(void) {
@@ -295,6 +341,10 @@ static httpd_handle_t start_webserver(void) {
     if (httpd_start(&server, &config) == ESP_OK) {
         httpd_uri_t root_uri = { .uri = "/", .method = HTTP_GET, .handler = root_get_handler };
         httpd_register_uri_handler(server, &root_uri);
+        
+        httpd_uri_t backup_uri = { .uri = "/backup", .method = HTTP_GET, .handler = backup_get_handler };
+        httpd_register_uri_handler(server, &backup_uri);
+        
         httpd_uri_t upload_uri = { .uri = "/upload", .method = HTTP_POST, .handler = upload_post_handler };
         httpd_register_uri_handler(server, &upload_uri);
         httpd_uri_t list_uri = { .uri = "/listfiles*", .method = HTTP_GET, .handler = list_files_handler };
@@ -310,6 +360,4 @@ static httpd_handle_t start_webserver(void) {
 void web_server_start(void) {
     ESP_LOGI(TAG, "Iniciando servidor web de configuracion.");
     start_webserver();
-    // No se necesita un bucle infinito aquí, ya que el servidor se ejecuta en su propia tarea.
-    // La función que llama a web_server_start() debe tener el bucle.
 }
