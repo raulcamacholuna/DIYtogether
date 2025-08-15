@@ -1,15 +1,14 @@
-/*
-  Fichero: ./components/diymon_ui/ui_telemetry.c
-  Fecha: 13/08/2025 - 06:30 
-  Último cambio: Simplificado para mostrar únicamente el nivel de batería.
-  Descripción: Se ha refactorizado el módulo de telemetría para eliminar la lectura y visualización de los datos del acelerómetro y giroscopio. Ahora, solo se actualiza el indicador de batería, reduciendo la carga de procesamiento y la frecuencia de redibujado de la pantalla.
-*/
+/* Fecha: 15/08/2025 - 10:07  */
+/* Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_telemetry.c */
+/* Último cambio: Añadida la visualización del código de evolución en la UI. */
+/* Descripción: Se ha añadido un nuevo label en la esquina inferior derecha para mostrar el código de evolución actual (ej: "EVO: 1.1.2"). Este label se actualiza periódicamente junto con el indicador de batería. */
 #include "ui_telemetry.h"
 #include "bsp_api.h"
 #include "screen_manager.h"
 #include "esp_log.h"
 #include "esp_lvgl_port.h"
 #include <math.h>
+#include "diymon_evolution.h" // Necesario para obtener el código de evolución
 
 static const char *TAG = "UI_TELEMETRY";
 
@@ -20,6 +19,7 @@ static const char *TAG = "UI_TELEMETRY";
 
 // --- Variables estáticas del módulo ---
 static lv_obj_t *s_battery_label;
+static lv_obj_t *s_evo_label; // Nuevo label para la evolución
 static lv_timer_t *s_telemetry_timer;
 
 /**
@@ -41,6 +41,10 @@ static void telemetry_update_timer_cb(lv_timer_t *timer) {
     if (percentage > 100.0f) percentage = 100.0f;
     if (percentage < 0.0f) percentage = 0.0f;
     lv_label_set_text_fmt(s_battery_label, LV_SYMBOL_BATTERY_FULL " %d%%", (int)percentage);
+
+    // [NUEVO] Procesar y mostrar datos de evolución
+    const char* evo_code = diymon_get_current_code();
+    lv_label_set_text_fmt(s_evo_label, "EVO: %s", evo_code);
 }
 
 void ui_telemetry_create(lv_obj_t *parent) {
@@ -54,16 +58,22 @@ void ui_telemetry_create(lv_obj_t *parent) {
     lv_style_set_radius(&style_telemetry, 5);
     lv_style_set_pad_all(&style_telemetry, 5);
 
-    // Crear únicamente el label de la batería
+    // Crear el label de la batería
     s_battery_label = lv_label_create(parent);
     lv_obj_add_style(s_battery_label, &style_telemetry, 0);
     lv_obj_align(s_battery_label, LV_ALIGN_BOTTOM_LEFT, 5, -5);
     lv_label_set_text(s_battery_label, LV_SYMBOL_BATTERY_FULL " --%");
+
+    // [NUEVO] Crear el label de Evolución
+    s_evo_label = lv_label_create(parent);
+    lv_obj_add_style(s_evo_label, &style_telemetry, 0);
+    lv_obj_align(s_evo_label, LV_ALIGN_BOTTOM_RIGHT, -5, -5);
+    lv_label_set_text(s_evo_label, "EVO: ---");
     
     // Crear y lanzar el temporizador
     s_telemetry_timer = lv_timer_create(telemetry_update_timer_cb, TELEMETRY_UPDATE_INTERVAL_MS, NULL);
-    telemetry_update_timer_cb(s_telemetry_timer); // Llamada inicial para poblar el campo
-    ESP_LOGI(TAG, "Módulo de telemetría de UI (solo batería) creado.");
+    telemetry_update_timer_cb(s_telemetry_timer); // Llamada inicial para poblar los campos
+    ESP_LOGI(TAG, "Módulo de telemetría de UI (batería y evolución) creado.");
 }
 
 void ui_telemetry_destroy(void) {
