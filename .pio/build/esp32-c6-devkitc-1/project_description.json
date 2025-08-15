@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "DIYTOGUETHER",
-    "project_version":    "1b5bedd-dirty",
+    "project_version":    "8ebf0c6-dirty",
     "project_path":       "Z:/DIYTOGETHER/DIYtogether",
     "idf_path":           "C:/Users/rcamacho/.platformio/packages/framework-espidf@src-6ebd8097f2a445b22da97153912660dc",
     "build_dir":          "Z:/DIYTOGETHER/DIYtogether/.pio/build/esp32-c6-devkitc-1",
