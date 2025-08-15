@@ -1,0 +1,14 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : [],
+		"files" : [],
+		"nodes" : []
+	},
+	"installers" : [],
+	"paths" : 
+	{
+		"build" : "esp-idf/esp_driver_cam",
+		"source" : "C:/Users/rcamacho/.platformio/packages/framework-espidf@src-6ebd8097f2a445b22da97153912660dc/components/esp_driver_cam"
+	}
+}

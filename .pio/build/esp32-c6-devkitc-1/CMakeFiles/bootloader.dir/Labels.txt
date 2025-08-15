@@ -1,0 +1,13 @@
+# Target labels
+ bootloader
+# Source files and their labels
+Z:/DIYTOGETHER/DIYtogether/.pio/build/esp32-c6-devkitc-1/CMakeFiles/bootloader
+Z:/DIYTOGETHER/DIYtogether/.pio/build/esp32-c6-devkitc-1/CMakeFiles/bootloader.rule
+Z:/DIYTOGETHER/DIYtogether/.pio/build/esp32-c6-devkitc-1/CMakeFiles/bootloader-complete.rule
+Z:/DIYTOGETHER/DIYtogether/.pio/build/esp32-c6-devkitc-1/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule
+Z:/DIYTOGETHER/DIYtogether/.pio/build/esp32-c6-devkitc-1/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule
+Z:/DIYTOGETHER/DIYtogether/.pio/build/esp32-c6-devkitc-1/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule
+Z:/DIYTOGETHER/DIYtogether/.pio/build/esp32-c6-devkitc-1/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule
+Z:/DIYTOGETHER/DIYtogether/.pio/build/esp32-c6-devkitc-1/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule
+Z:/DIYTOGETHER/DIYtogether/.pio/build/esp32-c6-devkitc-1/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule
+Z:/DIYTOGETHER/DIYtogether/.pio/build/esp32-c6-devkitc-1/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule

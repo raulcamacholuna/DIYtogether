@@ -1,7 +1,7 @@
-/* Fecha: 15/08/2025 - 09:49  */
+/* Fecha: 15/08/2025 - 04:04  */
 /* Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_idle_animation.c */
-/* Último cambio: Implementada la detección dinámica del número de fotogramas de la animación de reposo. */
-/* Descripción: Se ha modificado la función `ui_idle_animation_start` para que cuente cuántos ficheros `ANIM_IDLE_*.bin` existen en el directorio de assets actual. Este recuento se utiliza como el número de fotogramas, eliminando la constante `IDLE_ANIM_FRAME_COUNT` y permitiendo que las animaciones de reposo tengan una duración variable. */
+/* Último cambio: Añadido un repliegue para ocultar el personaje si no se encuentran las animaciones en la SD. */
+/* Descripción: Se ha mejorado la robustez del gestor de animación de reposo. Si no se encuentran los fotogramas de la animación en la tarjeta SD (un error común si la SD no está preparada), el objeto de imagen del personaje ahora se ocultará en lugar de mostrar una imagen corrupta. Esto evita un glitch visual y permite que el dispositivo siga siendo funcional. */
 
 #include "ui_idle_animation.h"
 #include "ui_action_animations.h" 
@@ -51,20 +51,26 @@ lv_obj_t* ui_idle_animation_start(lv_obj_t *parent) {
     
     s_idle_animation_player.base_path = strdup(anim_path);
 
-    // [CAMBIO CLAVE] Contar dinámicamente los fotogramas de la animación de reposo.
     uint16_t frame_count = animation_loader_count_frames(anim_path, "ANIM_IDLE_");
     if (frame_count == 0) {
-        ESP_LOGE(TAG, "No se encontraron fotogramas para la animación de reposo en '%s'. La animación no se iniciará.", anim_path);
+        ESP_LOGE(TAG, "No se encontraron fotogramas para la animación de reposo en '%s'. La animación no se iniciará y el personaje se ocultará.", anim_path);
         free(s_idle_animation_player.base_path);
         s_idle_animation_player.base_path = NULL;
-        return g_animation_img_obj; // Devolver el objeto de imagen aunque esté vacío para no romper la UI.
+        
+        // [CORRECCIÓN] Ocultar el objeto de imagen si no hay animación para evitar glitches.
+        if (g_animation_img_obj) {
+            lv_obj_add_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
+        }
+        
+        return g_animation_img_obj;
     }
     ESP_LOGI(TAG, "Detectados %d fotogramas para la animación de reposo.", frame_count);
     s_idle_animation_player.frame_count = frame_count;
 
-    // El objeto de imagen ya existe, solo nos aseguramos de que apunte a nuestros datos.
+    // El objeto de imagen ya existe, nos aseguramos de que apunte a nuestros datos y sea visible.
     if(g_animation_img_obj) {
         lv_image_set_src(g_animation_img_obj, &s_idle_animation_player.img_dsc);
+        lv_obj_clear_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
     }
     
     g_is_idle_running = true;

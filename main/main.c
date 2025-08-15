@@ -1,7 +1,7 @@
-/* Fecha: 15/08/2025 - 11:06  */
+/* Fecha: 15/08/2025 - 05:17  */
 /* Fichero: Z:\DIYTOGETHER\DIYtogether\main\main.c */
-/* Último cambio: Añadido mensaje de "espera" en pantalla durante la conexión de red en modos de servicio. */
-/* Descripción: Orquestador principal de la aplicación. Se ha añadido la función `display_waiting_for_network_on_screen` que muestra un mensaje de estado mientras el dispositivo intenta conectarse a la red WiFi. Este mensaje se muestra antes de que se presente la IP final o la información del modo AP, mejorando la experiencia de usuario. */
+/* Último cambio: Modificada la función erify_sdcard_contents para listar el contenido del directorio '/sdcard/diymon' en el log. */
+/* Descripción: Se ha mejorado la función de verificación de la SD para que, en lugar de solo comprobar la existencia del directorio base de assets, liste todos los ficheros y subdirectorios que contiene. Esto proporcionará un log detallado de lo que el dispositivo está viendo realmente en la tarjeta SD, permitiendo un diagnóstico preciso del porqué no se encuentran las animaciones. */
 
 #include <stdio.h>
 #include <string.h>
@@ -12,6 +12,8 @@
 #include "nvs.h"
 #include "esp_system.h"
 #include "esp_lvgl_port.h"
+#include "sys/stat.h" // Necesario para stat()
+#include <dirent.h>   // Necesario para opendir/readdir
 
 #include "bsp_api.h"
 #include "hardware_manager.h"
@@ -38,6 +40,7 @@ static void init_lvgl_for_service_screen(void);
 static void display_network_status_on_screen(bool is_connected, const char* ip_addr);
 static void display_waiting_for_network_on_screen(void);
 static void setup_inactivity_handling(void);
+static void verify_sdcard_contents(void);
 
 // --- Lógica de Gestión de Inactividad y Despertar ---
 typedef enum {
@@ -85,27 +88,24 @@ static void screen_touch_event_cb(lv_event_t * e) {
     lv_disp_t * disp = lv_display_get_default();
     if (!disp) return;
 
-    // Cualquier tipo de presión resetea el temporizador de inactividad de LVGL
     lv_display_trigger_activity(disp);
     
-    // Si la pantalla está atenuada pero no apagada, un solo toque la restaura
     if (code == LV_EVENT_PRESSED && s_is_dimmed && !screen_manager_is_off()) {
         ESP_LOGI(TAG, "Actividad detectada en pantalla atenuada, restaurando brillo.");
         read_user_brightness_from_nvs();
         screen_manager_set_brightness(s_user_brightness);
         s_is_dimmed = false;
-        return; // Evento gestionado
+        return;
     }
 
-    // Lógica de despertar con doble-doble-toque SÓLO si la pantalla está apagada
     if (code == LV_EVENT_CLICKED && screen_manager_is_off()) {
         switch (s_wake_state) {
             case WAKE_STATE_OFF:
                 s_wake_click_count++;
-                if (s_wake_click_count == 1) { // Primer toque de un posible doble-toque
+                if (s_wake_click_count == 1) {
                     s_double_click_timer = lv_timer_create(double_click_timer_cb, 500, NULL);
                     lv_timer_set_repeat_count(s_double_click_timer, 1);
-                } else if (s_wake_click_count == 2) { // Doble-toque detectado
+                } else if (s_wake_click_count == 2) {
                     if (s_double_click_timer) lv_timer_del(s_double_click_timer);
                     s_double_click_timer = NULL;
                     ESP_LOGI(TAG, "Secuencia de despertar: PRIMER doble-toque detectado. Esperando el segundo...");
@@ -116,19 +116,19 @@ static void screen_touch_event_cb(lv_event_t * e) {
                 }
                 break;
 
-            case WAKE_STATE_PRIMED: // Esperando el segundo doble-toque
+            case WAKE_STATE_PRIMED:
                 s_wake_click_count++;
                  if (s_wake_click_count == 1) {
                     s_double_click_timer = lv_timer_create(double_click_timer_cb, 500, NULL);
                     lv_timer_set_repeat_count(s_double_click_timer, 1);
-                } else if (s_wake_click_count >= 2) { // Segundo doble-toque detectado
+                } else if (s_wake_click_count >= 2) {
                     if (s_double_click_timer) lv_timer_del(s_double_click_timer);
                     if (s_wake_prime_timer) lv_timer_del(s_wake_prime_timer);
                     s_double_click_timer = NULL;
                     s_wake_prime_timer = NULL;
                     
                     ESP_LOGI(TAG, "Secuencia de despertar: SEGUNDO doble-toque detectado. ¡Encendiendo pantalla!");
-                    screen_manager_turn_on(); // Enciende y restaura brillo
+                    screen_manager_turn_on();
                     s_is_dimmed = false;
                     s_wake_state = WAKE_STATE_OFF;
                     s_wake_click_count = 0;
@@ -145,8 +145,6 @@ static void inactivity_timer_cb(lv_timer_t * timer) {
     uint32_t inactivity_ms = lv_display_get_inactive_time(disp);
     bool is_off = screen_manager_is_off();
     
-    // Si el usuario interactúa, lv_display_trigger_activity resetea el contador,
-    // por lo que este callback se ejecutará de nuevo y s_is_dimmed se pondrá a false.
     if (inactivity_ms < 30000 && s_is_dimmed) {
         s_is_dimmed = false;
     }
@@ -196,6 +194,35 @@ void app_main(void)
     } else {
         run_main_application_mode();
     }
+
+    while (1) {
+        vTaskDelay(pdMS_TO_TICKS(10000));
+    }
+}
+
+// [DIAGNÓSTICO] Esta función ahora lista el contenido del directorio de assets.
+static void verify_sdcard_contents(void) {
+    const char* dir_path = "/sdcard/diymon";
+    ESP_LOGI(TAG, "Verificando el contenido de la tarjeta SD en '%s'...", dir_path);
+    
+    DIR* dir = opendir(dir_path);
+    if (!dir) {
+        ESP_LOGE(TAG, "--------------------------------------------------------------------");
+        ESP_LOGE(TAG, "¡ERROR CRITICO! No se pudo abrir el directorio '%s'.", dir_path);
+        ESP_LOGE(TAG, "Asegúrate de que la tarjeta SD esté insertada y formateada (FAT32).");
+        ESP_LOGE(TAG, "Y que contenga la carpeta 'diymon' con todos los assets.");
+        ESP_LOGE(TAG, "El dispositivo se detendrá aquí.");
+        ESP_LOGE(TAG, "--------------------------------------------------------------------");
+        while(1) { vTaskDelay(pdMS_TO_TICKS(1000)); }
+    }
+
+    ESP_LOGI(TAG, "Contenido encontrado en '%s':", dir_path);
+    struct dirent* ent;
+    while ((ent = readdir(dir)) != NULL) {
+        ESP_LOGI(TAG, "  - %s", ent->d_name);
+    }
+    closedir(dir);
+    ESP_LOGI(TAG, "Verificación y listado de la SD completado.");
 }
 
 static void init_lvgl_for_service_screen(void)
@@ -272,7 +299,7 @@ static void run_wifi_portal_mode(void) {
     }
     
     display_waiting_for_network_on_screen();
-    vTaskDelay(pdMS_TO_TICKS(1500)); // Delay para que el mensaje sea visible
+    vTaskDelay(pdMS_TO_TICKS(1500)); 
 
     display_network_status_on_screen(false, NULL);
 
@@ -283,7 +310,12 @@ static void run_wifi_portal_mode(void) {
 static void run_main_application_mode(void) {
     ESP_LOGI(TAG, "Cargando aplicación principal...");
     hardware_manager_init();
+    
+    verify_sdcard_contents();
+
     screen_manager_init();
+    
+    hardware_manager_mount_lvgl_filesystem();
     
     ESP_LOGI(TAG, "El driver WiFi permanece desactivado para ahorrar RAM.");
     
@@ -368,13 +400,10 @@ static void display_network_status_on_screen(bool is_connected, const char* ip_a
         lv_style_set_text_align(&style_text, LV_TEXT_ALIGN_CENTER);
         lv_style_set_text_font(&style_text, &lv_font_montserrat_14);
 
-        // Limpiar los labels de "espera" si existen, creando nuevos
-        // LVGL es eficiente y no creará fugas de memoria si se hace sobre el mismo padre.
-        lv_obj_clean(scr); // Limpiamos la pantalla para eliminar mensajes previos
+        lv_obj_clean(scr);
         
-        // Recrear el fondo y el botón que ui_config_screen_show() puso
         ui_config_screen_show(); 
-        scr = lv_screen_active(); // ui_config_screen_show() crea una nueva pantalla
+        scr = lv_screen_active();
 
         lv_obj_t *line1 = lv_label_create(scr);
         lv_obj_t *line2 = lv_label_create(scr);

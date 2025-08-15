@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal de Configuración</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; color: #333; }
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        .header { text-align: center; margin-bottom: 20px; color: white; }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; gap: 15px; }
+        .header p { font-size: 1.2em; opacity: 0.9; }
+        .card { background: white; border-radius: 15px; padding: 25px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .card h3 { color: #5a67d8; font-size: 1.4em; word-break: break-all; margin: 0; display: flex; align-items: center; gap: 10px; }
+        .card-subtitle { font-size: 0.95em; color: #718096; margin: 5px 0 20px; }
+        .btn { border: none; padding: 10px 20px; border-radius: 25px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.2); display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .btn-secondary { background: linear-gradient(135deg, #4fd1c7 0%, #06b6d4 100%); color: white; }
+        .btn-danger { background: linear-gradient(135deg, #fc8181 0%, #f56565 100%); color: white; }
+        .btn-rename { background: linear-gradient(135deg, #3a86ff 0%, #2c6fcc 100%); color: white; } /* Azul para renombrar */
+        .btn-small { padding: 6px 12px; font-size: 12px; border-radius: 15px; }
+        
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab-btn { padding: 10px 20px; font-size: 16px; font-weight: 600; cursor: pointer; border: none; background-color: rgba(255, 255, 255, 0.2); color: white; border-radius: 10px; transition: all 0.3s ease; display: flex; align-items: center; gap: 8px; }
+        .tab-btn:hover { background-color: rgba(255, 255, 255, 0.4); }
+        .tab-btn.active { background-color: white; color: #5a67d8; box-shadow: 0 4px 10px rgba(0,0,0,0.1); transform: translateY(-2px); }
+        .content-panel { display: none; }
+        .content-panel.active { display: block; }
+        
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-weight: 600; margin-bottom: 5px; color: #4a5568; }
+        .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 16px; }
+
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .header-actions { display: flex; gap: 10px; }
+        .header-actions .btn { width: 42px; height: 42px; font-size: 20px; padding: 0; } /* Estilo para botones con solo icono */
+
+        .file-list { min-height: 250px; max-height: 400px; overflow-y: auto; border: 2px dashed #e2e8f0; border-radius: 10px; transition: all 0.3s ease; }
+        .file-list.dragover { border-color: #5a67d8; background: rgba(90, 103, 216, 0.05); }
+        .file-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-bottom: 1px solid #f0f2f5; }
+        .file-actions { display: flex; gap: 8px; }
+
+        .upload-progress-container { margin-top: 15px; }
+        .progress-bar { width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #48bb78, #38a169); border-radius: 4px; }
+        .status { font-size: 0.9em; color: #718096; margin-top: 8px; display: block; min-height: 1.2em; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMjAuNSA1SDMuNUMzLjIzIDUgMyA1LjIzIDMgNS41VjE4LjVDMyAxOC43NyAzLjIzIDE5IDMuNSAxOUgyMC41QzIwLjc3IDE5IDIxIDE4Ljc3IDIxIDE4LjVWMi41QzIxIDIuMjMgMjAuNzcgMiAyMC41IDJIOS41TDMgOC41VjE4LjVDMyAxOS44OCAxLjU3IDIxIDAgMjFDMS43MyAyMSAzIDExLjUgMyA4LjVWNS41QzMgNS4yMyAzLjIzIDUgMy41IDVIMjAuNUMyMC43NyA1IDIxIDUuMjMgMjEgNS41VjE4LjVDMjEgMTguNzcgMjAuNzcgMTkgMjAuNSAxOUgzLjVDMy4yMyAxOSAzIDE4Ljc3IDMgMTguNVYxNy41IiBmaWxsPSJ3aGl0ZSIvPjxwYXRoIGQ9Ik0yMC41IDVIMy41QzMuMjMgNSAzIDUuMjMgMyA1LjVWMjAuNUMzIDIwLjc3IDMuMjMgMjEgMy41IDIxSDIwLjVDMjAuNzcgMjEgMjEgMjAuNzcgMjEgMjAuNVY1LjVDMjEgNS4yMyAyMC43NyA1IDIwLjUgNVoiIGZpbGw9InVybCgjYSkiLz48cGF0aCBkPSJNMjAuNSA1SDMuNUMzLjIzIDUgMyA1LjIzIDMgNS41VjIwLjVDMyAyMC43NyAzLjIzIDIxIDMuNSAyMUgyMC41QzIwLjc3IDIxIDIxIDIwLjc3IDIxIDIwLjVWMi41QzIxIDIuMjMgMjAuNzcgMiAyMC41IDJIOS41TDQgN0gyMC41QzIwLjc3IDcgMjEgNy4yMyAyMSA3LjVWMThMDIwLjUgNVoiIGZpbGw9InVybCgjYikiLz48cGF0aCBkPSJNMjAuNSA1SDMuNUMzLjIzIDUgMyA1LjIzIDMgNS41VjE4LjVDMyAxOC43NyAzLjIzIDE5IDMuNSAxOUgyMC41QzIwLjc3IDE5IDIxIDE4Ljc3IDIxIDE4LjVWMi41QzIxIDIuMjMgMjAuNzcgMiAyMC41IDJIOS41TDQgN0gyMC41QzIwLjc3IDcgMjEgNy4yMyAyMSA3LjVWMThMMjAuNSA1WiIgZmlsbD0id2hpdGUiIGZpbGwtb3BhY2l0eT0iLjMiLz48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImEiIHgxPSIyMSIgeDI9IjMiIHkxPSIyMSIgeTI9IjUiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj48c3RvcCBzdG9wLWNvbG9yPSIjZmFiYzQ1Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjZmY4YzQ0Ii8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImIiIHgxPSIyMSIgeDI9IjMiIHkxPSIyMSIgeTI9IjUiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj48c3RvcCBzdG9wLWNvbG9yPSIjZmFiYzQ1Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjZmY4YzQ0Ii8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PC9zdmc+"> Portal de Configuración</h1>
+            <p>Gestiona el WiFi y los archivos de tu dispositivo</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" data-target="#wifi-panel">📶 WiFi</button>
+            <button class="tab-btn" data-target="#files-panel">📁 Archivos</button>
+            <button class="tab-btn" data-target="#settings-panel">⚙️ Configuración</button>
+            <button class="tab-btn" data-target="#index-panel">🌍 FIYndex</button>
+        </div>
+
+        <div class="tab-content">
+            <div id="wifi-panel" class="content-panel active">
+                <div class="card">
+                    <h3>📶 Configuración WiFi</h3>
+                    <p class="card-subtitle">Conecta tu dispositivo a la red local.</p>
+                    <form id="wifi-form">
+                        <div class="form-group"><label for="ssid">SSID (Nombre de red)</label><input type="text" id="ssid" name="ssid" required></div>
+                        <div class="form-group"><label for="password">Contraseña</label><input type="password" id="password" name="password"></div>
+                        <div class="form-group"><label for="authmode">Seguridad</label><select id="authmode" name="authmode"><option value="0">Automático</option><option value="1" selected>WPA2</option><option value="2">WPA3</option></select></div>
+                        <button type="submit" class="btn btn-primary" id="save-wifi-btn">💾 Guardar y Reiniciar</button>
+                    </form>
+                    <div id="wifi-status" class="status"></div>
+                </div>
+            </div>
+
+            <div id="files-panel" class="content-panel">
+                <div class="card">
+                    <div class="card-header">
+                        <h3><span id="current-path-display">/</span></h3>
+                        <div class="header-actions">
+                            <button class="btn btn-primary" id="upload-btn" title="Subir Archivo">📤</button>
+                            <button class="btn btn-secondary" id="create-file-btn" title="Crear Archivo">➕📄</button>
+                            <button class="btn btn-secondary" id="create-folder-btn" title="Crear Carpeta">➕📁</button>
+                            <button class="btn btn-secondary" id="refresh-btn" title="Actualizar">🔄</button>
+                        </div>
+                    </div>
+                    <div class="file-list" id="file-list"></div>
+                    <div class="upload-progress-container"><div class="progress-bar"><div class="progress-fill" id="upload-progress" style="width:0%"></div></div><span id="upload-status" class="status"></span></div>
+                    <input type="file" id="file-input" multiple class="hidden">
+                </div>
+            </div>
+
+            <div id="settings-panel" class="content-panel"><div class="card"><h3>⚙️ Configuración del Dispositivo</h3><p class="card-subtitle">(En desarrollo)</p></div></div>
+            <div id="index-panel" class="content-panel"><div class="card"><h3>🌍 FIYndex</h3><p class="card-subtitle">(En desarrollo)</p></div></div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- LÓGICA DE PESTAÑAS ---
+            document.querySelectorAll('.tab-btn').forEach(button => {
+                button.addEventListener('click', () => {
+                    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    document.querySelectorAll('.content-panel').forEach(panel => panel.classList.remove('active'));
+                    document.querySelector(button.dataset.target).classList.add('active');
+                });
+            });
+
+            // --- LÓGICA WIFI ---
+            const wifiForm = document.getElementById('wifi-form');
+            wifiForm.addEventListener('submit', async e => {
+                e.preventDefault();
+                const btn = document.getElementById('save-wifi-btn');
+                const status = document.getElementById('wifi-status');
+                btn.disabled = true;
+                btn.textContent = 'Guardando...';
+                status.textContent = 'Enviando credenciales...';
+                try {
+                    const response = await fetch('/save', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                        body: new URLSearchParams(new FormData(wifiForm)).toString()
+                    });
+                    if (!response.ok) throw new Error('Respuesta no válida del servidor.');
+                    status.innerHTML = '<span style="color:green">✅ Guardado. El dispositivo se reiniciará.</span>';
+                } catch (err) {
+                    status.innerHTML = `<span style="color:red">❌ Error: ${err.message}</span>`;
+                    btn.disabled = false;
+                    btn.textContent = '💾 Guardar y Reiniciar';
+                }
+            });
+
+            // --- LÓGICA DEL GESTOR DE ARCHIVOS ---
+            let currentPath = '/';
+            const fileInput = document.getElementById('file-input');
+            const fileListDiv = document.getElementById('file-list');
+            const pathDisplay = document.getElementById('current-path-display');
+
+            const formatBytes=b=>{if(!+b)return"0 B";const k=1024,s=["B","KB","MB","GB"],i=Math.floor(Math.log(b)/Math.log(k));return`${parseFloat((b/Math.pow(k,i)).toFixed(1))} ${s[i]}`};
+
+            const fetchFileList = async path => {
+                currentPath = path;
+                pathDisplay.textContent = `📁 ${path}`;
+                fileListDiv.innerHTML = '<p style="text-align:center;padding:20px;color:#999">Cargando...</p>';
+                try {
+                    const resp = await fetch(`/listfiles?path=${encodeURIComponent(path)}`);
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    renderFileList(await resp.json(), path);
+                } catch (e) { fileListDiv.innerHTML = `<p style="color:red;padding:20px">Error al cargar: ${e.message}</p>`; }
+            };
+
+            const handleFileUpload = async files => {
+                const pBar = document.getElementById('upload-progress');
+                const status = document.getElementById('upload-status');
+                if (files.length === 0) return;
+                status.textContent = `Subiendo ${files.length} archivo(s)...`;
+                let uploaded = 0;
+                for (const file of files) {
+                    const fd = new FormData();
+                    fd.append('path', currentPath);
+                    fd.append('file', file, file.name);
+                    try {
+                        const resp = await fetch('/upload', {method: 'POST', body: fd});
+                        if (!resp.ok) throw new Error('Fallo en subida');
+                        uploaded++;
+                        pBar.style.width = `${(uploaded / files.length) * 100}%`;
+                    } catch (e) { status.innerHTML = `<span style="color:red">❌ Error al subir ${file.name}</span>`; await new Promise(r=>setTimeout(r,2000)); }
+                }
+                status.innerHTML = '<span style="color:green">✅ Subida completada.</span>';
+                fetchFileList(currentPath);
+                setTimeout(() => { pBar.style.width = '0%'; status.textContent = ''; }, 2000);
+            };
+
+            const createItem = async (type) => {
+                const promptText = type === 'dir' ? 'Nombre de la nueva carpeta:' : 'Nombre del nuevo archivo:';
+                const name = prompt(promptText);
+                if (!name) return;
+
+                const fd = new FormData();
+                fd.append('path', currentPath);
+                fd.append('filename', name);
+                fd.append('type', type);
+                try {
+                    const resp = await fetch('/create', { method: 'POST', body: fd });
+                    if (!resp.ok) throw new Error('El servidor no pudo crear el item.');
+                    fetchFileList(currentPath);
+                } catch(e) { alert(`Error al crear: ${e.message}`); }
+            };
+
+            const renameItem = async (path, oldName) => {
+                const newName = prompt(`Nuevo nombre para "${oldName}":`, oldName);
+                if (!newName || newName === oldName) return;
+                const fd = new FormData();
+                fd.append('path', path);
+                fd.append('old_filename', oldName);
+                fd.append('new_filename', newName);
+                try {
+                    const resp = await fetch('/rename', { method: 'POST', body: fd });
+                    if (!resp.ok) throw new Error('El servidor no pudo renombrar.');
+                    fetchFileList(path);
+                } catch(e) { alert(`Error al renombrar: ${e.message}`); }
+            };
+
+            const deleteItem = async (path, name) => {
+                if (!confirm(`⚠️ ¿Borrar "${name}"?`)) return;
+                const fd = new FormData();
+                fd.append('path', path);
+                fd.append('filename', name);
+                try {
+                    const resp = await fetch('/delete', { method: 'POST', body: fd });
+                    if (!resp.ok) throw new Error('El servidor no pudo borrar.');
+                    fetchFileList(path);
+                } catch (e) { alert(`Error al borrar: ${e.message}`); }
+            };
+
+            const renderFileList = (files, path) => {
+                let html = (path !== '/') ? `<div class="file-item"><div class="file-info"><a href="#" class="dir-link" data-path="${path.substring(0, path.lastIndexOf('/'))||'/'}">⤴️ ..</a></div></div>` : '';
+                if (!files || files.length === 0) {
+                    fileListDiv.innerHTML = html + '<p style="text-align:center;padding:40px;color:#aaa">Directorio vacío.</p>';
+                    return;
+                }
+                files.sort((a,b)=>(a.type===b.type)?a.name.localeCompare(b.name):a.type==='dir'?-1:1).forEach(f=>{
+                    const icon=f.type==='dir'?'📁':'📄',fullPath=path==='/'?`/${f.name}`:`${path}/${f.name}`;
+                    const nameHtml=f.type==='dir'?`<a href="#" class="dir-link" data-path="${fullPath}">${f.name}</a>`:`<span>${f.name} <small style="color:#888">(${formatBytes(f.size)})</small></span>`;
+                    html+=`<div class="file-item"><div class="file-info"><span>${icon}</span>${nameHtml}</div><div class="file-actions"><button class="btn btn-small btn-rename" data-path="${path}" data-filename="${f.name}">✏️</button><button class="btn btn-small btn-danger" data-path="${path}" data-filename="${f.name}">🗑️</button></div></div>`;
+                });
+                fileListDiv.innerHTML = html;
+            };
+
+            document.getElementById('upload-btn').addEventListener('click', () => fileInput.click());
+            document.getElementById('refresh-btn').addEventListener('click', () => fetchFileList(currentPath));
+            document.getElementById('create-folder-btn').addEventListener('click', () => createItem('dir'));
+            document.getElementById('create-file-btn').addEventListener('click', () => createItem('file'));
+            fileInput.addEventListener('change', e => handleFileUpload(e.target.files));
+            ['dragenter','dragover','dragleave','drop'].forEach(e=>fileListDiv.addEventListener(e,evt=>{evt.preventDefault();evt.stopPropagation()}));
+            ['dragenter','dragover'].forEach(e=>fileListDiv.addEventListener(e,()=>fileListDiv.classList.add('dragover')));
+            ['dragleave','drop'].forEach(e=>fileListDiv.addEventListener(e,()=>fileListDiv.classList.remove('dragover')));
+            fileListDiv.addEventListener('drop', e => handleFileUpload(e.dataTransfer.files));
+            fileListDiv.addEventListener('click', e => {
+                const dirLink=e.target.closest('a.dir-link'),delBtn=e.target.closest('.btn-danger'),renBtn=e.target.closest('.btn-rename');
+                if (dirLink) { e.preventDefault(); fetchFileList(dirLink.dataset.path); }
+                if (delBtn) { deleteItem(delBtn.dataset.path, delBtn.dataset.filename); }
+                if (renBtn) { renameItem(renBtn.dataset.path, renBtn.dataset.filename); }
+            });
+
+            fetchFileList('/');
+        });
+    </script>
+</body>
+</html>

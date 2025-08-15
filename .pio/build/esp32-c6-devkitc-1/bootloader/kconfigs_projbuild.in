@@ -1,0 +1,5 @@
+source "C:/Users/rcamacho/.platformio/packages/framework-espidf@src-6ebd8097f2a445b22da97153912660dc/components/bootloader/Kconfig.projbuild"
+source "C:/Users/rcamacho/.platformio/packages/framework-espidf@src-6ebd8097f2a445b22da97153912660dc/components/esp_app_format/Kconfig.projbuild"
+source "C:/Users/rcamacho/.platformio/packages/framework-espidf@src-6ebd8097f2a445b22da97153912660dc/components/esp_rom/Kconfig.projbuild"
+source "C:/Users/rcamacho/.platformio/packages/framework-espidf@src-6ebd8097f2a445b22da97153912660dc/components/esptool_py/Kconfig.projbuild"
+source "C:/Users/rcamacho/.platformio/packages/framework-espidf@src-6ebd8097f2a445b22da97153912660dc/components/partition_table/Kconfig.projbuild"

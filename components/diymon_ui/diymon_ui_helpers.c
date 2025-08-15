@@ -1,9 +1,8 @@
-/*
- * Fichero: ./components/diymon_ui/diymon_ui_helpers.c
- * Fecha: 13/08/2025 - 05:59 
- * Último cambio: Modificado para usar el fondo de pantalla desde el firmware.
- * Descripción: Se ha reescrito la función `ui_helpers_load_background` para que utilice el asset `bg_0` compilado en el firmware en lugar de cargarlo desde la tarjeta SD. Se crea un objeto de imagen que se mueve al fondo de la pantalla.
- */
+/* Fecha: 15/08/2025 - 05:05  */
+/* Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\diymon_ui_helpers.c */
+/* Último cambio: Corregida la construcción de rutas de assets para usar el punto de montaje VFS '/sdcard'. */
+/* Descripción: Se ha modificado ui_helpers_build_asset_path para que genere rutas VFS directas (ej: '/sdcard/...') en lugar de rutas LVGL ('S:/...'). Esto es necesario porque el nimation_loader utiliza funciones de E/S estándar de C (open, opendir) que no entienden el sistema de letras de unidad de LVGL, solucionando el error de 'directorio no encontrado'. */
+
 #include "diymon_ui_helpers.h"
 #include "diymon_evolution.h"
 #include "esp_log.h"
@@ -13,7 +12,6 @@
 #include <ctype.h>
 #include "BG.h" // Incluir el nuevo asset de fondo
 
-#define SD_MOUNT_POINT "/sdcard"
 static const char* TAG_HELPERS = "UI_HELPERS";
 
 // Función interna para obtener el nombre del directorio de evolución (ej: "1.1.1" -> "111")
@@ -32,7 +30,8 @@ static void get_evolution_dir_name(char* dir_name_buffer, size_t buffer_size) {
 void ui_helpers_build_asset_path(char* buffer, size_t buffer_size, const char* asset_filename) {
     char dir_name[9];
     get_evolution_dir_name(dir_name, sizeof(dir_name));
-    snprintf(buffer, buffer_size, "%s/DIYMON/%s/%s", SD_MOUNT_POINT, dir_name, asset_filename);
+    // [CORRECCIÓN] Se usa el punto de montaje VFS real '/sdcard' porque animation_loader usa 'opendir' estándar.
+    snprintf(buffer, buffer_size, "S:/diymon/%s/%s/", dir_name, asset_filename);
 }
 
 // Carga la imagen de fondo desde el firmware creando un objeto de imagen.

@@ -15,252 +15,6 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(DIYTOGUETHER)
 
 # =================================================================================================
-# Fichero: Z:\DIYTOGETHER\DIYtogether\main.c
-# =================================================================================================
-
-#include <stdio.h>
-
-#include "esp_err.h"
-#include "esp_log.h"
-#include "esp_check.h"
-
-#include "nvs_flash.h"
-
-#include "esp_lvgl_port.h"
-
-#include "bsp_display.h"
-#include "bsp_touch.h"
-#include "bsp_i2c.h"
-#include "bsp_spi.h"
-#include "bsp_wifi.h"
-#include "bsp_sdcard.h"
-#include "bsp_battery.h"
-#include "bsp_qmi8658.h"
-
-#include "iot_button.h"
-#include "button_gpio.h"
-
-#include "demos/lv_demos.h"
-
-
-#include "lvgl_ui.h"
-
-#define EXAMPLE_DISPLAY_ROTATION 0
-
-#if EXAMPLE_DISPLAY_ROTATION == 90 || EXAMPLE_DISPLAY_ROTATION == 270
-#define EXAMPLE_LCD_H_RES (320)
-#define EXAMPLE_LCD_V_RES (172)
-#else
-#define EXAMPLE_LCD_H_RES (172)
-#define EXAMPLE_LCD_V_RES (320)
-#endif
-
-#define EXAMPLE_LCD_DRAW_BUFF_HEIGHT (50)
-#define EXAMPLE_LCD_DRAW_BUFF_DOUBLE (1)
-
-
-static char *TAG = "factory";
-
-/* LCD IO and panel */
-static esp_lcd_panel_io_handle_t io_handle = NULL;
-static esp_lcd_panel_handle_t panel_handle = NULL;
-static esp_lcd_touch_handle_t touch_handle = NULL;
-
-/* LVGL display and touch */
-static lv_display_t *lvgl_disp = NULL;
-static lv_indev_t *lvgl_touch_indev = NULL;
-
-
-void lv_fs_fatfs_init(void);
-static esp_err_t app_lvgl_init(void);
-static void button_init(void);
-static void touch_test(void);
-
-void app_main(void)
-{
-    i2c_master_bus_handle_t i2c_bus_handle;
-    // Initialize NVS
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
-    {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(ret);
-
-    i2c_bus_handle = bsp_i2c_init();
-    bsp_spi_init();
-
-    bsp_battery_init();
-    bsp_qmi8658_init(i2c_bus_handle);
-    bsp_wifi_init("WSTEST", "waveshare0755");
-    bsp_display_init(&io_handle, &panel_handle, EXAMPLE_LCD_H_RES * EXAMPLE_LCD_DRAW_BUFF_HEIGHT);
-    bsp_touch_init(&touch_handle, i2c_bus_handle, EXAMPLE_LCD_H_RES, EXAMPLE_LCD_V_RES, EXAMPLE_DISPLAY_ROTATION);
-    bsp_sdcard_init();
-    ESP_ERROR_CHECK(app_lvgl_init());
-    lv_fs_fatfs_init();
-
-
-    bsp_display_brightness_init();
-    bsp_display_set_brightness(100);
-
-    button_init();
-    touch_test();
-
-
-    if (lvgl_port_lock(0))
-    {
-        // lv_demo_benchmark();
-        // lv_demo_music();
-        // lv_demo_widgets();
-        lvgl_ui_init();
-        lvgl_port_unlock();
-    }
-}
-
-static esp_err_t app_lvgl_init(void)
-{
-    /* Initialize LVGL */
-    const lvgl_port_cfg_t lvgl_cfg = {
-        .task_priority = 4,       /* LVGL task priority */
-        .task_stack = 1024 * 10,  /* LVGL task stack size */
-        .task_affinity = -1,      /* LVGL task pinned to core (-1 is no affinity) */
-        .task_max_sleep_ms = 500, /* Maximum sleep in LVGL task */
-        .timer_period_ms = 5      /* LVGL timer tick period in ms */
-    };
-    ESP_RETURN_ON_ERROR(lvgl_port_init(&lvgl_cfg), TAG, "LVGL port initialization failed");
-
-    /* Add LCD screen */
-    ESP_LOGD(TAG, "Add LCD screen");
-    lvgl_port_display_cfg_t disp_cfg = {
-        .io_handle = io_handle,
-        .panel_handle = panel_handle,
-        .buffer_size = EXAMPLE_LCD_H_RES * EXAMPLE_LCD_DRAW_BUFF_HEIGHT,
-        .double_buffer = EXAMPLE_LCD_DRAW_BUFF_DOUBLE,
-        .hres = EXAMPLE_LCD_H_RES,
-        .vres = EXAMPLE_LCD_V_RES,
-        .monochrome = false,
-        /* Rotation values must be same as used in esp_lcd for initial settings of the screen */
-        .rotation = {
-            .swap_xy = false,
-            .mirror_x = false,
-            .mirror_y = false,
-        },
-        .flags = {
-            .buff_dma = true,
-        }};
-#if EXAMPLE_DISPLAY_ROTATION == 90
-    disp_cfg.rotation.swap_xy = true;
-    disp_cfg.rotation.mirror_x = true;
-    disp_cfg.rotation.mirror_y = false;
-    ESP_ERROR_CHECK(esp_lcd_panel_set_gap(panel_handle, 0, 34));
-#elif EXAMPLE_DISPLAY_ROTATION == 180
-    disp_cfg.rotation.swap_xy = false;
-    disp_cfg.rotation.mirror_x = true;
-    disp_cfg.rotation.mirror_y = true;
-    ESP_ERROR_CHECK(esp_lcd_panel_set_gap(panel_handle, 34, 0));
-#elif EXAMPLE_DISPLAY_ROTATION == 270
-    disp_cfg.rotation.swap_xy = true;
-    disp_cfg.rotation.mirror_x = false;
-    disp_cfg.rotation.mirror_y = true;
-    ESP_ERROR_CHECK(esp_lcd_panel_set_gap(panel_handle, 0, 34));
-#else
-    ESP_ERROR_CHECK(esp_lcd_panel_set_gap(panel_handle, 34, 0));
-#endif
-    lvgl_disp = lvgl_port_add_disp(&disp_cfg);
-
-    /* Add touch input (for selected screen) */
-    const lvgl_port_touch_cfg_t touch_cfg = {
-        .disp = lvgl_disp,
-        .handle = touch_handle,
-    };
-    lvgl_touch_indev = lvgl_port_add_touch(&touch_cfg);
-
-    return ESP_OK;
-}
-
-
-
-static bool touch_test_done = false;
-
-
-static void button_event_cb(void *arg, void *data)
-{
-    button_event_t event = iot_button_get_event((button_handle_t)arg);
-    ESP_LOGI(TAG, "%s", iot_button_get_event_str(event));
-    touch_test_done = true;
-}
-
-static void button_init(void)
-{
-    button_config_t btn_cfg = {};
-    button_gpio_config_t btn_gpio_cfg = {};
-    btn_gpio_cfg.gpio_num = GPIO_NUM_9;
-    btn_gpio_cfg.active_level = 0;
-    static button_handle_t btn = NULL;
-    ESP_ERROR_CHECK(iot_button_new_gpio_device(&btn_cfg, &btn_gpio_cfg, &btn));
-    iot_button_register_cb(btn, BUTTON_SINGLE_CLICK, NULL, button_event_cb, NULL);
-    // iot_button_register_cb(btn, BUTTON_LONG_PRESS_START, NULL, button_event_cb, NULL);
-    // iot_button_register_cb(btn, BUTTON_LONG_PRESS_HOLD, NULL, button_event_cb, NULL);
-    // iot_button_register_cb(btn, BUTTON_LONG_PRESS_UP, NULL, button_event_cb, NULL);
-    // iot_button_register_cb(btn, BUTTON_PRESS_END, NULL, button_event_cb, NULL);
-}
-
-static void touch_test(void)
-{
-    uint16_t touchpad_x[1] = {0};
-    uint16_t touchpad_y[1] = {0};
-    uint8_t touchpad_cnt = 0;
-    uint16_t color_arr[16] = {0};
-    lv_obj_t *lable = NULL;
-
-    for (int i = 0; i < 16; i++)
-    {
-        color_arr[i] = 0xf800;
-    }
-    if (lvgl_port_lock(0))
-    {
-        lable = lv_label_create(lv_scr_act());
-        lv_label_set_text(lable, "Touch testing mode \nExit with BOOT button");
-        lv_obj_center(lable);
-        lvgl_port_unlock();
-    }
-    vTaskDelay(pdMS_TO_TICKS(500));
-    if (lvgl_port_lock(0))
-    {
-        while (!touch_test_done)
-        {
-            /* Read data from touch controller into memory */
-            esp_lcd_touch_read_data(touch_handle);
-
-            /* Read data from touch controller */
-            bool touchpad_pressed = esp_lcd_touch_get_coordinates(touch_handle, touchpad_x, touchpad_y, NULL, &touchpad_cnt, 1);
-            if (touchpad_pressed && touchpad_cnt > 0)
-            {
-                // touchpad_x[0] = EXAMPLE_LCD_H_RES - 1 - touchpad_x[0];
-
-                if (touchpad_x[0] < 2)
-                    touchpad_x[0] = 2;
-                else if (touchpad_x[0] > EXAMPLE_LCD_H_RES - 2 - 1)
-                    touchpad_x[0] = EXAMPLE_LCD_H_RES - 2 - 1;
-
-                if (touchpad_y[0] < 2)
-                    touchpad_y[0] = 2;
-                else if (touchpad_y[0] > EXAMPLE_LCD_V_RES - 2 - 1)
-                    touchpad_y[0] = EXAMPLE_LCD_V_RES - 2 - 1;
-
-                esp_lcd_panel_draw_bitmap(panel_handle, touchpad_x[0] - 2, touchpad_y[0] - 2, touchpad_x[0] + 2, touchpad_y[0] + 2, color_arr);
-            }
-            vTaskDelay(pdMS_TO_TICKS(10));
-        }
-        lv_obj_del(lable);
-        lvgl_port_unlock();
-    }
-    
-}
-
-
-# =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\partitions.csv
 # =================================================================================================
 
@@ -5771,12 +5525,11 @@ idf_component_register(
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\diymon_ui_helpers.c
 # =================================================================================================
 
-/*
- * Fichero: ./components/diymon_ui/diymon_ui_helpers.c
- * Fecha: 13/08/2025 - 05:59 
- * Último cambio: Modificado para usar el fondo de pantalla desde el firmware.
- * Descripción: Se ha reescrito la función `ui_helpers_load_background` para que utilice el asset `bg_0` compilado en el firmware en lugar de cargarlo desde la tarjeta SD. Se crea un objeto de imagen que se mueve al fondo de la pantalla.
- */
+/* Fecha: 15/08/2025 - 04:11  */
+/* Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\diymon_ui_helpers.c */
+/* Último cambio: Modificada la construcción de rutas de assets para usar la letra de unidad 'S:' de LVGL. */
+/* Descripción: Funciones de ayuda para la UI. Se ha modificado `ui_helpers_build_asset_path` para que genere rutas compatibles con el sistema de ficheros de LVGL (ej: 'S:/...'), en lugar de rutas VFS de ESP-IDF ('/sdcard/...'). Esto permite a LVGL localizar y cargar correctamente las animaciones desde la tarjeta SD. */
+
 #include "diymon_ui_helpers.h"
 #include "diymon_evolution.h"
 #include "esp_log.h"
@@ -5786,7 +5539,6 @@ idf_component_register(
 #include <ctype.h>
 #include "BG.h" // Incluir el nuevo asset de fondo
 
-#define SD_MOUNT_POINT "/sdcard"
 static const char* TAG_HELPERS = "UI_HELPERS";
 
 // Función interna para obtener el nombre del directorio de evolución (ej: "1.1.1" -> "111")
@@ -5805,7 +5557,8 @@ static void get_evolution_dir_name(char* dir_name_buffer, size_t buffer_size) {
 void ui_helpers_build_asset_path(char* buffer, size_t buffer_size, const char* asset_filename) {
     char dir_name[9];
     get_evolution_dir_name(dir_name, sizeof(dir_name));
-    snprintf(buffer, buffer_size, "%s/DIYMON/%s/%s", SD_MOUNT_POINT, dir_name, asset_filename);
+    // [CORRECCIÓN] Se utiliza la letra de unidad 'S:' que LVGL entiende, en lugar del punto de montaje VFS.
+    snprintf(buffer, buffer_size, "S:/DIYMON/%s/%s", dir_name, asset_filename);
 }
 
 // Carga la imagen de fondo desde el firmware creando un objeto de imagen.
@@ -6962,10 +6715,10 @@ void ui_config_screen_show(void);
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_idle_animation.c
 # =================================================================================================
 
-/* Fecha: 15/08/2025 - 09:49  */
+/* Fecha: 15/08/2025 - 04:04  */
 /* Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_idle_animation.c */
-/* Último cambio: Implementada la detección dinámica del número de fotogramas de la animación de reposo. */
-/* Descripción: Se ha modificado la función `ui_idle_animation_start` para que cuente cuántos ficheros `ANIM_IDLE_*.bin` existen en el directorio de assets actual. Este recuento se utiliza como el número de fotogramas, eliminando la constante `IDLE_ANIM_FRAME_COUNT` y permitiendo que las animaciones de reposo tengan una duración variable. */
+/* Último cambio: Añadido un repliegue para ocultar el personaje si no se encuentran las animaciones en la SD. */
+/* Descripción: Se ha mejorado la robustez del gestor de animación de reposo. Si no se encuentran los fotogramas de la animación en la tarjeta SD (un error común si la SD no está preparada), el objeto de imagen del personaje ahora se ocultará en lugar de mostrar una imagen corrupta. Esto evita un glitch visual y permite que el dispositivo siga siendo funcional. */
 
 #include "ui_idle_animation.h"
 #include "ui_action_animations.h" 
@@ -7015,20 +6768,26 @@ lv_obj_t* ui_idle_animation_start(lv_obj_t *parent) {
     
     s_idle_animation_player.base_path = strdup(anim_path);
 
-    // [CAMBIO CLAVE] Contar dinámicamente los fotogramas de la animación de reposo.
     uint16_t frame_count = animation_loader_count_frames(anim_path, "ANIM_IDLE_");
     if (frame_count == 0) {
-        ESP_LOGE(TAG, "No se encontraron fotogramas para la animación de reposo en '%s'. La animación no se iniciará.", anim_path);
+        ESP_LOGE(TAG, "No se encontraron fotogramas para la animación de reposo en '%s'. La animación no se iniciará y el personaje se ocultará.", anim_path);
         free(s_idle_animation_player.base_path);
         s_idle_animation_player.base_path = NULL;
-        return g_animation_img_obj; // Devolver el objeto de imagen aunque esté vacío para no romper la UI.
+        
+        // [CORRECCIÓN] Ocultar el objeto de imagen si no hay animación para evitar glitches.
+        if (g_animation_img_obj) {
+            lv_obj_add_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
+        }
+        
+        return g_animation_img_obj;
     }
     ESP_LOGI(TAG, "Detectados %d fotogramas para la animación de reposo.", frame_count);
     s_idle_animation_player.frame_count = frame_count;
 
-    // El objeto de imagen ya existe, solo nos aseguramos de que apunte a nuestros datos.
+    // El objeto de imagen ya existe, nos aseguramos de que apunte a nuestros datos y sea visible.
     if(g_animation_img_obj) {
         lv_image_set_src(g_animation_img_obj, &s_idle_animation_player.img_dsc);
+        lv_obj_clear_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
     }
     
     g_is_idle_running = true;
@@ -10036,6 +9795,11 @@ err:
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\iot_button\CMakeLists.txt
 # =================================================================================================
 
+# Fecha: 15/08/2025 - 03:42 
+# Fichero: Z:\DIYTOGETHER\DIYtogether\components\iot_button\CMakeLists.txt
+# Último cambio: Eliminadas las llamadas a 'package_manager' y 'cu_pkg_define_version' para resolver el error de compilación en PlatformIO.
+# Descripción: Registro del componente 'iot_button'. Se han eliminado las funciones de gestión de paquetes que requerían un fichero 'idf_component.yml' inexistente, causando el fallo de CMake. El componente ahora se registra de forma estándar, permitiendo que PlatformIO lo compile correctamente.
+
 set(PRIVREQ esp_timer)
 set(REQ driver)
 set(SRC_FILES "button_gpio.c" "iot_button.c" "button_matrix.c")
@@ -10052,8 +9816,11 @@ idf_component_register(SRCS ${SRC_FILES}
                         REQUIRES ${REQ}
                         PRIV_REQUIRES ${PRIVREQ})
 
-include(package_manager)
-cu_pkg_define_version(${CMAKE_CURRENT_LIST_DIR})
+# [CORRECCIÓN] Se eliminaron las siguientes líneas que causaban el error de CMake,
+# ya que este componente es local y no necesita gestionar su versión a través
+# del registro de componentes de Espressif.
+# include(package_manager)
+# cu_pkg_define_version(${CMAKE_CURRENT_LIST_DIR})
 
 
 # =================================================================================================
@@ -11333,12 +11100,11 @@ static const char* INDEX_HTML_CONTENT = R"rawliteral(
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server.c
 # =================================================================================================
 
-/*
-# Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server.c
-# Fecha: `$timestamp
-# Último cambio: Añadido el manejador para guardar credenciales WiFi (/save).
-# Descripción: Servidor web para configuración. Se ha añadido el endpoint '/save' para procesar el formulario de configuración WiFi, guardar las credenciales en NVS y reiniciar el dispositivo. Esto soluciona el error 404 que impedía guardar la configuración.
-*/
+/* Fecha: 15/08/2025 - 04:18  */
+/* Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server.c */
+/* Último cambio: Modificado el manejador raíz ('/') para servir la página HTML desde el firmware en lugar de la SD. */
+/* Descripción: El manejador del endpoint raíz ahora envía el contenido del `INDEX_HTML_CONTENT` (definido en `web_server_page.h`) directamente. Esto elimina la dependencia de la tarjeta SD para mostrar el portal de configuración, solucionando el error 404 y haciendo el modo de servicio más robusto. */
+
 #include "web_server.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
@@ -11356,6 +11122,7 @@ static const char* INDEX_HTML_CONTENT = R"rawliteral(
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "esp_system.h"
+#include "web_server_page.h" // [CORRECCIÓN] Incluir el fichero con el HTML
 
 static const char *TAG = "WEB_SERVER";
 #define WEB_MOUNT_POINT "/sdcard"
@@ -11575,7 +11342,7 @@ static esp_err_t delete_file_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-// --- [NUEVO] Manejador para guardar credenciales WiFi ---
+// --- Manejador para guardar credenciales WiFi ---
 static esp_err_t save_post_handler(httpd_req_t *req) {
     char buf[256];
     int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
@@ -11614,34 +11381,11 @@ static esp_err_t save_post_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-// --- Manejador para servir la página principal desde la SD ---
+// --- [CORRECCIÓN] Manejador para servir la página principal desde el firmware ---
 static esp_err_t root_get_handler(httpd_req_t *req) {
-    const char *filepath = "/sdcard/config/index.html";
-    ESP_LOGI(TAG, "Sirviendo página principal desde: %s", filepath);
-
-    FILE *f = fopen(filepath, "r");
-    if (f == NULL) {
-        ESP_LOGE(TAG, "No se pudo encontrar %s", filepath);
-        httpd_resp_send_404(req);
-        return ESP_FAIL;
-    }
-
+    ESP_LOGI(TAG, "Sirviendo página principal desde el firmware.");
     httpd_resp_set_type(req, "text/html");
-
-    char chunk[512];
-    size_t chunksize;
-    do {
-        chunksize = fread(chunk, 1, sizeof(chunk), f);
-        if (chunksize > 0 && httpd_resp_send_chunk(req, chunk, chunksize) != ESP_OK) {
-            fclose(f);
-            ESP_LOGE(TAG, "Error al enviar chunk de archivo");
-            return ESP_FAIL;
-        }
-    } while (chunksize != 0);
-
-    fclose(f);
-    httpd_resp_send_chunk(req, NULL, 0);
-    return ESP_OK;
+    return httpd_resp_send(req, INDEX_HTML_CONTENT, HTTPD_RESP_USE_STRLEN);
 }
 
 static httpd_handle_t start_webserver(void) {
@@ -11668,9 +11412,8 @@ static httpd_handle_t start_webserver(void) {
 void web_server_start(void) {
     ESP_LOGI(TAG, "Iniciando servidor web de configuracion.");
     start_webserver();
-    while(1) {
-        vTaskDelay(pdMS_TO_TICKS(10000));
-    }
+    // No se necesita un bucle infinito aquí, ya que el servidor se ejecuta en su propia tarea.
+    // La función que llama a web_server_start() debe tener el bucle.
 }
 
 
@@ -11944,10 +11687,10 @@ void wifi_portal_erase_credentials(void);
 # Fichero: Z:\DIYTOGETHER\DIYtogether\main\CMakeLists.txt
 # =================================================================================================
 
+# Fecha: 15/08/2025 - 04:09 
 # Fichero: Z:\DIYTOGETHER\DIYtogether\main\CMakeLists.txt
-# Fecha: $timestamp
-# Último cambio: Eliminada la dependencia del componente obsoleto `service_screen`.
-# Descripción: CMakeLists para el componente principal. Se elimina la dependencia de `service_screen` ya que su funcionalidad ha sido reemplazada por la nueva pantalla de configuración `ui_config_screen` dentro del componente `diymon_ui`.
+# Último cambio: Añadidas dependencias explícitas (nvs_flash, fatfs, sdmmc) para mayor robustez.
+# Descripción: Se han añadido las dependencias `nvs_flash`, `fatfs` y `sdmmc` a la lista de `REQUIRES`. Aunque estas dependencias podían ser resueltas de forma transitiva a través de otros componentes (como el BSP), declararlas explícitamente aquí asegura que el componente `main` siempre se enlace correctamente con estos sistemas base, de los cuales depende para el arranque (NVS) y el montaje del sistema de ficheros (FAT/SD).
 
 idf_component_register(
     SRCS 
@@ -11956,6 +11699,7 @@ idf_component_register(
     INCLUDE_DIRS "."
     
     REQUIRES
+        # Componentes de la aplicación
         diymon_bsp
         diymon_core
         diymon_ui
@@ -11963,11 +11707,17 @@ idf_component_register(
         web_server
         screen_manager
 
+        # Drivers y librerías de sistema base
+        driver
+        nvs_flash
+        fatfs
+        sdmmc
+        
+        # Componentes de UI y display
         lvgl
         esp_lvgl_port
         esp_lcd
         esp_lcd_touch
-        driver
 )
 
 
@@ -11975,18 +11725,105 @@ idf_component_register(
 # Fichero: Z:\DIYTOGETHER\DIYtogether\main\hardware_manager.c
 # =================================================================================================
 
-/*
-# Fichero: Z:\DIYTOGETHER\DIYtogether\main\hardware_manager.c
-# Fecha: $timestamp
-# Último cambio: Eliminado el driver de sistema de ficheros personalizado para LVGL.
-# Descripción: Ahora que los iconos de los botones están compilados en el firmware, LVGL ya no necesita acceder a la tarjeta SD. Se ha eliminado todo el código del driver de sistema de ficheros personalizado, simplificando el arranque, reduciendo el tamaño del binario y eliminando código que ya era obsoleto.
-*/
+/* Fecha: 15/08/2025 - 04:30  */
+/* Fichero: Z:\DIYTOGETHER\DIYtogether\main\hardware_manager.c */
+/* Último cambio: Corregidas las signaturas de los callbacks del sistema de ficheros para coincidir con la API de LVGL v9. */
+/* Descripción: Se han actualizado las firmas de todas las funciones de callback (fs_open_cb, fs_dir_read_cb, etc.) para que coincidan exactamente con las definidas en la API de LVGL v9. Esto resuelve todas las advertencias de compilación sobre 'incompatible pointer types' y asegura una integración correcta y segura con el sistema de ficheros. */
+
 #include "hardware_manager.h"
 #include "esp_log.h"
 #include "bsp_api.h"
 #include "esp_lvgl_port.h"
+#include "lvgl.h"
+
+#include "ff.h"
 
 static const char *TAG = "HW_MANAGER";
+
+// --- Implementación local del driver de LVGL v9 para FatFS ---
+
+static void * fs_open_cb(lv_fs_drv_t * drv, const char * path, lv_fs_mode_t mode) {
+    uint8_t fmode = 0;
+    if(mode == LV_FS_MODE_WR) fmode = FA_WRITE | FA_OPEN_ALWAYS;
+    else if(mode == LV_FS_MODE_RD) fmode = FA_READ;
+    else if(mode == (LV_FS_MODE_WR | LV_FS_MODE_RD)) fmode = FA_READ | FA_WRITE | FA_OPEN_ALWAYS;
+
+    FIL * f = lv_malloc(sizeof(FIL));
+    if(f == NULL) return NULL;
+
+    FRESULT res = f_open(f, path, fmode);
+    if(res == FR_OK) {
+        return f;
+    } else {
+        lv_free(f);
+        return NULL;
+    }
+}
+
+static lv_fs_res_t fs_close_cb(lv_fs_drv_t * drv, void * file_p) {
+    f_close((FIL *)file_p);
+    lv_free(file_p);
+    return LV_FS_RES_OK;
+}
+
+static lv_fs_res_t fs_read_cb(lv_fs_drv_t * drv, void * file_p, void * buf, uint32_t btr, uint32_t * br) {
+    FRESULT res = f_read((FIL *)file_p, buf, btr, (UINT *)br);
+    return (res == FR_OK) ? LV_FS_RES_OK : LV_FS_RES_FS_ERR;
+}
+
+static lv_fs_res_t fs_write_cb(lv_fs_drv_t * drv, void * file_p, const void * buf, uint32_t btw, uint32_t * bw) {
+    FRESULT res = f_write((FIL *)file_p, buf, btw, (UINT *)bw);
+    return (res == FR_OK) ? LV_FS_RES_OK : LV_FS_RES_FS_ERR;
+}
+
+static lv_fs_res_t fs_seek_cb(lv_fs_drv_t * drv, void * file_p, uint32_t pos, lv_fs_whence_t whence) {
+    // FatFS solo soporta seek desde el principio del archivo (SEEK_SET)
+    f_lseek((FIL *)file_p, pos);
+    return LV_FS_RES_OK;
+}
+
+static lv_fs_res_t fs_tell_cb(lv_fs_drv_t * drv, void * file_p, uint32_t * pos_p) {
+    *pos_p = f_tell((FIL *)file_p);
+    return LV_FS_RES_OK;
+}
+
+static void * fs_dir_open_cb(lv_fs_drv_t * drv, const char *path) {
+    FF_DIR * d = lv_malloc(sizeof(FF_DIR));
+    if(d == NULL) return NULL;
+
+    FRESULT res = f_opendir(d, path);
+    if(res == FR_OK) {
+        return d;
+    } else {
+        lv_free(d);
+        return NULL;
+    }
+}
+
+static lv_fs_res_t fs_dir_read_cb(lv_fs_drv_t * drv, void * rddir_p, char * fn) {
+    FILINFO fno;
+    FRESULT res = f_readdir((FF_DIR *)rddir_p, &fno);
+    if (res != FR_OK) return LV_FS_RES_FS_ERR;
+    if (fno.fname[0] == 0) {
+        fn[0] = 0;
+        return LV_FS_RES_OK;
+    }
+    
+    if(fno.fattrib & AM_DIR) {
+        snprintf(fn, LV_FS_MAX_FN_LEN, "/%s", fno.fname);
+    } else {
+        strncpy(fn, fno.fname, LV_FS_MAX_FN_LEN);
+        fn[LV_FS_MAX_FN_LEN - 1] = '\0';
+    }
+    
+    return LV_FS_RES_OK;
+}
+
+static lv_fs_res_t fs_dir_close_cb(lv_fs_drv_t * drv, void * rddir_p) {
+    f_closedir((FF_DIR *)rddir_p);
+    lv_free(rddir_p);
+    return LV_FS_RES_OK;
+}
 
 esp_err_t hardware_manager_init(void) {
     ESP_LOGI(TAG, "Initializing BSP...");
@@ -12003,9 +11840,7 @@ esp_err_t hardware_manager_init(void) {
         .double_buffer = 1,
         .hres = bsp_get_display_hres(),
         .vres = bsp_get_display_vres(),
-        .flags = {
-            .swap_bytes = true, 
-        }
+        .flags = { .swap_bytes = true, }
     };
     lv_disp_t * disp = lvgl_port_add_disp(&disp_cfg);
 
@@ -12018,13 +11853,33 @@ esp_err_t hardware_manager_init(void) {
     ESP_ERROR_CHECK(esp_lcd_touch_set_mirror_x(touch_handle, false));
     ESP_ERROR_CHECK(esp_lcd_touch_set_mirror_y(touch_handle, false));
 
-    const lvgl_port_touch_cfg_t touch_cfg = {
-        .disp = disp,
-        .handle = touch_handle,
-    };
+    const lvgl_port_touch_cfg_t touch_cfg = { .disp = disp, .handle = touch_handle };
     lvgl_port_add_touch(&touch_cfg);
     
     return ESP_OK;
+}
+
+void hardware_manager_mount_lvgl_filesystem(void)
+{
+    ESP_LOGI(TAG, "Registrando el sistema de ficheros FATFS con LVGL...");
+    
+    static lv_fs_drv_t fs_drv;
+    lv_fs_drv_init(&fs_drv);
+
+    fs_drv.letter = 'S';
+    fs_drv.open_cb = fs_open_cb;
+    fs_drv.close_cb = fs_close_cb;
+    fs_drv.read_cb = fs_read_cb;
+    fs_drv.write_cb = fs_write_cb;
+    fs_drv.seek_cb = fs_seek_cb;
+    fs_drv.tell_cb = fs_tell_cb;
+    fs_drv.dir_open_cb = fs_dir_open_cb;
+    fs_drv.dir_read_cb = fs_dir_read_cb;
+    fs_drv.dir_close_cb = fs_dir_close_cb;
+
+    lv_fs_drv_register(&fs_drv);
+    
+    ESP_LOGI(TAG, "Sistema de ficheros montado para LVGL en la unidad 'S:'");
 }
 
 
@@ -12032,23 +11887,10 @@ esp_err_t hardware_manager_init(void) {
 # Fichero: Z:\DIYTOGETHER\DIYtogether\main\hardware_manager.h
 # =================================================================================================
 
-/*
- * =====================================================================================
- *
- *       Filename:  hardware_manager.h
- *
- *    Description:  Archivo de cabecera para el gestor de hardware de DIYMON.
- *                  Define la interfaz pública para inicializar y controlar
- *                  los periféricos del dispositivo.
- *
- *        Version:  1.0
- *        Created:  08/08/2025
- *
- *         Author:  Raúl Camacho Luna (con revisión de IA)
- *   Organization:  DIYMON Project
- *
- * =====================================================================================
- */
+/* Fecha: 15/08/2025 - 04:10  */
+/* Fichero: Z:\DIYTOGETHER\DIYtogether\main\hardware_manager.h */
+/* Último cambio: Añadida la declaración de hardware_manager_mount_lvgl_filesystem. */
+/* Descripción: Define la interfaz pública del gestor de hardware. Se añade una nueva función para registrar explícitamente el sistema de ficheros de la tarjeta SD con LVGL, permitiendo que la librería acceda a los ficheros de animación. */
 
 #ifndef HARDWARE_MANAGER_H
 #define HARDWARE_MANAGER_H
@@ -12056,27 +11898,33 @@ esp_err_t hardware_manager_init(void) {
 #include "esp_err.h"
 
 /**
- * @brief Inicializa todos los periféricos de hardware necesarios para DIYMON.
+ * @brief Inicializa los periféricos de hardware base (display, touch, bsp, etc.) y el port de LVGL.
  *
- * Esta función debe ser llamada una sola vez al inicio del programa.
- * Se encarga de configurar la pantalla, el panel táctil y los drivers de LVGL.
- *
- * @return ESP_OK si la inicialización fue exitosa, o un código de error en caso contrario.
+ * @return ESP_OK si la inicialización fue exitosa.
  */
 esp_err_t hardware_manager_init(void);
 
+/**
+ * @brief Registra el sistema de ficheros de la tarjeta SD (montada en /sdcard) con LVGL.
+ * 
+ * Esta función asigna la letra de unidad 'S' al punto de montaje /sdcard,
+ * permitiendo que LVGL acceda a los ficheros de animación usando rutas como "S:/DIYMON/..."
+ */
+void hardware_manager_mount_lvgl_filesystem(void);
+
+
 #endif // HARDWARE_MANAGER_H
+
 
 # =================================================================================================
 # Fichero: Z:\DIYTOGETHER\DIYtogether\main\main.c
 # =================================================================================================
 
-/*
-Fichero: Z:\DIYTOGETHER\DIYtogether\main\main.c
-Fecha: $timestamp
-Último cambio: Corregido el registro del gestor de inactividad para que se adjunte a la pantalla de servicio correcta, permitiendo que la función de despertar por doble-doble-toque funcione en los modos de configuración.
-Descripción: Orquestador principal de la aplicación. Se ha corregido un error lógico que causaba que el gestor de eventos de toque para despertar la pantalla no se registrara en las pantallas de servicio (portal WiFi, servidor de archivos), impidiendo despertar el dispositivo. Ahora, la inicialización del gestor de inactividad se realiza después de cargar la pantalla correspondiente, asegurando su correcto funcionamiento en todos los modos.
-*/
+/* Fecha: 15/08/2025 - 04:22  */
+/* Fichero: Z:\DIYTOGETHER\DIYtogether\main\main.c */
+/* Último cambio: Añadida la llamada a `hardware_manager_mount_lvgl_filesystem` para registrar la SD con LVGL. */
+/* Descripción: Orquestador principal. Se ha añadido la llamada a la función que monta el sistema de ficheros de la tarjeta SD para LVGL. Este paso es crucial para que la librería pueda resolver las rutas "S:/..." y encontrar los ficheros de animación, solucionando así el error de "fotogramas no encontrados". */
+
 #include <stdio.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
@@ -12110,6 +11958,7 @@ static bool check_file_server_mode_flag(void);
 static void erase_file_server_mode_flag(void);
 static void init_lvgl_for_service_screen(void);
 static void display_network_status_on_screen(bool is_connected, const char* ip_addr);
+static void display_waiting_for_network_on_screen(void);
 static void setup_inactivity_handling(void);
 
 // --- Lógica de Gestión de Inactividad y Despertar ---
@@ -12269,6 +12118,10 @@ void app_main(void)
     } else {
         run_main_application_mode();
     }
+
+    while (1) {
+        vTaskDelay(pdMS_TO_TICKS(10000));
+    }
 }
 
 static void init_lvgl_for_service_screen(void)
@@ -12306,9 +12159,11 @@ static void run_file_server_mode(void) {
     
     if (lvgl_port_lock(0)) {
         ui_config_screen_show();
-        setup_inactivity_handling(); // <-- CORRECCIÓN: Llamar después de cargar la pantalla
+        setup_inactivity_handling();
         lvgl_port_unlock();
     }
+
+    display_waiting_for_network_on_screen();
 
     bsp_wifi_init_stack();
     bsp_wifi_init_sta_from_nvs();
@@ -12338,10 +12193,13 @@ static void run_wifi_portal_mode(void) {
     
     if (lvgl_port_lock(0)) {
         ui_config_screen_show();
-        setup_inactivity_handling(); // <-- CORRECCIÓN: Llamar después de cargar la pantalla
+        setup_inactivity_handling();
         lvgl_port_unlock();
     }
     
+    display_waiting_for_network_on_screen();
+    vTaskDelay(pdMS_TO_TICKS(1500)); // Delay para que el mensaje sea visible
+
     display_network_status_on_screen(false, NULL);
 
     bsp_wifi_init_stack();
@@ -12352,6 +12210,9 @@ static void run_main_application_mode(void) {
     ESP_LOGI(TAG, "Cargando aplicación principal...");
     hardware_manager_init();
     screen_manager_init();
+    
+    // [CORRECCIÓN] Montar el sistema de ficheros para LVGL ANTES de inicializar la UI.
+    hardware_manager_mount_lvgl_filesystem();
     
     ESP_LOGI(TAG, "El driver WiFi permanece desactivado para ahorrar RAM.");
     
@@ -12391,6 +12252,37 @@ static void erase_file_server_mode_flag(void) {
     }
 }
 
+static void display_waiting_for_network_on_screen(void) {
+    if (lvgl_port_lock(0)) {
+        lv_obj_t *scr = lv_screen_active();
+        if (!scr) {
+            lvgl_port_unlock();
+            return;
+        }
+
+        static lv_style_t style_text;
+        lv_style_init(&style_text);
+        lv_style_set_text_color(&style_text, lv_color_white());
+        lv_style_set_text_align(&style_text, LV_TEXT_ALIGN_CENTER);
+        lv_style_set_text_font(&style_text, &lv_font_montserrat_14);
+
+        lv_obj_t *line1 = lv_label_create(scr);
+        lv_obj_t *line2 = lv_label_create(scr);
+        lv_obj_add_style(line1, &style_text, 0);
+        lv_obj_add_style(line2, &style_text, 0);
+        lv_obj_set_width(line1, 160);
+        lv_obj_set_width(line2, 160);
+
+        lv_label_set_text(line1, "Espera un momento...");
+        lv_label_set_text(line2, "Detectando redes");
+        
+        lv_obj_align(line1, LV_ALIGN_CENTER, 0, -50);
+        lv_obj_align(line2, LV_ALIGN_CENTER, 0, -25);
+
+        lvgl_port_unlock();
+    }
+}
+
 static void display_network_status_on_screen(bool is_connected, const char* ip_addr) {
     if (lvgl_port_lock(0)) {
         lv_obj_t *scr = lv_screen_active();
@@ -12404,6 +12296,14 @@ static void display_network_status_on_screen(bool is_connected, const char* ip_a
         lv_style_set_text_color(&style_text, lv_color_white());
         lv_style_set_text_align(&style_text, LV_TEXT_ALIGN_CENTER);
         lv_style_set_text_font(&style_text, &lv_font_montserrat_14);
+
+        // Limpiar los labels de "espera" si existen, creando nuevos
+        // LVGL es eficiente y no creará fugas de memoria si se hace sobre el mismo padre.
+        lv_obj_clean(scr); // Limpiamos la pantalla para eliminar mensajes previos
+        
+        // Recrear el fondo y el botón que ui_config_screen_show() puso
+        ui_config_screen_show(); 
+        scr = lv_screen_active(); // ui_config_screen_show() crea una nueva pantalla
 
         lv_obj_t *line1 = lv_label_create(scr);
         lv_obj_t *line2 = lv_label_create(scr);

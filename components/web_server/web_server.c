@@ -1,9 +1,8 @@
-/*
-# Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server.c
-# Fecha: `$timestamp
-# Último cambio: Añadido el manejador para guardar credenciales WiFi (/save).
-# Descripción: Servidor web para configuración. Se ha añadido el endpoint '/save' para procesar el formulario de configuración WiFi, guardar las credenciales en NVS y reiniciar el dispositivo. Esto soluciona el error 404 que impedía guardar la configuración.
-*/
+/* Fecha: 15/08/2025 - 04:18  */
+/* Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server.c */
+/* Último cambio: Modificado el manejador raíz ('/') para servir la página HTML desde el firmware en lugar de la SD. */
+/* Descripción: El manejador del endpoint raíz ahora envía el contenido del `INDEX_HTML_CONTENT` (definido en `web_server_page.h`) directamente. Esto elimina la dependencia de la tarjeta SD para mostrar el portal de configuración, solucionando el error 404 y haciendo el modo de servicio más robusto. */
+
 #include "web_server.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
@@ -21,6 +20,7 @@
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "esp_system.h"
+#include "web_server_page.h" // [CORRECCIÓN] Incluir el fichero con el HTML
 
 static const char *TAG = "WEB_SERVER";
 #define WEB_MOUNT_POINT "/sdcard"
@@ -240,7 +240,7 @@ static esp_err_t delete_file_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-// --- [NUEVO] Manejador para guardar credenciales WiFi ---
+// --- Manejador para guardar credenciales WiFi ---
 static esp_err_t save_post_handler(httpd_req_t *req) {
     char buf[256];
     int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
@@ -279,34 +279,11 @@ static esp_err_t save_post_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-// --- Manejador para servir la página principal desde la SD ---
+// --- [CORRECCIÓN] Manejador para servir la página principal desde el firmware ---
 static esp_err_t root_get_handler(httpd_req_t *req) {
-    const char *filepath = "/sdcard/config/index.html";
-    ESP_LOGI(TAG, "Sirviendo página principal desde: %s", filepath);
-
-    FILE *f = fopen(filepath, "r");
-    if (f == NULL) {
-        ESP_LOGE(TAG, "No se pudo encontrar %s", filepath);
-        httpd_resp_send_404(req);
-        return ESP_FAIL;
-    }
-
+    ESP_LOGI(TAG, "Sirviendo página principal desde el firmware.");
     httpd_resp_set_type(req, "text/html");
-
-    char chunk[512];
-    size_t chunksize;
-    do {
-        chunksize = fread(chunk, 1, sizeof(chunk), f);
-        if (chunksize > 0 && httpd_resp_send_chunk(req, chunk, chunksize) != ESP_OK) {
-            fclose(f);
-            ESP_LOGE(TAG, "Error al enviar chunk de archivo");
-            return ESP_FAIL;
-        }
-    } while (chunksize != 0);
-
-    fclose(f);
-    httpd_resp_send_chunk(req, NULL, 0);
-    return ESP_OK;
+    return httpd_resp_send(req, INDEX_HTML_CONTENT, HTTPD_RESP_USE_STRLEN);
 }
 
 static httpd_handle_t start_webserver(void) {
@@ -333,7 +310,6 @@ static httpd_handle_t start_webserver(void) {
 void web_server_start(void) {
     ESP_LOGI(TAG, "Iniciando servidor web de configuracion.");
     start_webserver();
-    while(1) {
-        vTaskDelay(pdMS_TO_TICKS(10000));
-    }
+    // No se necesita un bucle infinito aquí, ya que el servidor se ejecuta en su propia tarea.
+    // La función que llama a web_server_start() debe tener el bucle.
 }
