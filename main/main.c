@@ -1,8 +1,8 @@
 /*
 Fichero: Z:\DIYTOGETHER\DIYtogether\main\main.c
 Fecha: $timestamp
-Último cambio: Implementada secuencia de despertar con doble-doble-toque.
-Descripción: Orquestador principal de la aplicación. Se ha implementado una nueva lógica de despertar de pantalla que requiere una secuencia de dos dobles-toques para encenderla desde el estado apagado, evitando activaciones accidentales. Se ha centralizado esta lógica en main.c, y se ha ajustado para que un solo toque siga restaurando el brillo si la pantalla está solo atenuada.
+Último cambio: Corregido el registro del gestor de inactividad para que se adjunte a la pantalla de servicio correcta, permitiendo que la función de despertar por doble-doble-toque funcione en los modos de configuración.
+Descripción: Orquestador principal de la aplicación. Se ha corregido un error lógico que causaba que el gestor de eventos de toque para despertar la pantalla no se registrara en las pantallas de servicio (portal WiFi, servidor de archivos), impidiendo despertar el dispositivo. Ahora, la inicialización del gestor de inactividad se realiza después de cargar la pantalla correspondiente, asegurando su correcto funcionamiento en todos los modos.
 */
 #include <stdio.h>
 #include <string.h>
@@ -145,7 +145,7 @@ static void inactivity_timer_cb(lv_timer_t * timer) {
     uint32_t inactivity_ms = lv_display_get_inactive_time(disp);
     bool is_off = screen_manager_is_off();
     
-    // Si el usuario interactúa, lv_display_send_activity resetea el contador,
+    // Si el usuario interactúa, lv_display_trigger_activity resetea el contador,
     // por lo que este callback se ejecutará de nuevo y s_is_dimmed se pondrá a false.
     if (inactivity_ms < 30000 && s_is_dimmed) {
         s_is_dimmed = false;
@@ -167,8 +167,10 @@ static void setup_inactivity_handling(void) {
     lv_timer_create(inactivity_timer_cb, 5000, NULL);
     lv_obj_t * scr = lv_screen_active();
     if (scr) {
-        // Usamos LV_EVENT_ALL para capturar tanto PRESS como CLICK
-        lv_obj_add_event_cb(scr, screen_touch_event_cb, LV_EVENT_ALL, NULL);
+        lv_obj_add_event_cb(scr, screen_touch_event_cb, LV_EVENT_PRESSED, NULL);
+        lv_obj_add_event_cb(scr, screen_touch_event_cb, LV_EVENT_CLICKED, NULL);
+        lv_obj_add_event_cb(scr, screen_touch_event_cb, LV_EVENT_RELEASED, NULL);
+        lv_obj_add_event_cb(scr, screen_touch_event_cb, LV_EVENT_GESTURE, NULL);
     }
     ESP_LOGI(TAG, "Gestor de inactividad y despertar configurado.");
 }
@@ -221,8 +223,6 @@ static void init_lvgl_for_service_screen(void)
         .handle = bsp_get_touch_handle(),
     };
     lvgl_port_add_touch(&touch_cfg);
-    
-    setup_inactivity_handling();
 }
 
 static void run_file_server_mode(void) {
@@ -233,6 +233,7 @@ static void run_file_server_mode(void) {
     
     if (lvgl_port_lock(0)) {
         ui_config_screen_show();
+        setup_inactivity_handling(); // <-- CORRECCIÓN: Llamar después de cargar la pantalla
         lvgl_port_unlock();
     }
 
@@ -264,6 +265,7 @@ static void run_wifi_portal_mode(void) {
     
     if (lvgl_port_lock(0)) {
         ui_config_screen_show();
+        setup_inactivity_handling(); // <-- CORRECCIÓN: Llamar después de cargar la pantalla
         lvgl_port_unlock();
     }
     

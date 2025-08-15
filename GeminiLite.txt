@@ -3882,11 +3882,11 @@ void bsp_battery_get_voltage(float *voltage, uint16_t *adc_value);
 # =================================================================================================
 
 /*
- * Fichero: ./components/diymon_bsp/WS1.9TS/bsp_display.c
- * Fecha: 13/08/2025 - 08:03 
- * Último cambio: Eliminado 'swap_color_bytes' obsoleto para compatibilidad con ESP-IDF 5.x.
- * Descripción: Driver del display. Se elimina la propiedad 'swap_color_bytes' de la configuración del panel IO SPI, ya que es obsoleta en la versión actual de ESP-IDF. La inversión de bytes se gestionará en una capa superior (LVGL port).
- */
+Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_bsp\WS1.9TS\bsp_display.c
+Fecha: $timestamp
+Último cambio: Modificada la lógica de `bsp_display_set_brightness` para no guardar el estado de atenuación (10%) en NVS.
+Descripción: Driver del display. Se ha modificado la función de ajuste de brillo para que los cambios automáticos de atenuación (al 10%) no sobrescriban el brillo configurado por el usuario en la NVS ni el último nivel de brillo conocido. Esto asegura que al reactivar la pantalla, esta vuelva al estado deseado por el usuario y no al 10%.
+*/
 #include "bsp_api.h"
 #include "esp_log.h"
 #include "driver/spi_master.h"
@@ -3978,15 +3978,22 @@ void bsp_display_set_brightness(int percentage) {
     if (percentage > 100) percentage = 100;
     if (percentage < 0) percentage = 0;
 
-    // Guarda el último nivel de brillo (si es mayor a 0) para la función de re-encendido.
-    if (percentage > 0) {
-        s_last_brightness_percentage = percentage;
-    }
-
     // Calcula y establece el ciclo de trabajo del PWM para el backlight.
     uint32_t duty = 255 - ((255 * percentage) / 100);
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
+
+    // El valor 10% es el nivel de atenuación automática por inactividad.
+    // No se debe guardar en NVS ni como último brillo conocido del usuario.
+    if (percentage == 10) {
+        ESP_LOGD(TAG, "Atenuando pantalla temporalmente a 10%%. No se guarda el estado.");
+        return;
+    }
+
+    // Guarda el último nivel de brillo (si es > 0) para la función de re-encendido.
+    if (percentage > 0) {
+        s_last_brightness_percentage = percentage;
+    }
 
     // Guarda el nuevo nivel de brillo en la memoria no volátil (NVS).
     nvs_handle_t nvs_handle;
@@ -3995,7 +4002,7 @@ void bsp_display_set_brightness(int percentage) {
         err = nvs_set_i32(nvs_handle, "brightness", (int32_t)percentage);
         if (err == ESP_OK) {
             nvs_commit(nvs_handle);
-            ESP_LOGD(TAG, "Brillo (%d%%) guardado en NVS.", percentage);
+            ESP_LOGD(TAG, "Brillo de usuario (%d%%) guardado en NVS.", percentage);
         } else {
             ESP_LOGE(TAG, "Error al guardar brillo en NVS: %s", esp_err_to_name(err));
         }
@@ -4007,8 +4014,10 @@ void bsp_display_set_brightness(int percentage) {
 
 void bsp_display_turn_on(void) {
     ESP_LOGI(TAG, "Turning display ON and restoring brightness to %d%%", s_last_brightness_percentage);
-    // 1. Restaurar el brillo
-    bsp_display_set_brightness(s_last_brightness_percentage);
+    // 1. Restaurar el brillo (sin guardar estado, ya que se restaura uno existente)
+    uint32_t duty = 255 - ((255 * s_last_brightness_percentage) / 100);
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty);
+    ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
     // 2. Encender el panel
     esp_lcd_panel_disp_on_off(g_panel_handle, true);
 }
@@ -4017,7 +4026,7 @@ void bsp_display_turn_off(void) {
     ESP_LOGI(TAG, "Turning display and backlight OFF");
     // 1. Apagar el panel
     esp_lcd_panel_disp_on_off(g_panel_handle, false);
-    // 2. Apagar el backlight (sin guardar el 0% como último brillo)
+    // 2. Apagar el backlight directamente para no llamar a set_brightness
     uint32_t duty = 255; // Duty 255 es 0% de brillo en mi configuración invertida
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
@@ -5861,10 +5870,10 @@ extern "C" {
 # =================================================================================================
 
 /*
-# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\screens.c
-# Fecha: $timestamp
-# Último cambio: Reactivada la detección de gestos habilitando el scroll.
-# Descripción: Se ha corregido el problema que impedía la detección de gestos. La línea `lv_obj_clear_flag(..., LV_OBJ_FLAG_SCROLLABLE)` deshabilitaba el mecanismo de scroll de LVGL, que es necesario para generar eventos de deslizamiento. Se ha reemplazado por una configuración que permite el scroll para la detección de gestos pero oculta la barra de desplazamiento visual.
+Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\screens.c
+Fecha: $timestamp
+Último cambio: Eliminada la lógica de despertar por toque, que ha sido centralizada en main.c.
+Descripción: Gestor de la pantalla principal. Se ha eliminado el manejador del evento `LV_EVENT_CLICKED` y las variables asociadas que gestionaban el despertar de la pantalla. Esta responsabilidad ahora recae exclusivamente en el gestor de inactividad de `main.c` para evitar conflictos y centralizar el control.
 */
 #include "screens.h"
 #include "ui_idle_animation.h"
@@ -5879,8 +5888,6 @@ extern "C" {
 
 static const char *TAG = "SCREENS";
 
-static uint8_t g_click_count = 0;
-static lv_timer_t *g_double_click_timer = NULL;
 static lv_timer_t *s_resume_idle_timer = NULL; // Temporizador para reanudar el idle
 
 lv_obj_t *g_idle_animation_obj = NULL;
@@ -5890,11 +5897,6 @@ static lv_coord_t touch_start_x = -1;
 static lv_coord_t touch_start_y = -1;
 
 static void main_screen_event_cb(lv_event_t *e);
-
-static void double_click_timer_cb(lv_timer_t *timer) {
-    g_click_count = 0;
-    g_double_click_timer = NULL;
-}
 
 static void resume_idle_timer_cb(lv_timer_t *timer) {
     ESP_LOGD(TAG, "Temporizador de reanudación de idle disparado.");
@@ -5908,8 +5910,7 @@ void create_screen_main(void) {
     lv_obj_add_flag(g_main_screen_obj, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(g_main_screen_obj, main_screen_event_cb, LV_EVENT_ALL, NULL);
     
-    // [CORRECCIÓN] Habilitar la detección de gestos permitiendo el scroll, pero sin mostrar la barra.
-    // La línea `lv_obj_clear_flag(g_main_screen_obj, LV_OBJ_FLAG_SCROLLABLE);` impedía los gestos.
+    // Habilitar la detección de gestos permitiendo el scroll, pero sin mostrar la barra.
     lv_obj_set_scroll_dir(g_main_screen_obj, LV_DIR_ALL);
     lv_obj_set_scrollbar_mode(g_main_screen_obj, LV_SCROLLBAR_MODE_OFF);
 
@@ -5962,24 +5963,7 @@ static void main_screen_event_cb(lv_event_t *e) {
             }
             break;
         }
-        case LV_EVENT_CLICKED: {
-            if (screen_manager_is_off()) {
-                g_click_count++;
-                if (g_click_count == 1) {
-                    g_double_click_timer = lv_timer_create(double_click_timer_cb, 300, NULL);
-                    lv_timer_set_repeat_count(g_double_click_timer, 1);
-                } else if (g_click_count == 2) {
-                    if (g_double_click_timer) {
-                        lv_timer_del(g_double_click_timer);
-                        g_double_click_timer = NULL;
-                    }
-                    ESP_LOGI(TAG, "Doble toque detectado. Encendiendo pantalla...");
-                    screen_manager_turn_on();
-                    g_click_count = 0;
-                }
-            }
-            break;
-        }
+        // La lógica de LV_EVENT_CLICKED para despertar la pantalla ha sido movida a main.c
         default:
             break;
     }
@@ -12046,9 +12030,9 @@ esp_err_t hardware_manager_init(void);
 
 /*
 Fichero: Z:\DIYTOGETHER\DIYtogether\main\main.c
-Fecha: $timestamp
-Último cambio: Añadida la inicialización del driver táctil a los modos de servicio.
-Descripción: Orquestador principal de la aplicación. Se ha añadido la inicialización y registro del driver táctil en la función `init_lvgl_for_service_screen`. Esto es crucial para que los elementos interactivos de la pantalla de configuración, como el botón de reinicio, puedan recibir eventos de toque y funcionar correctamente.
+Fecha: 14/08/2025 - 08:10 
+Último cambio: Corregido el gestor de inactividad para que la pantalla se atenúe y apague correctamente.
+Descripción: Orquestador principal de la aplicación. Se ha corregido un error en setup_inactivity_handling que registraba el callback de actividad para LV_EVENT_ALL, lo que causaba que eventos de redibujado reiniciaran el temporizador de inactividad. Ahora, el callback solo se registra para eventos de entrada del usuario (PRESSED, CLICKED, etc.), permitiendo que la funcionalidad de auto-atenuación y apagado funcione como se espera.
 */
 #include <stdio.h>
 #include <string.h>
@@ -12083,8 +12067,147 @@ static bool check_file_server_mode_flag(void);
 static void erase_file_server_mode_flag(void);
 static void init_lvgl_for_service_screen(void);
 static void display_network_status_on_screen(bool is_connected, const char* ip_addr);
+static void setup_inactivity_handling(void);
+
+// --- Lógica de Gestión de Inactividad y Despertar ---
+typedef enum {
+    WAKE_STATE_OFF,
+    WAKE_STATE_PRIMED, // Esperando el segundo doble-toque
+} wake_up_state_t;
+
+static bool s_is_dimmed = false;
+static int s_user_brightness = 100;
+static bool s_user_brightness_known = false;
+
+static wake_up_state_t s_wake_state = WAKE_STATE_OFF;
+static uint8_t s_wake_click_count = 0;
+static lv_timer_t *s_double_click_timer = NULL;
+static lv_timer_t *s_wake_prime_timer = NULL;
 
 
+static void read_user_brightness_from_nvs(void) {
+    if (s_user_brightness_known) return;
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open("storage", NVS_READONLY, &nvs_handle);
+    if (err == ESP_OK) {
+        nvs_get_i32(nvs_handle, "brightness", (int32_t*)&s_user_brightness);
+        nvs_close(nvs_handle);
+        s_user_brightness_known = true;
+        ESP_LOGI(TAG, "Brillo de usuario por defecto guardado: %d%%", s_user_brightness);
+    }
+}
+
+static void double_click_timer_cb(lv_timer_t * timer) {
+    ESP_LOGD(TAG, "Temporizador de doble-toque expirado. Reiniciando contador de toques.");
+    s_wake_click_count = 0;
+    s_double_click_timer = NULL;
+}
+
+static void wake_prime_timer_cb(lv_timer_t * timer) {
+    ESP_LOGI(TAG, "Ventana de 3s para segundo doble-toque expirada. Secuencia de despertar cancelada.");
+    s_wake_state = WAKE_STATE_OFF;
+    s_wake_click_count = 0;
+    s_wake_prime_timer = NULL;
+}
+
+static void screen_touch_event_cb(lv_event_t * e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    lv_disp_t * disp = lv_display_get_default();
+    if (!disp) return;
+
+    // Cualquier tipo de presión resetea el temporizador de inactividad de LVGL
+    lv_display_trigger_activity(disp);
+    
+    // Si la pantalla está atenuada pero no apagada, un solo toque la restaura
+    if (code == LV_EVENT_PRESSED && s_is_dimmed && !screen_manager_is_off()) {
+        ESP_LOGI(TAG, "Actividad detectada en pantalla atenuada, restaurando brillo.");
+        read_user_brightness_from_nvs();
+        screen_manager_set_brightness(s_user_brightness);
+        s_is_dimmed = false;
+        return; // Evento gestionado
+    }
+
+    // Lógica de despertar con doble-doble-toque SÓLO si la pantalla está apagada
+    if (code == LV_EVENT_CLICKED && screen_manager_is_off()) {
+        switch (s_wake_state) {
+            case WAKE_STATE_OFF:
+                s_wake_click_count++;
+                if (s_wake_click_count == 1) { // Primer toque de un posible doble-toque
+                    s_double_click_timer = lv_timer_create(double_click_timer_cb, 500, NULL);
+                    lv_timer_set_repeat_count(s_double_click_timer, 1);
+                } else if (s_wake_click_count == 2) { // Doble-toque detectado
+                    if (s_double_click_timer) lv_timer_del(s_double_click_timer);
+                    s_double_click_timer = NULL;
+                    ESP_LOGI(TAG, "Secuencia de despertar: PRIMER doble-toque detectado. Esperando el segundo...");
+                    s_wake_state = WAKE_STATE_PRIMED;
+                    s_wake_click_count = 0;
+                    s_wake_prime_timer = lv_timer_create(wake_prime_timer_cb, 3000, NULL);
+                    lv_timer_set_repeat_count(s_wake_prime_timer, 1);
+                }
+                break;
+
+            case WAKE_STATE_PRIMED: // Esperando el segundo doble-toque
+                s_wake_click_count++;
+                 if (s_wake_click_count == 1) {
+                    s_double_click_timer = lv_timer_create(double_click_timer_cb, 500, NULL);
+                    lv_timer_set_repeat_count(s_double_click_timer, 1);
+                } else if (s_wake_click_count >= 2) { // Segundo doble-toque detectado
+                    if (s_double_click_timer) lv_timer_del(s_double_click_timer);
+                    if (s_wake_prime_timer) lv_timer_del(s_wake_prime_timer);
+                    s_double_click_timer = NULL;
+                    s_wake_prime_timer = NULL;
+                    
+                    ESP_LOGI(TAG, "Secuencia de despertar: SEGUNDO doble-toque detectado. ¡Encendiendo pantalla!");
+                    screen_manager_turn_on(); // Enciende y restaura brillo
+                    s_is_dimmed = false;
+                    s_wake_state = WAKE_STATE_OFF;
+                    s_wake_click_count = 0;
+                }
+                break;
+        }
+    }
+}
+
+static void inactivity_timer_cb(lv_timer_t * timer) {
+    lv_disp_t * disp = lv_display_get_default();
+    if (!disp) return;
+
+    uint32_t inactivity_ms = lv_display_get_inactive_time(disp);
+    bool is_off = screen_manager_is_off();
+    
+    // Si el usuario interactúa, lv_display_trigger_activity resetea el contador,
+    // por lo que este callback se ejecutará de nuevo y s_is_dimmed se pondrá a false.
+    if (inactivity_ms < 30000 && s_is_dimmed) {
+        s_is_dimmed = false;
+    }
+
+    if (!is_off && inactivity_ms > 60000) {
+        ESP_LOGI(TAG, "Inactividad > 60s. Apagando pantalla.");
+        screen_manager_turn_off();
+        s_is_dimmed = false;
+    } else if (!is_off && !s_is_dimmed && inactivity_ms > 30000) {
+        ESP_LOGI(TAG, "Inactividad > 30s. Atenuando pantalla al 10%%.");
+        read_user_brightness_from_nvs();
+        screen_manager_set_brightness(10);
+        s_is_dimmed = true;
+    }
+}
+
+static void setup_inactivity_handling(void) {
+    lv_timer_create(inactivity_timer_cb, 5000, NULL);
+    lv_obj_t * scr = lv_screen_active();
+    if (scr) {
+        // CORRECCIÓN: Se registra el callback SOLO para eventos de entrada, no para LV_EVENT_ALL.
+        // LV_EVENT_ALL incluye eventos de redibujado, que reseteaban constantemente el temporizador.
+        lv_obj_add_event_cb(scr, screen_touch_event_cb, LV_EVENT_PRESSED, NULL);
+        lv_obj_add_event_cb(scr, screen_touch_event_cb, LV_EVENT_CLICKED, NULL);
+        lv_obj_add_event_cb(scr, screen_touch_event_cb, LV_EVENT_RELEASED, NULL);
+        lv_obj_add_event_cb(scr, screen_touch_event_cb, LV_EVENT_GESTURE, NULL);
+    }
+    ESP_LOGI(TAG, "Gestor de inactividad y despertar configurado.");
+}
+
+// --- Flujo Principal de la Aplicación ---
 void app_main(void)
 {
     esp_err_t ret = nvs_flash_init();
@@ -12132,6 +12255,8 @@ static void init_lvgl_for_service_screen(void)
         .handle = bsp_get_touch_handle(),
     };
     lvgl_port_add_touch(&touch_cfg);
+    
+    setup_inactivity_handling();
 }
 
 static void run_file_server_mode(void) {
@@ -12195,6 +12320,7 @@ static void run_main_application_mode(void) {
 
     if (lvgl_port_lock(0)) {
         ui_init();
+        setup_inactivity_handling();
         lvgl_port_unlock();
     }
     ESP_LOGI(TAG, "Interfaz de Usuario principal inicializada.");
