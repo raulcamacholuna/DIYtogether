@@ -1,9 +1,8 @@
-/*
-Fichero: Z:\DIYTOGETHER\DIYtogether\main\main.c
-Fecha: $timestamp
-Último cambio: Corregido el registro del gestor de inactividad para que se adjunte a la pantalla de servicio correcta, permitiendo que la función de despertar por doble-doble-toque funcione en los modos de configuración.
-Descripción: Orquestador principal de la aplicación. Se ha corregido un error lógico que causaba que el gestor de eventos de toque para despertar la pantalla no se registrara en las pantallas de servicio (portal WiFi, servidor de archivos), impidiendo despertar el dispositivo. Ahora, la inicialización del gestor de inactividad se realiza después de cargar la pantalla correspondiente, asegurando su correcto funcionamiento en todos los modos.
-*/
+/* Fecha: 15/08/2025 - 11:06  */
+/* Fichero: Z:\DIYTOGETHER\DIYtogether\main\main.c */
+/* Último cambio: Añadido mensaje de "espera" en pantalla durante la conexión de red en modos de servicio. */
+/* Descripción: Orquestador principal de la aplicación. Se ha añadido la función `display_waiting_for_network_on_screen` que muestra un mensaje de estado mientras el dispositivo intenta conectarse a la red WiFi. Este mensaje se muestra antes de que se presente la IP final o la información del modo AP, mejorando la experiencia de usuario. */
+
 #include <stdio.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
@@ -37,6 +36,7 @@ static bool check_file_server_mode_flag(void);
 static void erase_file_server_mode_flag(void);
 static void init_lvgl_for_service_screen(void);
 static void display_network_status_on_screen(bool is_connected, const char* ip_addr);
+static void display_waiting_for_network_on_screen(void);
 static void setup_inactivity_handling(void);
 
 // --- Lógica de Gestión de Inactividad y Despertar ---
@@ -233,9 +233,11 @@ static void run_file_server_mode(void) {
     
     if (lvgl_port_lock(0)) {
         ui_config_screen_show();
-        setup_inactivity_handling(); // <-- CORRECCIÓN: Llamar después de cargar la pantalla
+        setup_inactivity_handling();
         lvgl_port_unlock();
     }
+
+    display_waiting_for_network_on_screen();
 
     bsp_wifi_init_stack();
     bsp_wifi_init_sta_from_nvs();
@@ -265,10 +267,13 @@ static void run_wifi_portal_mode(void) {
     
     if (lvgl_port_lock(0)) {
         ui_config_screen_show();
-        setup_inactivity_handling(); // <-- CORRECCIÓN: Llamar después de cargar la pantalla
+        setup_inactivity_handling();
         lvgl_port_unlock();
     }
     
+    display_waiting_for_network_on_screen();
+    vTaskDelay(pdMS_TO_TICKS(1500)); // Delay para que el mensaje sea visible
+
     display_network_status_on_screen(false, NULL);
 
     bsp_wifi_init_stack();
@@ -318,6 +323,37 @@ static void erase_file_server_mode_flag(void) {
     }
 }
 
+static void display_waiting_for_network_on_screen(void) {
+    if (lvgl_port_lock(0)) {
+        lv_obj_t *scr = lv_screen_active();
+        if (!scr) {
+            lvgl_port_unlock();
+            return;
+        }
+
+        static lv_style_t style_text;
+        lv_style_init(&style_text);
+        lv_style_set_text_color(&style_text, lv_color_white());
+        lv_style_set_text_align(&style_text, LV_TEXT_ALIGN_CENTER);
+        lv_style_set_text_font(&style_text, &lv_font_montserrat_14);
+
+        lv_obj_t *line1 = lv_label_create(scr);
+        lv_obj_t *line2 = lv_label_create(scr);
+        lv_obj_add_style(line1, &style_text, 0);
+        lv_obj_add_style(line2, &style_text, 0);
+        lv_obj_set_width(line1, 160);
+        lv_obj_set_width(line2, 160);
+
+        lv_label_set_text(line1, "Espera un momento...");
+        lv_label_set_text(line2, "Detectando redes");
+        
+        lv_obj_align(line1, LV_ALIGN_CENTER, 0, -50);
+        lv_obj_align(line2, LV_ALIGN_CENTER, 0, -25);
+
+        lvgl_port_unlock();
+    }
+}
+
 static void display_network_status_on_screen(bool is_connected, const char* ip_addr) {
     if (lvgl_port_lock(0)) {
         lv_obj_t *scr = lv_screen_active();
@@ -331,6 +367,14 @@ static void display_network_status_on_screen(bool is_connected, const char* ip_a
         lv_style_set_text_color(&style_text, lv_color_white());
         lv_style_set_text_align(&style_text, LV_TEXT_ALIGN_CENTER);
         lv_style_set_text_font(&style_text, &lv_font_montserrat_14);
+
+        // Limpiar los labels de "espera" si existen, creando nuevos
+        // LVGL es eficiente y no creará fugas de memoria si se hace sobre el mismo padre.
+        lv_obj_clean(scr); // Limpiamos la pantalla para eliminar mensajes previos
+        
+        // Recrear el fondo y el botón que ui_config_screen_show() puso
+        ui_config_screen_show(); 
+        scr = lv_screen_active(); // ui_config_screen_show() crea una nueva pantalla
 
         lv_obj_t *line1 = lv_label_create(scr);
         lv_obj_t *line2 = lv_label_create(scr);
