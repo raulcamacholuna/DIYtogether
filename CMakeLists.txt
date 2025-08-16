@@ -7,4 +7,4 @@ set(EXTRA_COMPONENT_DIRS components_dependencies)
 add_compile_definitions(LVGL_VERSION_MAJOR=9)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
-project(DIYTOGUETHER)
+project(DIYTOGETHER)

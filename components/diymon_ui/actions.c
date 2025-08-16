@@ -1,9 +1,8 @@
-/*
-# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\actions.c
-# Fecha: $timestamp
-# Último cambio: Reducido el tiempo de reinicio para el modo servidor de archivos a 500ms.
-# Descripción: Orquestador de acciones de la UI. Se ha reducido el retardo antes de reiniciar al activar el modo de servidor de archivos para que la transición sea más rápida y la experiencia de usuario más fluida.
-*/
+/* Fecha: 16/08/2025 - 11:54  */
+/* Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\actions.c */
+/* Último cambio: Modificada la acción de apagar pantalla para que también oculte los paneles de acciones. */
+/* Descripción: Orquestador de acciones de la UI. Al apagar la pantalla, ahora se simulan gestos de deslizamiento hacia arriba y hacia la izquierda para forzar el cierre de cualquier panel de acciones que esté abierto. Esto evita que los botones del panel puedan ser presionados accidentalmente mientras la pantalla está apagada. */
+
 #include "actions.h"
 #include "ui_action_animations.h" 
 #include "esp_log.h"
@@ -15,6 +14,7 @@
 #include "freertos/task.h"
 #include "nvs_flash.h"
 #include "nvs.h"
+#include "ui_actions_panel.h" // Se necesita para ocultar los paneles
 
 static const char *TAG = "DIYMON_ACTIONS";
 
@@ -52,7 +52,10 @@ void execute_diymon_action(diymon_action_id_t action_id) {
                 ESP_LOGI(TAG, "Accion: Encender pantalla.");
                 screen_manager_turn_on();
             } else {
-                ESP_LOGI(TAG, "Accion: Apagar pantalla.");
+                ESP_LOGI(TAG, "Accion: Apagar pantalla y ocultar paneles.");
+                // Simula gestos para ocultar cualquier panel abierto (superior o lateral)
+                ui_actions_panel_handle_gesture(LV_DIR_TOP, 0, 0);
+                ui_actions_panel_handle_gesture(LV_DIR_LEFT, 0, 0);
                 screen_manager_turn_off();
             }
             break;
@@ -81,7 +84,7 @@ void execute_diymon_action(diymon_action_id_t action_id) {
                 }
                 nvs_close(nvs_handle);
             }
-            vTaskDelay(pdMS_TO_TICKS(500)); // <-- CAMBIO DE 2000 a 500
+            vTaskDelay(pdMS_TO_TICKS(500));
             esp_restart();
             break;
         }
