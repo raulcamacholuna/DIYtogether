@@ -1,7 +1,7 @@
-# Fecha: 15/08/2025 - 04:09 
-# Fichero: Z:\DIYTOGETHER\DIYtogether\main\CMakeLists.txt
-# Último cambio: Añadidas dependencias explícitas (nvs_flash, fatfs, sdmmc) para mayor robustez.
-# Descripción: Se han añadido las dependencias `nvs_flash`, `fatfs` y `sdmmc` a la lista de `REQUIRES`. Aunque estas dependencias podían ser resueltas de forma transitiva a través de otros componentes (como el BSP), declararlas explícitamente aquí asegura que el componente `main` siempre se enlace correctamente con estos sistemas base, de los cuales depende para el arranque (NVS) y el montaje del sistema de ficheros (FAT/SD).
+# Fecha: 16/08/2025 - 09:38 
+# Fichero: main/CMakeLists.txt
+# Último cambio: Corregida la dependencia 'diymon_bsp' a 'bsp' para resolver el error de compilación.
+# Descripción: El sistema de compilación no encuentra el componente 'diymon_bsp' porque el directorio fue renombrado a 'bsp'. Esta corrección actualiza el nombre en la lista de dependencias de 'main', que es la causa raíz del error "Failed to resolve component 'diymon_bsp' required by component 'main'".
 
 idf_component_register(
     SRCS 
@@ -10,10 +10,10 @@ idf_component_register(
     INCLUDE_DIRS "."
     
     REQUIRES
-        # Componentes de la aplicación
-        diymon_bsp
-        diymon_core
-        diymon_ui
+        # Componentes de la aplicación (con nombres actualizados)
+        bsp
+        core
+        ui
         wifi_portal
         web_server
         screen_manager

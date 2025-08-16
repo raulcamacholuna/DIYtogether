@@ -2,16 +2,16 @@
 
 dependencies:
   # El cerebro de la lógica
-  diymon_core:
-    path: ../components/diymon_core
+  core:
+    path: ../components/core
   
   # La cara y los músculos
-  diymon_ui:
-    path: ../components/diymon_ui
+  ui:
+    path: ../components/ui
   
   # El sistema nervioso y los huesos
-  diymon_bsp:
-    path: ../components/diymon_bsp
+  bsp:
+    path: ../components/bsp
 
   # Versión mínima requerida del ESP-IDF
   idf: ">=5.1"
@@ -24,4 +24,4 @@ dependencies:
 
   # Driver específico para el controlador táctil CST816S, identificado en la documentación
   espressif/esp_lcd_touch_cst816s:
-    path: ../components/diymon_bsp/ws1.9ts/esp_lcd_touch_cst816s
+    path: ../components/bsp/ws1.9ts/esp_lcd_touch_cst816s

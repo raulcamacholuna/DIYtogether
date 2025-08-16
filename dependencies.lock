@@ -1,22 +1,14 @@
 dependencies:
-  diymon_bsp:
+  bsp:
     dependencies: []
     source:
-      path: Z:\DIYTOGETHER\DIYtogether\components\diymon_bsp
+      path: Z:\DIYTOGETHER\DIYtogether\components\bsp
       type: local
     version: '*'
-  diymon_core:
+  core:
     dependencies: []
     source:
-      path: Z:\DIYTOGETHER\DIYtogether\components\diymon_core
-      type: local
-    version: '*'
-  diymon_ui:
-    dependencies:
-    - name: lvgl/lvgl
-      version: ^9.3.0
-    source:
-      path: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui
+      path: Z:\DIYTOGETHER\DIYtogether\components\core
       type: local
     version: '*'
   esp_lcd_touch:
@@ -45,7 +37,7 @@ dependencies:
     - name: idf
       version: '>=4.4.2'
     source:
-      path: Z:\DIYTOGETHER\DIYtogether\components\diymon_bsp\WS1.9TS\esp_lcd_touch_cst816s
+      path: Z:\DIYTOGETHER\DIYtogether\components\bsp\WS1.9TS\esp_lcd_touch_cst816s
       type: local
     version: 1.1.0
   idf:
@@ -59,6 +51,12 @@ dependencies:
       registry_url: https://components.espressif.com/
       type: service
     version: 9.3.0
+  ui:
+    dependencies: []
+    source:
+      path: Z:\DIYTOGETHER\DIYtogether\components\ui
+      type: local
+    version: '*'
   zlib:
     dependencies: []
     source:
@@ -66,15 +64,15 @@ dependencies:
       type: local
     version: 1.3.1
 direct_dependencies:
-- diymon_bsp
-- diymon_core
-- diymon_ui
+- bsp
+- core
 - espressif/cmake_utilities
 - espressif/esp_lcd_touch_cst816s
 - espressif/esp_lvgl_port
 - espressif/zlib
 - idf
 - lvgl/lvgl
-manifest_hash: 526368f36f9cbac16104848d30bbecac4e98afb1bd32e4a2ce660ab6b4fccd00
+- ui
+manifest_hash: 67314558c5f72395dda1d7f00615108d255e37fffb4e6e80f04fd3c5034fa351
 target: esp32c6
 version: 2.0.0

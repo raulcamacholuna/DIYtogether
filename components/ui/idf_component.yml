@@ -1,0 +1,6 @@
+# Fecha: 16/08/2025 - 09:37 
+# Fichero: components/ui/idf_component.yml
+# Último cambio: Vaciado el fichero para eliminar la declaración de dependencias redundante y asegurar compatibilidad.
+# Descripción: Se ha vaciado este fichero para resolver el error de CMake "Already defined root local requirement". Las dependencias entre componentes locales (como 'ui' dependiendo de 'bsp') ya se gestionan a través de la directiva 'REQUIRES' en sus respectivos ficheros CMakeLists.txt. Este manifiesto era redundante. Usar únicamente CMakeLists.txt es el método estándar y es totalmente compatible tanto con el `idf.py` nativo como con PlatformIO, asegurando que el build no se rompa en ninguno de los dos entornos.
+
+# El contenido ha sido eliminado intencionadamente.
