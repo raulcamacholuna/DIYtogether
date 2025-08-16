@@ -11,18 +11,19 @@
         .header { text-align: center; margin-bottom: 20px; color: white; }
         .header h1 { font-size: 2.5em; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; gap: 15px; }
         .header p { font-size: 1.2em; opacity: 0.9; }
-        .card { background: white; border-radius: 15px; padding: 25px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .card { background: white; border-radius: 15px; padding: 25px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); margin-bottom: 20px; }
         .card h3 { color: #5a67d8; font-size: 1.4em; word-break: break-all; margin: 0; display: flex; align-items: center; gap: 10px; }
+        .card h4 { color: #4a5568; font-size: 1.1em; margin-top: 20px; margin-bottom: 15px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
         .card-subtitle { font-size: 0.95em; color: #718096; margin: 5px 0 20px; }
         .btn { border: none; padding: 10px 20px; border-radius: 25px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.2); display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
         .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
         .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
         .btn-secondary { background: linear-gradient(135deg, #4fd1c7 0%, #06b6d4 100%); color: white; }
         .btn-danger { background: linear-gradient(135deg, #fc8181 0%, #f56565 100%); color: white; }
-        .btn-rename { background: linear-gradient(135deg, #3a86ff 0%, #2c6fcc 100%); color: white; } /* Azul para renombrar */
+        .btn-rename { background: linear-gradient(135deg, #3a86ff 0%, #2c6fcc 100%); color: white; }
         .btn-small { padding: 6px 12px; font-size: 12px; border-radius: 15px; }
         
-        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
         .tab-btn { padding: 10px 20px; font-size: 16px; font-weight: 600; cursor: pointer; border: none; background-color: rgba(255, 255, 255, 0.2); color: white; border-radius: 10px; transition: all 0.3s ease; display: flex; align-items: center; gap: 8px; }
         .tab-btn:hover { background-color: rgba(255, 255, 255, 0.4); }
         .tab-btn.active { background-color: white; color: #5a67d8; box-shadow: 0 4px 10px rgba(0,0,0,0.1); transform: translateY(-2px); }
@@ -32,10 +33,13 @@
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; font-weight: 600; margin-bottom: 5px; color: #4a5568; }
         .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 16px; }
+        .form-group input[type="range"] { padding: 0; }
+        .range-group { display: flex; align-items: center; gap: 15px; }
+        .range-group span { font-weight: bold; color: #5a67d8; min-width: 40px; text-align: right; }
 
         .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .header-actions { display: flex; gap: 10px; }
-        .header-actions .btn { width: 42px; height: 42px; font-size: 20px; padding: 0; } /* Estilo para botones con solo icono */
+        .header-actions .btn { width: 42px; height: 42px; font-size: 20px; padding: 0; }
 
         .file-list { min-height: 250px; max-height: 400px; overflow-y: auto; border: 2px dashed #e2e8f0; border-radius: 10px; transition: all 0.3s ease; }
         .file-list.dragover { border-color: #5a67d8; background: rgba(90, 103, 216, 0.05); }
@@ -47,12 +51,37 @@
         .progress-fill { height: 100%; background: linear-gradient(90deg, #48bb78, #38a169); border-radius: 4px; }
         .status { font-size: 0.9em; color: #718096; margin-top: 8px; display: block; min-height: 1.2em; }
         .hidden { display: none !important; }
+        .danger-zone { border: 2px solid #f56565; border-radius: 10px; padding: 15px; margin-top: 20px; background-color: #fff5f5; }
+        .danger-zone h4 { color: #c53030; border-color: #fed7d7; }
+
+        /* --- INICIO: Estilos FIYndex --- */
+        .fiyndex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; }
+        .fiy-card { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px; text-align: center; transition: all 0.3s ease; position: relative; overflow: hidden; }
+        .fiy-card:hover { transform: translateY(-5px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
+        .fiy-image { width: 100px; height: 100px; margin: 0 auto 10px; background-color: #e2e8f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 2.5em; color: #a0aec0; }
+        .fiy-image img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .fiy-info h5 { margin: 0 0 2px; color: #2d3748; font-size: 1em; }
+        .fiy-info p { margin: 0; color: #718096; font-size: 0.8em; }
+        .status-icons { position: absolute; top: 8px; right: 8px; display: flex; flex-direction: column; gap: 5px; }
+        .status-icon { width: 20px; height: 20px; background-color: rgba(255,255,255,0.7); border-radius: 50%; padding: 3px; }
+        .status-icon svg { width: 100%; height: 100%; fill: #a0aec0; transition: fill 0.3s ease; }
+        .status-icon.unlocked svg { fill: #48bb78; } /* Verde para desbloqueado */
+        .btn-edit { position: absolute; bottom: 8px; right: 8px; padding: 4px 8px; font-size: 12px; border-radius: 8px; background: #5a67d8; color: white; border: none; cursor: pointer; opacity: 0; transition: opacity 0.3s ease; }
+        .fiy-card:hover .btn-edit { opacity: 1; }
+        /* Estilos para estado bloqueado */
+        .fiy-card.locked { background: #fff; }
+        .fiy-card.locked .fiy-image, .fiy-card.locked .fiy-info, .fiy-card.locked .status-icons { filter: grayscale(1) brightness(0.8); opacity: 0.6; }
+        .fiy-card.locked .fiy-info h5 { color: #a0aec0; }
+        .fiy-card.locked:hover { transform: none; box-shadow: none; }
+        .fiyndex-grid .fiy-image { background-color: #667eea; color: white; font-weight: bold; }
+        .fiy-card.locked .fiy-image { background-color: #e2e8f0; color: #a0aec0; }
+        /* --- FIN: Estilos FIYndex --- */
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1><img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMjAuNSA1SDMuNUMzLjIzIDUgMyA1LjIzIDMgNS41VjE4LjVDMyAxOC43NyAzLjIzIDE5IDMuNSAxOUgyMC41QzIwLjc3IDE5IDIxIDE4Ljc3IDIxIDE4LjVWMi41QzIxIDIuMjMgMjAuNzcgMiAyMC41IDJIOS41TDMgOC41VjE4LjVDMyAxOS44OCAxLjU3IDIxIDAgMjFDMS43MyAyMSAzIDExLjUgMyA4LjVWNS41QzMgNS4yMyAzLjIzIDUgMy41IDVIMjAuNUMyMC43NyA1IDIxIDUuMjMgMjEgNS41VjE4LjVDMjEgMTguNzcgMjAuNzcgMTkgMjAuNSAxOUgzLjVDMy4yMyAxOSAzIDE4Ljc3IDMgMTguNVYxNy41IiBmaWxsPSJ3aGl0ZSIvPjxwYXRoIGQ9Ik0yMC41IDVIMy41QzMuMjMgNSAzIDUuMjMgMyA1LjVWMjAuNUMzIDIwLjc3IDMuMjMgMjEgMy41IDIxSDIwLjVDMjAuNzcgMjEgMjEgMjAuNzcgMjEgMjAuNVY1LjVDMjEgNS4yMyAyMC43NyA1IDIwLjUgNVoiIGZpbGw9InVybCgjYSkiLz48cGF0aCBkPSJNMjAuNSA1SDMuNUMzLjIzIDUgMyA1LjIzIDMgNS41VjIwLjVDMyAyMC43NyAzLjIzIDIxIDMuNSAyMUgyMC41QzIwLjc3IDIxIDIxIDIwLjc3IDIxIDIwLjVWMi41QzIxIDIuMjMgMjAuNzcgMiAyMC41IDJIOS41TDQgN0gyMC41QzIwLjc3IDcgMjEgNy4yMyAyMSA3LjVWMThMDIwLjUgNVoiIGZpbGw9InVybCgjYikiLz48cGF0aCBkPSJNMjAuNSA1SDMuNUMzLjIzIDUgMyA1LjIzIDMgNS41VjE4LjVDMyAxOC43NyAzLjIzIDE5IDMuNSAxOUgyMC41QzIwLjc3IDE5IDIxIDE4Ljc3IDIxIDE4LjVWMi41QzIxIDIuMjMgMjAuNzcgMiAyMC41IDJIOS41TDQgN0gyMC41QzIwLjc3IDcgMjEgNy4yMyAyMSA3LjVWMThMMjAuNSA1WiIgZmlsbD0id2hpdGUiIGZpbGwtb3BhY2l0eT0iLjMiLz48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImEiIHgxPSIyMSIgeDI9IjMiIHkxPSIyMSIgeTI9IjUiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj48c3RvcCBzdG9wLWNvbG9yPSIjZmFiYzQ1Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjZmY4YzQ0Ii8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImIiIHgxPSIyMSIgeDI9IjMiIHkxPSIyMSIgeTI9IjUiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj48c3RvcCBzdG9wLWNvbG9yPSIjZmFiYzQ1Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjZmY4YzQ0Ii8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PC9zdmc+"> Portal de Configuración</h1>
+            <h1><img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMjAuNSA1SDMuNUMzLjIzIDUgMyA1LjIzIDMgNS41VjE4LjVDMyAxOC43NyAzLjIzIDE5IDMuNSAxOUgyMC41QzIwLjc3IDE5IDIxIDE4Ljc3IDIxIDE4LjVWMi41QzIxIDIuMjMgMjAuNzcgMiAyMC41IDJIOS41TDMgOC41VjE4LjVDMyAxOS44OCAxLjU3IDIxIDAgMjFDMS43MyAyMSAzIDExLjUgMyA4LjVWNS41QzMgNS4yMyAzLjIzIDUgMy41IDVIMjAuNUMyMC43NyA1IDIxIDUuMjMgMjEgNS41VjE4LjVDMjEgMTguNzcgMjAuNzcgMTkgMjAuNSAxOUgzLjVDMy4yMyAxOSAzIDE4Ljc3IDMgMTguNVYxNy41IiBmaWxsPSJ3aGl0ZSIvPjxwYXRoIGQPSJNMjAuNSA1SDMuNUMzLjIzIDUgMyA1LjIzIDMgNS41VjIwLjVDMyAyMC43NyAzLjIzIDIxIDMuNSAyMUgyMC41QzIwLjc3IDIxIDIxIDIwLjc3IDIxIDIwLjVWM1LjVDMjEgNS4yMyAyMC43NyA1IDIwLjUgNVoiIGZpbGw9InVybCgjYSkiLz48cGF0aCBkPSJNMjAuNSA1SDMuNUMzLjIzIDUgMyA1LjIzIDMgNS41VjIwLjVDMyAyMC43NyAzLjIzIDIxIDMuNSAyMUgyMC41QzIwLjc3IDIxIDIxIDIwLjc3IDIxIDIwLjVWMi41QzIxIDIuMjMgMjAuNzcgMiAyMC41IDJIOS41TDQgN0gyMC41QzIwLjc3IDcgMjEgNy4yMyAyMSA3LjVWMThMDIwLjUgNVoiIGZpbGw9InVybCgjYikiLz48cGF0aCBkPSJNMjAuNSA1SDMuNUMzLjIzIDUgMyA1LjIzIDMgNS41VjE4LjVDMyAxOC43NyAzLjIzIDE5IDMuNSAxOUgyMC41QzIwLjc3IDE5IDIxIDE4Ljc3IDIxIDE4LjVWMi41QzIxIDIuMjMgMjAuNzcgMiAyMC41IDJIOS41TDQgN0gyMC41QzIwLjc3IDcgMjEgNy4yMyAyMSA3LjVWMThMMjAuNSA1WiIgZmlsbD0id2hpdGUiIGZpbGwtb3BhY2l0eT0iLjMiLz48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImEiIHgxPSIyMSIgeDI9IjMiIHkxPSIyMSIgeTI9IjUiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj48c3RvcCBzdG9wLWNvbG9yPSIjZmFiYzQ1Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjZmY4YzQ0Ii8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImIiIHgxPSIyMSIgeDI9IjMiIHkxPSIyMSIgeTI9IjUiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj48c3RvcCBzdG9wLWNvbG9yPSIjZmFiYzQ1Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjZmY4YzQ0Ii8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PC9zdmc+"> Portal de Configuración</h1>
             <p>Gestiona el WiFi y los archivos de tu dispositivo</p>
         </div>
 
@@ -95,20 +124,111 @@
                 </div>
             </div>
 
-            <div id="settings-panel" class="content-panel"><div class="card"><h3>⚙️ Configuración del Dispositivo</h3><p class="card-subtitle">(En desarrollo)</p></div></div>
-            <div id="index-panel" class="content-panel"><div class="card"><h3>🌍 FIYndex</h3><p class="card-subtitle">(En desarrollo)</p></div></div>
+            <div id="settings-panel" class="content-panel">
+                <div class="card">
+                    <h3>⚙️ Configuración del Dispositivo</h3>
+                    <p class="card-subtitle">Ajusta los parámetros de funcionamiento del dispositivo.</p>
+                    <form id="settings-form">
+                        <h4>General</h4>
+                        <div class="form-group">
+                            <label for="hostname">Nombre del Dispositivo (Hostname)</label>
+                            <input type="text" id="hostname" name="hostname" placeholder="Mi-Tamagotchi-C6">
+                        </div>
+                        <div class="form-group">
+                            <label for="timezone">Zona Horaria</label>
+                            <select id="timezone" name="timezone">
+                                <option value="Etc/UTC">UTC</option>
+                                <option value="Europe/Madrid">Europa/Madrid (CET)</option>
+                                <option value="America/New_York">América/Nueva York (EST)</option>
+                                <option value="America/Mexico_City">América/Ciudad de México (CST)</option>
+                                <option value="America/Bogota">América/Bogotá (COT)</option>
+                            </select>
+                        </div>
+
+                        <h4>Pantalla y Energía</h4>
+                        <div class="form-group">
+                            <label for="brightness">Brillo de Pantalla</label>
+                            <div class="range-group">
+                                <input type="range" id="brightness" name="brightness" min="10" max="100" step="5" value="80">
+                                <span id="brightness-value">80%</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="screen_timeout">Apagar Pantalla (inactividad)</label>
+                            <select id="screen_timeout" name="screen_timeout">
+                                <option value="30">30 segundos</option>
+                                <option value="60">1 minuto</option>
+                                <option value="300">5 minutos</option>
+                                <option value="600">10 minutos</option>
+                                <option value="0">Nunca</option>
+                            </select>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" id="save-settings-btn">💾 Guardar Cambios</button>
+                    </form>
+                    <div id="settings-status" class="status"></div>
+                </div>
+
+                <div class="card">
+                    <h4>Sistema y Mantenimiento</h4>
+                     <div class="form-group">
+                        <label>Firmware</label>
+                        <button type="button" class="btn btn-secondary" id="check-ota-btn">📡 Buscar Actualizaciones</button>
+                        <div id="ota-status" class="status"></div>
+                    </div>
+                    <div class="danger-zone">
+                        <h4>⚠️ Zona de Peligro</h4>
+                        <div class="form-group">
+                            <label>Acciones del Dispositivo</label>
+                            <div style="display:flex; gap: 10px; flex-wrap: wrap;">
+                                <button type="button" class="btn btn-secondary" id="reboot-btn">🔄 Reiniciar Dispositivo</button>
+                                <button type="button" class="btn btn-danger" id="factory-reset-btn">💥 Restaurar de Fábrica</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="index-panel" class="content-panel">
+                <div class="card">
+                    <h3>🌍 FIYndex - Tu colección de DIYTogethers</h3>
+                    <p class="card-subtitle">Descubre todas las criaturas que has visto o criado.</p>
+                    <div id="fiyndex-grid" class="fiyndex-grid">
+                        <!-- El contenido se generará dinámicamente aquí -->
+                    </div>
+                    <div id="fiyndex-status" class="status"></div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            let filesTabLoaded = false;
+
             // --- LÓGICA DE PESTAÑAS ---
             document.querySelectorAll('.tab-btn').forEach(button => {
                 button.addEventListener('click', () => {
                     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
                     button.classList.add('active');
                     document.querySelectorAll('.content-panel').forEach(panel => panel.classList.remove('active'));
-                    document.querySelector(button.dataset.target).classList.add('active');
+                    const targetPanel = document.querySelector(button.dataset.target);
+                    targetPanel.classList.add('active');
+                    
+                    switch (targetPanel.id) {
+                        case 'settings-panel':
+                            loadDeviceSettings();
+                            break;
+                        case 'index-panel':
+                            loadFiyndexData();
+                            break;
+                        case 'files-panel':
+                            if (!filesTabLoaded) {
+                                fetchFileList('/');
+                                filesTabLoaded = true;
+                            }
+                            break;
+                    }
                 });
             });
 
@@ -127,12 +247,92 @@
                         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                         body: new URLSearchParams(new FormData(wifiForm)).toString()
                     });
-                    if (!response.ok) throw new Error('Respuesta no válida del servidor.');
-                    status.innerHTML = '<span style="color:green">✅ Guardado. El dispositivo se reiniciará.</span>';
+                    if (!response.ok) throw new Error(`Error del servidor: ${response.statusText}`);
+                    status.innerHTML = '<span style="color:green">✅ Guardado. El dispositivo se reiniciará para aplicar los cambios.</span>';
+                    setTimeout(() => status.textContent = '', 5000);
                 } catch (err) {
                     status.innerHTML = `<span style="color:red">❌ Error: ${err.message}</span>`;
                     btn.disabled = false;
                     btn.textContent = '💾 Guardar y Reiniciar';
+                }
+            });
+            
+            // --- LÓGICA DE CONFIGURACIÓN ---
+            const settingsForm = document.getElementById('settings-form');
+            const brightnessSlider = document.getElementById('brightness');
+            const brightnessValue = document.getElementById('brightness-value');
+            
+            const loadDeviceSettings = async () => {
+                try {
+                    const response = await fetch('/getsettings');
+                    if (!response.ok) throw new Error('No se pudieron cargar las configuraciones.');
+                    const settings = await response.json();
+                    
+                    document.getElementById('hostname').value = settings.hostname || '';
+                    document.getElementById('timezone').value = settings.timezone || 'Etc/UTC';
+                    brightnessSlider.value = settings.brightness || 80;
+                    brightnessValue.textContent = `${brightnessSlider.value}%`;
+                    document.getElementById('screen_timeout').value = settings.screen_timeout || 300;
+                } catch (e) {
+                    document.getElementById('settings-status').innerHTML = `<span style="color:red">❌ Error al cargar configuración: ${e.message}</span>`;
+                }
+            };
+            
+            brightnessSlider.addEventListener('input', e => {
+                brightnessValue.textContent = `${e.target.value}%`;
+            });
+            
+            settingsForm.addEventListener('submit', async e => {
+                e.preventDefault();
+                const btn = document.getElementById('save-settings-btn');
+                const status = document.getElementById('settings-status');
+                btn.disabled = true;
+                btn.textContent = 'Guardando...';
+                status.textContent = 'Aplicando cambios...';
+                try {
+                    const response = await fetch('/savesettings', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                        body: new URLSearchParams(new FormData(settingsForm)).toString()
+                    });
+                    if (!response.ok) throw new Error(`Error del servidor: ${response.statusText}`);
+                    status.innerHTML = '<span style="color:green">✅ Configuración guardada correctamente.</span>';
+                } catch (err) {
+                     status.innerHTML = `<span style="color:red">❌ Error: ${err.message}</span>`;
+                } finally {
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        btn.textContent = '💾 Guardar Cambios';
+                        status.textContent = '';
+                    }, 3000);
+                }
+            });
+
+            document.getElementById('check-ota-btn').addEventListener('click', async () => {
+                const status = document.getElementById('ota-status');
+                status.textContent = 'Buscando actualizaciones, por favor espere...';
+                try {
+                    const resp = await fetch('/checkota', { method: 'POST' });
+                    const result = await resp.text();
+                    status.innerHTML = `<span style="color:blue">ℹ️ ${result}</span>`;
+                } catch(e) { status.innerHTML = `<span style="color:red">❌ Error de conexión al buscar actualizaciones.</span>`; }
+            });
+
+            document.getElementById('reboot-btn').addEventListener('click', async () => {
+                if (confirm('¿Estás seguro de que quieres reiniciar el dispositivo?')) {
+                    try {
+                        alert('El dispositivo se está reiniciando. Perderás la conexión.');
+                        await fetch('/reboot', { method: 'POST' });
+                    } catch (e) { /* Error de red esperado y normal */ }
+                }
+            });
+
+            document.getElementById('factory-reset-btn').addEventListener('click', async () => {
+                if (confirm('⚠️ ¡ADVERTENCIA!\nEsto borrará TODAS las configuraciones (WiFi incluido) y reiniciará el dispositivo a su estado de fábrica.\n\n¿Estás completamente seguro?')) {
+                    try {
+                        alert('Restaurando de fábrica. Perderás la conexión.');
+                        await fetch('/factoryreset', { method: 'POST' });
+                    } catch (e) { /* Error de red esperado y normal */ }
                 }
             });
 
@@ -181,11 +381,7 @@
                 const promptText = type === 'dir' ? 'Nombre de la nueva carpeta:' : 'Nombre del nuevo archivo:';
                 const name = prompt(promptText);
                 if (!name) return;
-
-                const fd = new FormData();
-                fd.append('path', currentPath);
-                fd.append('filename', name);
-                fd.append('type', type);
+                const fd = new FormData(); fd.append('path', currentPath); fd.append('filename', name); fd.append('type', type);
                 try {
                     const resp = await fetch('/create', { method: 'POST', body: fd });
                     if (!resp.ok) throw new Error('El servidor no pudo crear el item.');
@@ -196,10 +392,7 @@
             const renameItem = async (path, oldName) => {
                 const newName = prompt(`Nuevo nombre para "${oldName}":`, oldName);
                 if (!newName || newName === oldName) return;
-                const fd = new FormData();
-                fd.append('path', path);
-                fd.append('old_filename', oldName);
-                fd.append('new_filename', newName);
+                const fd = new FormData(); fd.append('path', path); fd.append('old_filename', oldName); fd.append('new_filename', newName);
                 try {
                     const resp = await fetch('/rename', { method: 'POST', body: fd });
                     if (!resp.ok) throw new Error('El servidor no pudo renombrar.');
@@ -209,9 +402,7 @@
 
             const deleteItem = async (path, name) => {
                 if (!confirm(`⚠️ ¿Borrar "${name}"?`)) return;
-                const fd = new FormData();
-                fd.append('path', path);
-                fd.append('filename', name);
+                const fd = new FormData(); fd.append('path', path); fd.append('filename', name);
                 try {
                     const resp = await fetch('/delete', { method: 'POST', body: fd });
                     if (!resp.ok) throw new Error('El servidor no pudo borrar.');
@@ -222,8 +413,7 @@
             const renderFileList = (files, path) => {
                 let html = (path !== '/') ? `<div class="file-item"><div class="file-info"><a href="#" class="dir-link" data-path="${path.substring(0, path.lastIndexOf('/'))||'/'}">⤴️ ..</a></div></div>` : '';
                 if (!files || files.length === 0) {
-                    fileListDiv.innerHTML = html + '<p style="text-align:center;padding:40px;color:#aaa">Directorio vacío.</p>';
-                    return;
+                    fileListDiv.innerHTML = html + '<p style="text-align:center;padding:40px;color:#aaa">Directorio vacío.</p>'; return;
                 }
                 files.sort((a,b)=>(a.type===b.type)?a.name.localeCompare(b.name):a.type==='dir'?-1:1).forEach(f=>{
                     const icon=f.type==='dir'?'📁':'📄',fullPath=path==='/'?`/${f.name}`:`${path}/${f.name}`;
@@ -249,7 +439,85 @@
                 if (renBtn) { renameItem(renBtn.dataset.path, renBtn.dataset.filename); }
             });
 
-            fetchFileList('/');
+            // --- LÓGICA FIYndex ---
+            const ICON_EYE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>`;
+            const ICON_EGG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2C9.25 2 7 4.25 7 7c0 2.05 1.2 3.8 2.94 4.58C9.37 12.5 9 13.69 9 15c0 2.21 1.79 4 4 4s4-1.79 4-4c0-1.31-.37-2.5-1.06-3.42C15.8 10.8 17 9.05 17 7c0-2.75-2.25-5-5-5zm0 1.5c1.93 0 3.5 1.57 3.5 3.5S13.93 10.5 12 10.5 8.5 8.93 8.5 7 10.07 3.5 12 3.5z"/></svg>`;
+            
+            const renderFiyndex = (creatures) => {
+                const grid = document.getElementById('fiyndex-grid');
+                if (!creatures || creatures.length === 0) {
+                    grid.innerHTML = '<p>No se encontraron criaturas.</p>';
+                    return;
+                }
+                
+                let html = '';
+                creatures.forEach(c => {
+                    const isLocked = !c.seen && !c.hatched;
+                    const name = isLocked ? '???' : c.name;
+                    const imageContent = isLocked ? '?' : (c.imageUrl ? `<img src="${c.imageUrl}" alt="${c.name}">` : c.id);
+
+                    html += `
+                        <div class="fiy-card ${isLocked ? 'locked' : ''}">
+                            <div class="status-icons">
+                                <span class="status-icon ${c.seen ? 'unlocked' : ''}" title="Visto">${ICON_EYE}</span>
+                                <span class="status-icon ${c.hatched ? 'unlocked' : ''}" title="Criado">${ICON_EGG}</span>
+                            </div>
+                            <div class="fiy-image">${imageContent}</div>
+                            <div class="fiy-info">
+                                <h5>${name}</h5>
+                                <p>ID: ${c.id}</p>
+                            </div>
+                            ${!isLocked ? `<a href="https://diytogether.com/editor?id=${c.id}" target="_blank" class="btn-edit">✏️</a>` : ''}
+                        </div>
+                    `;
+                });
+                grid.innerHTML = html;
+            };
+
+            const generateMockData = () => {
+                const specialCreatures = [
+                    { id: 'H', name: 'Huevo', seen: Math.random() > 0.3, hatched: Math.random() > 0.5 },
+                    { id: '0', name: 'Neutral', seen: true, hatched: true }
+                ];
+                
+                const primaryEvolutions = [];
+                const secondaryEvolutions = [];
+                const tertiaryEvolutions = [];
+
+                for (let i = 1; i <= 4; i++) {
+                    primaryEvolutions.push({ id: `${i}`, name: `Evo ${i}`, seen: Math.random() > 0.4, hatched: Math.random() > 0.6 });
+                    for (let j = 1; j <= 4; j++) {
+                        secondaryEvolutions.push({ id: `${i}.${j}`, name: `Evo ${i}.${j}`, seen: Math.random() > 0.5, hatched: Math.random() > 0.7 });
+                        for (let k = 1; k <= 4; k++) {
+                            tertiaryEvolutions.push({ id: `${i}.${j}.${k}`, name: `Evo ${i}.${j}.${k}`, seen: Math.random() > 0.6, hatched: Math.random() > 0.8 });
+                        }
+                    }
+                }
+
+                const data = [
+                    ...specialCreatures,
+                    ...primaryEvolutions,
+                    ...secondaryEvolutions,
+                    ...tertiaryEvolutions
+                ];
+
+                return data.map(c => ({
+                    ...c, 
+                    imageUrl: (!c.seen && !c.hatched) ? null : `https://placehold.co/100x100/667eea/white?text=${c.id}`
+                }));
+            };
+
+            const loadFiyndexData = async () => {
+                const status = document.getElementById('fiyndex-status');
+                status.textContent = 'Cargando datos del FIYndex...';
+                
+                setTimeout(() => { 
+                    const mockData = generateMockData();
+                    renderFiyndex(mockData);
+                    status.textContent = `Mostrando ${mockData.length} entradas.`;
+                }, 250);
+            };
+
         });
     </script>
 </body>
