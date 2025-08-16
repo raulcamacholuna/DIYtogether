@@ -1,9 +1,7 @@
-/*
-  Fichero: ./components/diymon_bsp/WS1.9TS/bsp_wifi.c
-  Fecha: 13/08/2025 - 05:00 
-  Último cambio: Añadida la función bsp_wifi_init_sta para corregir error de compilación.
-  Descripción: Gestor de conexión WiFi. Se añade una nueva función para permitir la conexión a una red WiFi pasando el SSID y la contraseña directamente, sin depender de la NVS.
-*/
+/* Fecha: 16/08/2025 - 08:03  */
+/* Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_bsp\WS1.9TS\bsp_wifi.c */
+/* Último cambio: Añadido un retardo de 1 segundo antes de reintentar la conexión WiFi tras una desconexión. */
+/* Descripción: Gestor de conexión WiFi. Se ha añadido un `vTaskDelay` en el manejador del evento `WIFI_EVENT_STA_DISCONNECTED` para introducir una pausa antes de llamar a `esp_wifi_connect()`. Esto evita reintentos de conexión demasiado rápidos que pueden llevar a errores de 'Association refused too many times' si el punto de acceso está ocupado. */
 #include "bsp_api.h"
 #include <string.h>
 #include "freertos/FreeRTOS.h"
@@ -42,11 +40,14 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                 break;
             case WIFI_EVENT_STA_DISCONNECTED: {
                 wifi_event_sta_disconnected_t* event = (wifi_event_sta_disconnected_t*) event_data;
-                ESP_LOGE(TAG, "EVENTO: WIFI_EVENT_STA_DISCONNECTED - Desconexión de la red.");
-                ESP_LOGE(TAG, "Razón de la desconexión: %d", event->reason);
+                ESP_LOGE(TAG, "EVENTO: WIFI_EVENT_STA_DISCONNECTED - Desconexión de la red (Razón: %d).", event->reason);
                 if (event->reason == WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT) {
-                    ESP_LOGE(TAG, "DIAGNÓSTICO: Error '4-Way Handshake Timeout'. ¡Verifica que la contraseña guardada sea correcta para la red!");
+                    ESP_LOGE(TAG, "DIAGNÓSTICO: Error '4-Way Handshake Timeout'. ¡Verifica que la contraseña sea correcta!");
                 }
+                // Añadir un retardo para evitar reintentos demasiado rápidos
+                vTaskDelay(pdMS_TO_TICKS(1000));
+                ESP_LOGI(TAG, "Reintentando conexión...");
+                esp_wifi_connect();
                 break;
             }
             default:
@@ -164,7 +165,6 @@ void bsp_wifi_init_sta_from_nvs(void) {
     nvs_close(nvs_handle);
 
     if (len_ssid > 1 && strcmp(ssid, "skipped") != 0) {
-        // --- [NUEVO] Log de depuración para mostrar la contraseña ---
         ESP_LOGW(TAG, "DEPURACIÓN: Usando SSID:[%s] | Contraseña:[%s] | ModoAuth:[%d]", ssid, pass, (int)authmode);
 
         wifi_config_t wifi_config = {0};
@@ -259,4 +259,3 @@ void bsp_wifi_init_sta(const char *ssid, const char *pass) {
         ESP_LOGW(TAG, "SSID inválido para conectar.");
     }
 }
-
