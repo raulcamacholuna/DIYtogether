@@ -1,7 +1,7 @@
-/* Fecha: 16/08/2025 - 08:08  */
+/* Fecha: 16/08/2025 - 08:38  */
 /* Fichero: components/diymon_ui/actions.c */
-/* Último cambio: Añadida la llamada a `web_server_start()` en el modo de configuración para activar el servidor web. */
-/* Descripción: Se ha añadido el inicio del servidor web después de establecer la conexión WiFi en el modo de configuración en tiempo real. Esto soluciona el problema por el cual las páginas de gestión de archivos (index.html, backup.html) no se servían al activar este modo desde la UI principal. */
+/* Último cambio: Añadida la contraseña del AP a la pantalla de configuración en tiempo real. */
+/* Descripción: Orquestador central de acciones. Se ha modificado el texto que se muestra en la pantalla al entrar en modo de configuración para incluir la contraseña del Punto de Acceso, facilitando la conexión del usuario. */
 
 #include "actions.h"
 #include "esp_log.h"
@@ -25,7 +25,7 @@
 #include "screens.h" 
 #include "ui_actions_panel.h"
 #include "bsp_api.h"
-#include "web_server.h" // Necesario para iniciar el servidor web
+#include "web_server.h"
 
 static const char *TAG = "DIYMON_ACTIONS";
 
@@ -73,13 +73,12 @@ static void wifi_config_task(void *param) {
             lv_label_set_text_fmt(s_config_status_label2, "IP: %s", ip_addr_buffer);
         } else {
             lv_label_set_text(s_config_status_label1, "Modo AP Activo");
-            lv_label_set_text(s_config_status_label2, "SSID: DIYTogether\nIP: 192.168.4.1");
+            // [CAMBIO] Añadida la contraseña a la UI.
+            lv_label_set_text(s_config_status_label2, "SSID: DIYTogether\nPass: MakeItYours\nIP: 192.168.4.1");
         }
     }
     lvgl_port_unlock();
 
-    // --- [CORRECCIÓN] ---
-    // Iniciar el servidor web una vez que la red esté activa.
     if (s_is_config_mode_active) {
         ESP_LOGI(TAG, "Iniciando servidor web para gestión de archivos.");
         web_server_start();

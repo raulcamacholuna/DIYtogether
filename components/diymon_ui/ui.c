@@ -1,7 +1,7 @@
-/* Fecha: 16/08/2025 - 07:46  */
+/* Fecha: 16/08/2025 - 08:34  */
 /* Fichero: components/diymon_ui/ui.c */
-/* Último cambio: Corregida la conexión de eventos para los botones del panel de configuración. */
-/* Descripción: Se ha modificado la función `ui_connect_actions` para asignar la acción `ACTION_ID_ACTIVATE_CONFIG_MODE` al botón 9 (el tercer botón del panel de configuración), tal como solicitó el usuario. Los otros botones del panel de configuración se han enlazado temporalmente a una acción placeholder para evitar comportamientos no deseados. */
+/* Último cambio: Intercambiada la funcionalidad de los botones 6 y 9 para que el botón del panel de administración active el modo de configuración. */
+/* Descripción: Orquestador de la UI. Se ha modificado la conexión de eventos para que el tercer botón del panel de administración (botón 6) active el modo de configuración WiFi en tiempo real, mientras que el tercer botón del panel de configuración (botón 9) ahora actúa como un placeholder. */
 #include "ui.h"
 #include "screens.h"
 #include "actions.h"
@@ -16,8 +16,6 @@ static const char *TAG = "DIYMON_UI_MAIN";
 
 static void button_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    // Para las acciones de jugador, queremos respuesta inmediata al presionar
-    // Para el resto, esperamos al evento 'CLICKED' para evitar acciones accidentales
     if (code == LV_EVENT_PRESSED || code == LV_EVENT_CLICKED) {
         diymon_action_id_t action_id = (diymon_action_id_t)(intptr_t)lv_event_get_user_data(e);
         execute_diymon_action(action_id);
@@ -33,7 +31,8 @@ static void ui_connect_actions(void) {
     // --- Panel de Administración ---
     lv_obj_add_event_cb(ui_actions_panel_get_brightness_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_BRIGHTNESS_CYCLE);
     lv_obj_add_event_cb(ui_actions_panel_get_toggle_screen_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_TOGGLE_SCREEN);
-    lv_obj_add_event_cb(ui_actions_panel_get_admin_placeholder_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_ADMIN_PLACEHOLDER);
+    // [CAMBIO] El botón 6 (tercero del panel de admin) ahora activa el modo de configuración WiFi
+    lv_obj_add_event_cb(ui_actions_panel_get_admin_placeholder_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_ACTIVATE_CONFIG_MODE);
 
     // --- Panel de Evolución ---
     lv_obj_add_event_cb(ui_actions_panel_get_evo_fire_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EVO_FIRE);
@@ -42,13 +41,11 @@ static void ui_connect_actions(void) {
     lv_obj_add_event_cb(ui_actions_panel_get_evo_wind_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EVO_WIND);
     lv_obj_add_event_cb(ui_actions_panel_get_evo_back_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EVO_BACK);
     
-    // --- Panel de Configuración (con la lógica corregida) ---
-    // Botones 7 y 8 temporalmente desactivados (apuntan a un placeholder)
+    // --- Panel de Configuración ---
     lv_obj_add_event_cb(ui_actions_panel_get_reset_all_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_RESET_ALL);
     lv_obj_add_event_cb(ui_actions_panel_get_enable_file_server_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_ENABLE_FILE_SERVER);
-    
-    // Botón 9 (tercero del panel) activa el modo de configuración WiFi en tiempo real
-    lv_obj_add_event_cb(ui_actions_panel_get_config_placeholder_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_ACTIVATE_CONFIG_MODE);
+    // [CAMBIO] El botón 9 (tercero del panel de config) ahora es un placeholder
+    lv_obj_add_event_cb(ui_actions_panel_get_config_placeholder_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_CONFIG_PLACEHOLDER);
 
     ESP_LOGI(TAG, "Eventos de todos los botones de acción conectados.");
 }

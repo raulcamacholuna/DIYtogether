@@ -1,9 +1,7 @@
-/*
-Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\screens.c
-Fecha: $timestamp
-Último cambio: Eliminada la lógica de despertar por toque, que ha sido centralizada en main.c.
-Descripción: Gestor de la pantalla principal. Se ha eliminado el manejador del evento `LV_EVENT_CLICKED` y las variables asociadas que gestionaban el despertar de la pantalla. Esta responsabilidad ahora recae exclusivamente en el gestor de inactividad de `main.c` para evitar conflictos y centralizar el control.
-*/
+/* Fecha: 16/08/2025 - 08:42  */
+/* Fichero: components/diymon_ui/screens.c */
+/* Último cambio: Añadida la lógica para ocultar los paneles de acciones al hacer clic en la pantalla. */
+/* Descripción: Gestor de la pantalla principal. Maneja los eventos de entrada globales como gestos para mostrar paneles y, ahora, clics para ocultarlos, coordinando el estado de la animación de reposo. */
 #include "screens.h"
 #include "ui_idle_animation.h"
 #include "ui_actions_panel.h"
@@ -17,7 +15,7 @@ Descripción: Gestor de la pantalla principal. Se ha eliminado el manejador del 
 
 static const char *TAG = "SCREENS";
 
-static lv_timer_t *s_resume_idle_timer = NULL; // Temporizador para reanudar el idle
+static lv_timer_t *s_resume_idle_timer = NULL;
 
 lv_obj_t *g_idle_animation_obj = NULL;
 lv_obj_t *g_main_screen_obj = NULL;
@@ -30,7 +28,7 @@ static void main_screen_event_cb(lv_event_t *e);
 static void resume_idle_timer_cb(lv_timer_t *timer) {
     ESP_LOGD(TAG, "Temporizador de reanudación de idle disparado.");
     ui_idle_animation_resume();
-    s_resume_idle_timer = NULL; // El temporizador se auto-elimina (repeat_count=1)
+    s_resume_idle_timer = NULL;
 }
 
 void create_screen_main(void) {
@@ -39,7 +37,6 @@ void create_screen_main(void) {
     lv_obj_add_flag(g_main_screen_obj, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(g_main_screen_obj, main_screen_event_cb, LV_EVENT_ALL, NULL);
     
-    // Habilitar la detección de gestos permitiendo el scroll, pero sin mostrar la barra.
     lv_obj_set_scroll_dir(g_main_screen_obj, LV_DIR_ALL);
     lv_obj_set_scrollbar_mode(g_main_screen_obj, LV_SCROLLBAR_MODE_OFF);
 
@@ -69,7 +66,6 @@ static void main_screen_event_cb(lv_event_t *e) {
             touch_start_x = p.x;
             touch_start_y = p.y;
             if (!screen_manager_is_off()) {
-                ESP_LOGD(TAG, "Touch detected, pausing idle animation.");
                 ui_idle_animation_pause();
             }
             break;
@@ -79,7 +75,6 @@ static void main_screen_event_cb(lv_event_t *e) {
             touch_start_y = -1;
             
             if (!screen_manager_is_off() && s_resume_idle_timer == NULL) {
-                 ESP_LOGD(TAG, "Touch released. Starting 500ms timer to resume idle animation.");
                 s_resume_idle_timer = lv_timer_create(resume_idle_timer_cb, 500, NULL);
                 lv_timer_set_repeat_count(s_resume_idle_timer, 1);
             }
@@ -92,7 +87,15 @@ static void main_screen_event_cb(lv_event_t *e) {
             }
             break;
         }
-        // La lógica de LV_EVENT_CLICKED para despertar la pantalla ha sido movida a main.c
+        case LV_EVENT_CLICKED: {
+            // Si la pantalla no está apagada, un clic en cualquier
+            // parte que no sea un botón, oculta los paneles de acción.
+            if (!screen_manager_is_off()) {
+                ESP_LOGD(TAG, "Click en la pantalla, ocultando paneles.");
+                ui_actions_panel_hide_all();
+            }
+            break;
+        }
         default:
             break;
     }
