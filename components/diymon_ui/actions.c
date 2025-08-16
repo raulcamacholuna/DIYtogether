@@ -1,6 +1,6 @@
-/* Fecha: 16/08/2025 - 07:42  */
+/* Fecha: 16/08/2025 - 08:04  */
 /* Fichero: components/diymon_ui/actions.c */
-/* Último cambio: Corregidos errores de compilación por includes y variables faltantes. */
+/* Último cambio: Añadido include 'esp_lvgl_port.h' para resolver el error de compilación 'implicit declaration'. */
 /* Descripción: Orquestador central de acciones. Llama a la función correspondiente del módulo adecuado basado en la acción del usuario. La nueva acción para activar el modo de configuración establece una bandera en NVS y reinicia el dispositivo. */
 
 #include "actions.h"
@@ -11,6 +11,8 @@
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "lvgl.h"
+#include "esp_wifi.h"
+#include "esp_netif.h"
 #include "esp_lvgl_port.h" // Necesario para lvgl_port_lock/unlock
 
 // Includes de módulos con los que interactúa
@@ -42,10 +44,9 @@ extern lv_obj_t *g_animation_img_obj;
 // --- Declaraciones de funciones ---
 static void wifi_config_task(void *param);
 static void config_back_button_event_cb(lv_event_t *e);
+static void erase_nvs_key(const char* key);
 
-/**
- * @brief Tarea en segundo plano para gestionar la conexión WiFi sin bloquear la UI.
- */
+
 static void wifi_config_task(void *param) {
     lvgl_port_lock(0);
     if (s_is_config_mode_active && s_config_status_label1) {
@@ -58,7 +59,7 @@ static void wifi_config_task(void *param) {
     bsp_wifi_init_sta_from_nvs();
     bool ip_ok = bsp_wifi_wait_for_ip(15000);
 
-    if (!ip_ok) {
+    if (!ip_ok && s_is_config_mode_active) {
         bsp_wifi_start_ap();
     }
     
@@ -89,6 +90,11 @@ static void config_back_button_event_cb(lv_event_t *e) {
         
         esp_wifi_stop();
         esp_wifi_deinit();
+
+        esp_netif_t* sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+        if (sta_netif) { esp_netif_destroy(sta_netif); }
+        esp_netif_t* ap_netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
+        if (ap_netif) { esp_netif_destroy(ap_netif); }
 
         if (s_config_status_label1) { lv_obj_del(s_config_status_label1); s_config_status_label1 = NULL; }
         if (s_config_status_label2) { lv_obj_del(s_config_status_label2); s_config_status_label2 = NULL; }
@@ -121,6 +127,8 @@ void execute_diymon_action(diymon_action_id_t action_id) {
         ui_idle_animation_stop();
         ui_telemetry_destroy();
         if (g_animation_img_obj) lv_obj_add_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
+        
+        vTaskDelay(pdMS_TO_TICKS(500));
 
         s_config_status_label1 = lv_label_create(g_main_screen_obj);
         s_config_status_label2 = lv_label_create(g_main_screen_obj);
@@ -145,57 +153,44 @@ void execute_diymon_action(diymon_action_id_t action_id) {
     }
 
     if (s_is_config_mode_active) {
-        ESP_LOGW(TAG, "Acción %d ignorada, modo de configuración activo.", action_id);
         return;
     }
 
     switch(action_id) {
         case ACTION_ID_COMER: case ACTION_ID_EJERCICIO: case ACTION_ID_ATACAR:
-            ui_action_animations_play(action_id);
-            break;
+            ui_action_animations_play(action_id); break;
         case ACTION_ID_BRIGHTNESS_CYCLE:
             s_current_brightness_idx = (s_current_brightness_idx + 1) % 4;
-            screen_manager_set_brightness(s_brightness_levels[s_current_brightness_idx]);
-            break;
+            screen_manager_set_brightness(s_brightness_levels[s_current_brightness_idx]); break;
         case ACTION_ID_TOGGLE_SCREEN:
             if (screen_manager_is_off()) screen_manager_turn_on();
             else { ui_actions_panel_hide_all(); screen_manager_turn_off(); }
             break;
         case ACTION_ID_ENABLE_FILE_SERVER: {
-            nvs_handle_t nvs_handle;
-            if (nvs_open("storage", NVS_READWRITE, &nvs_handle) == ESP_OK) {
-                nvs_set_str(nvs_handle, "file_server", "1"); nvs_commit(nvs_handle); nvs_close(nvs_handle);
-            }
-            vTaskDelay(pdMS_TO_TICKS(500)); esp_restart();
-            break;
+            nvs_handle_t nvs; if (nvs_open("storage", NVS_READWRITE, &nvs) == ESP_OK) {
+                nvs_set_str(nvs, "file_server", "1"); nvs_commit(nvs); nvs_close(nvs); }
+            vTaskDelay(pdMS_TO_TICKS(500)); esp_restart(); break;
         }
         case ACTION_ID_RESET_ALL:
             wifi_portal_erase_credentials(); diymon_evolution_reset_state(); erase_nvs_key("file_server");
-            vTaskDelay(pdMS_TO_TICKS(1000)); esp_restart();
-            break;
+            vTaskDelay(pdMS_TO_TICKS(1000)); esp_restart(); break;
         case ACTION_ID_EVO_FIRE: case ACTION_ID_EVO_WATER: case ACTION_ID_EVO_EARTH: case ACTION_ID_EVO_WIND: {
-            const char* code = diymon_get_current_code();
-            int branch = (action_id - ACTION_ID_EVO_FIRE) + 1;
+            const char* code = diymon_get_current_code(); int branch = (action_id - ACTION_ID_EVO_FIRE) + 1;
             const char* next = diymon_get_branched_evolution(code, branch);
             if (next) {
                 ui_idle_animation_stop(); if (g_animation_img_obj) lv_obj_add_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
                 diymon_set_current_code(next); ui_telemetry_force_update();
                 ui_idle_animation_start(g_main_screen_obj); if (g_animation_img_obj) lv_obj_clear_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
-            }
-            break;
+            } break;
         }
         case ACTION_ID_EVO_BACK: {
-            const char* code = diymon_get_current_code();
-            const char* prev = diymon_get_previous_evolution_in_sequence(code);
+            const char* code = diymon_get_current_code(); const char* prev = diymon_get_previous_evolution_in_sequence(code);
             if (prev) {
                 ui_idle_animation_stop(); if (g_animation_img_obj) lv_obj_add_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
                 diymon_set_current_code(prev); ui_telemetry_force_update();
                 ui_idle_animation_start(g_main_screen_obj); if (g_animation_img_obj) lv_obj_clear_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
-            }
-            break;
+            } break;
         }
-        default:
-            ESP_LOGW(TAG, "ID de accion desconocido: %d", action_id);
-            break;
+        default: break;
     }
 }
