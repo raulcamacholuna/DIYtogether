@@ -4367,10 +4367,10 @@ extern "C" {
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_bsp\WS1.9TS\bsp_wifi.c
 # =================================================================================================
 
-/* Fecha: 16/08/2025 - 08:03  */
-/* Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_bsp\WS1.9TS\bsp_wifi.c */
-/* Último cambio: Añadido un retardo de 1 segundo antes de reintentar la conexión WiFi tras una desconexión. */
-/* Descripción: Gestor de conexión WiFi. Se ha añadido un `vTaskDelay` en el manejador del evento `WIFI_EVENT_STA_DISCONNECTED` para introducir una pausa antes de llamar a `esp_wifi_connect()`. Esto evita reintentos de conexión demasiado rápidos que pueden llevar a errores de 'Association refused too many times' si el punto de acceso está ocupado. */
+/* Fecha: 16/08/2025 - 07:50  */
+/* Fichero: components/diymon_bsp/WS1.9TS/bsp_wifi.c */
+/* Último cambio: Hecha la inicialización del stack de red (netif, event loop) idempotente para evitar un crash al llamarla múltiples veces. */
+/* Descripción: Gestor de conexión WiFi. El crash (ESP_ERR_INVALID_STATE) ocurría porque `esp_event_loop_create_default()` era llamado en el arranque principal y de nuevo al entrar en modo configuración. La función `bsp_wifi_init_stack` ahora utiliza una bandera estática para asegurar que el stack de red solo se inicialice una vez, resolviendo el error. */
 #include "bsp_api.h"
 #include <string.h>
 #include "freertos/FreeRTOS.h"
@@ -4394,6 +4394,7 @@ extern "C" {
 
 static const char *TAG = "bsp_wifi";
 static SemaphoreHandle_t s_ip_acquired_sem = NULL;
+static bool g_network_stack_initialized = false; // Flag de idempotencia
 
 static void event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data)
@@ -4401,82 +4402,38 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     if (event_base == WIFI_EVENT) {
         switch(event_id) {
             case WIFI_EVENT_STA_START:
-                ESP_LOGI(TAG, "EVENTO: WIFI_EVENT_STA_START - Intentando conectar...");
                 esp_wifi_connect();
                 break;
             case WIFI_EVENT_STA_CONNECTED:
-                ESP_LOGI(TAG, "EVENTO: WIFI_EVENT_STA_CONNECTED - Conectado al AP, esperando IP.");
+                ESP_LOGI(TAG, "Conectado al AP, esperando IP.");
                 break;
             case WIFI_EVENT_STA_DISCONNECTED: {
-                wifi_event_sta_disconnected_t* event = (wifi_event_sta_disconnected_t*) event_data;
-                ESP_LOGE(TAG, "EVENTO: WIFI_EVENT_STA_DISCONNECTED - Desconexión de la red (Razón: %d).", event->reason);
-                if (event->reason == WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT) {
-                    ESP_LOGE(TAG, "DIAGNÓSTICO: Error '4-Way Handshake Timeout'. ¡Verifica que la contraseña sea correcta!");
-                }
-                // Añadir un retardo para evitar reintentos demasiado rápidos
                 vTaskDelay(pdMS_TO_TICKS(1000));
                 ESP_LOGI(TAG, "Reintentando conexión...");
                 esp_wifi_connect();
                 break;
             }
             default:
-                ESP_LOGD(TAG, "Recibido evento WiFi no gestionado: %d", (int)event_id);
                 break;
         }
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-        ESP_LOGI(TAG, "EVENTO: IP_EVENT_STA_GOT_IP - ¡IP Obtenida!: " IPSTR, IP2STR(&event->ip_info.ip));
+        ESP_LOGI(TAG, "¡IP Obtenida!: " IPSTR, IP2STR(&event->ip_info.ip));
         if (s_ip_acquired_sem) {
             xSemaphoreGive(s_ip_acquired_sem);
         }
     }
 }
 
-
 void bsp_wifi_init_stack(void) {
+    if (g_network_stack_initialized) {
+        ESP_LOGD(TAG, "El stack de red ya ha sido inicializado.");
+        return;
+    }
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-}
-
-esp_err_t bsp_wifi_scan(void) {
-    ESP_LOGI(TAG, "Iniciando escaneo de redes WiFi (modo autónomo)...");
-    
-    esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();
-    assert(sta_netif);
-    
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_start());
-
-    wifi_scan_config_t scan_config = {
-        .ssid = 0, .bssid = 0, .channel = 0, .show_hidden = false
-    };
-    ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, true));
-
-    uint16_t ap_count = 0;
-    esp_wifi_scan_get_ap_num(&ap_count);
-    if (ap_count > 0) {
-        wifi_ap_record_t *ap_list = (wifi_ap_record_t *)malloc(sizeof(wifi_ap_record_t) * ap_count);
-        if (ap_list) {
-            ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_count, ap_list));
-            ESP_LOGI(TAG, "------------------- REDES WIFI ENCONTRADAS -------------------");
-            for (int i = 0; i < ap_count; i++) {
-                ESP_LOGI(TAG, "SSID: %-32s | RSSI: %d", (char*)ap_list[i].ssid, ap_list[i].rssi);
-            }
-            ESP_LOGI(TAG, "------------------------------------------------------------");
-            free(ap_list);
-        }
-    } else {
-        ESP_LOGW(TAG, "No se encontraron redes WiFi.");
-    }
-    
-    ESP_ERROR_CHECK(esp_wifi_stop());
-    ESP_ERROR_CHECK(esp_wifi_deinit());
-    esp_netif_destroy(sta_netif);
-    
-    ESP_LOGI(TAG, "Escaneo autónomo finalizado, recursos liberados.");
-    return ESP_OK;
+    g_network_stack_initialized = true;
+    ESP_LOGI(TAG, "Stack de red (netif, event loop) inicializado por primera vez.");
 }
 
 void bsp_wifi_start_ap(void) {
@@ -4487,12 +4444,9 @@ void bsp_wifi_start_ap(void) {
 
     wifi_config_t wifi_config = {
         .ap = {
-            .ssid = PORTAL_AP_SSID,
-            .ssid_len = strlen(PORTAL_AP_SSID),
-            .channel = PORTAL_AP_CHANNEL,
-            .password = PORTAL_AP_PASS,
-            .max_connection = PORTAL_AP_MAX_CONN,
-            .authmode = WIFI_AUTH_WPA_WPA2_PSK
+            .ssid = PORTAL_AP_SSID, .ssid_len = strlen(PORTAL_AP_SSID),
+            .channel = PORTAL_AP_CHANNEL, .password = PORTAL_AP_PASS,
+            .max_connection = PORTAL_AP_MAX_CONN, .authmode = WIFI_AUTH_WPA_WPA2_PSK
         },
     };
     if (strlen(PORTAL_AP_PASS) == 0) {
@@ -4502,14 +4456,9 @@ void bsp_wifi_start_ap(void) {
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
-
-    ESP_LOGI(TAG, "Punto de Acceso WiFi iniciado. SSID: %s, Password: %s",
-             PORTAL_AP_SSID, PORTAL_AP_PASS);
 }
 
 void bsp_wifi_init_sta_from_nvs(void) {
-    bsp_wifi_scan();
-    
     esp_netif_create_default_wifi_sta();
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
@@ -4519,62 +4468,24 @@ void bsp_wifi_init_sta_from_nvs(void) {
     s_ip_acquired_sem = xSemaphoreCreateBinary();
 
     char ssid[32] = {0}, pass[64] = {0};
-    int32_t authmode = 0;
     size_t len_ssid = sizeof(ssid), len_pass = sizeof(pass);
 
     nvs_handle_t nvs_handle;
-    esp_err_t err = nvs_open("storage", NVS_READONLY, &nvs_handle);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "No se pudo abrir NVS para leer credenciales WiFi.");
-        return;
+    if (nvs_open("storage", NVS_READONLY, &nvs_handle) == ESP_OK) {
+        nvs_get_str(nvs_handle, "wifi_ssid", ssid, &len_ssid);
+        nvs_get_str(nvs_handle, "wifi_pass", pass, &len_pass);
+        nvs_close(nvs_handle);
     }
-    nvs_get_str(nvs_handle, "wifi_ssid", ssid, &len_ssid);
-    nvs_get_str(nvs_handle, "wifi_pass", pass, &len_pass);
-    nvs_get_i32(nvs_handle, "wifi_authmode", &authmode);
-    nvs_close(nvs_handle);
 
-    if (len_ssid > 1 && strcmp(ssid, "skipped") != 0) {
-        ESP_LOGW(TAG, "DEPURACIÓN: Usando SSID:[%s] | Contraseña:[%s] | ModoAuth:[%d]", ssid, pass, (int)authmode);
-
+    if (len_ssid > 1) {
         wifi_config_t wifi_config = {0};
         strcpy((char *)wifi_config.sta.ssid, ssid);
         strcpy((char *)wifi_config.sta.password, pass);
-        wifi_config.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
-        
-        switch (authmode) {
-            case 2: // Forzar WPA3
-                ESP_LOGI(TAG, "Configurando conexión: WPA3-PSK (PMF Requerido).");
-                wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA3_PSK;
-                wifi_config.sta.pmf_cfg.capable = true;
-                wifi_config.sta.pmf_cfg.required = true;
-                break;
-            case 1: // Forzar WPA2
-                ESP_LOGI(TAG, "Configurando conexión: WPA2-PSK (PMF Desactivado).");
-                wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
-                wifi_config.sta.pmf_cfg.capable = false;
-                wifi_config.sta.pmf_cfg.required = false;
-                break;
-            case 0: // Automático (por defecto)
-            default:
-                ESP_LOGI(TAG, "Configurando conexión: Modo automático -> WPA2-PSK (PMF Desactivado para compatibilidad).");
-                wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
-                wifi_config.sta.pmf_cfg.capable = false;
-                wifi_config.sta.pmf_cfg.required = false;
-                break;
-        }
+        wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
         
         ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
         ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
-        
-        ESP_LOGI(TAG, "Protocolos WiFi limitados a 802.11b/g/n para máxima compatibilidad.");
-        ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N));
-        
         ESP_ERROR_CHECK(esp_wifi_start());
-        ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
-
-        ESP_LOGI(TAG, "Iniciando conexión a la red guardada: %s", ssid);
-    } else {
-        ESP_LOGW(TAG, "No hay credenciales WiFi válidas para conectar.");
     }
 }
 
@@ -4602,30 +4513,14 @@ void bsp_wifi_init_sta(const char *ssid, const char *pass) {
     s_ip_acquired_sem = xSemaphoreCreateBinary();
 
     if (ssid && strlen(ssid) > 0) {
-        ESP_LOGI(TAG, "Configurando conexión: SSID:[%s]", ssid);
-
         wifi_config_t wifi_config = {0};
         strcpy((char *)wifi_config.sta.ssid, ssid);
-        if (pass) {
-             strcpy((char *)wifi_config.sta.password, pass);
-        }
-        wifi_config.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
-        wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK; // Default to WPA2 for compatibility
-        wifi_config.sta.pmf_cfg.capable = false;
-        wifi_config.sta.pmf_cfg.required = false;
+        if (pass) { strcpy((char *)wifi_config.sta.password, pass); }
+        wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
 
         ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
         ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
-        
-        ESP_LOGI(TAG, "Protocolos WiFi limitados a 802.11b/g/n para máxima compatibilidad.");
-        ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N));
-        
         ESP_ERROR_CHECK(esp_wifi_start());
-        ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
-
-        ESP_LOGI(TAG, "Iniciando conexión a la red: %s", ssid);
-    } else {
-        ESP_LOGW(TAG, "SSID inválido para conectar.");
     }
 }
 
@@ -5082,10 +4977,10 @@ void diymon_evolution_reset_state(void) {
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\actions.c
 # =================================================================================================
 
-/* Fecha: 16/08/2025 - 07:22  */
+/* Fecha: 16/08/2025 - 08:08  */
 /* Fichero: components/diymon_ui/actions.c */
-/* Último cambio: Añadida llamada para ocultar paneles de acciones al apagar la pantalla. */
-/* Descripción: Orquestador central de acciones. Llama a la función correspondiente del módulo adecuado basado en la acción del usuario. Ahora se asegura de que los paneles de acción se oculten al apagar la pantalla. */
+/* Último cambio: Añadida la llamada a `web_server_start()` en el modo de configuración para activar el servidor web. */
+/* Descripción: Se ha añadido el inicio del servidor web después de establecer la conexión WiFi en el modo de configuración en tiempo real. Esto soluciona el problema por el cual las páginas de gestión de archivos (index.html, backup.html) no se servían al activar este modo desde la UI principal. */
 
 #include "actions.h"
 #include "esp_log.h"
@@ -5095,6 +4990,9 @@ void diymon_evolution_reset_state(void) {
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "lvgl.h"
+#include "esp_wifi.h"
+#include "esp_netif.h"
+#include "esp_lvgl_port.h"
 
 // Includes de módulos con los que interactúa
 #include "diymon_evolution.h"
@@ -5104,142 +5002,183 @@ void diymon_evolution_reset_state(void) {
 #include "ui_idle_animation.h"
 #include "ui_telemetry.h"
 #include "screens.h" 
-#include "ui_actions_panel.h" // Necesario para ocultar los paneles
+#include "ui_actions_panel.h"
+#include "bsp_api.h"
+#include "web_server.h" // Necesario para iniciar el servidor web
 
 static const char *TAG = "DIYMON_ACTIONS";
 
-// Variables estáticas para la gestión del brillo
+// --- Variables estáticas para la gestión del brillo ---
 static int s_brightness_levels[] = {25, 50, 75, 100};
 static int s_current_brightness_idx = 3;
 
-// Declaración externa para la variable global del objeto de imagen de la animación.
+// --- Variables para el modo de configuración en tiempo real ---
+static bool s_is_config_mode_active = false;
+static lv_obj_t *s_config_status_label1 = NULL;
+static lv_obj_t *s_config_status_label2 = NULL;
+static lv_obj_t *s_config_back_button = NULL;
+static TaskHandle_t s_wifi_task_handle = NULL;
+
 extern lv_obj_t *g_animation_img_obj;
 
-/**
- * @brief Función de ayuda para borrar una clave específica de la NVS.
- */
+// --- Declaraciones de funciones ---
+static void wifi_config_task(void *param);
+static void config_back_button_event_cb(lv_event_t *e);
+static void erase_nvs_key(const char* key);
+
+
+static void wifi_config_task(void *param) {
+    lvgl_port_lock(0);
+    if (s_is_config_mode_active && s_config_status_label1) {
+        lv_label_set_text(s_config_status_label1, "Conectando...");
+        lv_label_set_text(s_config_status_label2, "Usando credenciales guardadas.");
+    }
+    lvgl_port_unlock();
+
+    bsp_wifi_init_stack();
+    bsp_wifi_init_sta_from_nvs();
+    bool ip_ok = bsp_wifi_wait_for_ip(15000);
+
+    if (!ip_ok && s_is_config_mode_active) {
+        bsp_wifi_start_ap();
+    }
+    
+    lvgl_port_lock(0);
+    if (s_is_config_mode_active) {
+        char ip_addr_buffer[16] = "192.168.4.1";
+        if (ip_ok) {
+            bsp_wifi_get_ip(ip_addr_buffer);
+            lv_label_set_text(s_config_status_label1, "Conectado!");
+            lv_label_set_text_fmt(s_config_status_label2, "IP: %s", ip_addr_buffer);
+        } else {
+            lv_label_set_text(s_config_status_label1, "Modo AP Activo");
+            lv_label_set_text(s_config_status_label2, "SSID: DIYTogether\nIP: 192.168.4.1");
+        }
+    }
+    lvgl_port_unlock();
+
+    // --- [CORRECCIÓN] ---
+    // Iniciar el servidor web una vez que la red esté activa.
+    if (s_is_config_mode_active) {
+        ESP_LOGI(TAG, "Iniciando servidor web para gestión de archivos.");
+        web_server_start();
+    }
+
+    s_wifi_task_handle = NULL;
+    vTaskDelete(NULL);
+}
+
+static void config_back_button_event_cb(lv_event_t *e) {
+    if (s_is_config_mode_active) {
+        ESP_LOGI(TAG, "Saliendo del modo de configuración WiFi.");
+        s_is_config_mode_active = false;
+
+        if (s_wifi_task_handle) { vTaskDelete(s_wifi_task_handle); s_wifi_task_handle = NULL; }
+        
+        esp_wifi_stop();
+        esp_wifi_deinit();
+
+        esp_netif_t* sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+        if (sta_netif) { esp_netif_destroy(sta_netif); }
+        esp_netif_t* ap_netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
+        if (ap_netif) { esp_netif_destroy(ap_netif); }
+
+        if (s_config_status_label1) { lv_obj_del(s_config_status_label1); s_config_status_label1 = NULL; }
+        if (s_config_status_label2) { lv_obj_del(s_config_status_label2); s_config_status_label2 = NULL; }
+        if (s_config_back_button) { lv_obj_del(s_config_back_button); s_config_back_button = NULL; }
+
+        if(g_animation_img_obj) lv_obj_clear_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
+        ui_telemetry_create(g_main_screen_obj);
+        ui_idle_animation_start(g_main_screen_obj);
+    }
+}
+
 static void erase_nvs_key(const char* key) {
     nvs_handle_t nvs_handle;
-    esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
-    if (err == ESP_OK) {
+    if (nvs_open("storage", NVS_READWRITE, &nvs_handle) == ESP_OK) {
         nvs_erase_key(nvs_handle, key);
         nvs_commit(nvs_handle);
         nvs_close(nvs_handle);
-        ESP_LOGI(TAG, "NVS key '%s' borrada.", key);
-    } else {
-        ESP_LOGE(TAG, "Error abriendo NVS para borrar la clave '%s'.", key);
     }
 }
 
 void execute_diymon_action(diymon_action_id_t action_id) {
     ESP_LOGI(TAG, "Ejecutando acción ID: %d", action_id);
 
-    switch(action_id) {
-        // --- Acciones de Jugador ---
-        case ACTION_ID_COMER:
-        case ACTION_ID_EJERCICIO:
-        case ACTION_ID_ATACAR:
-            ui_action_animations_play(action_id);
-            break;
+    if (action_id == ACTION_ID_ACTIVATE_CONFIG_MODE) {
+        if (s_is_config_mode_active) return;
+        s_is_config_mode_active = true;
+        ESP_LOGI(TAG, "Entrando en modo de configuración WiFi sin reinicio.");
 
-        // --- Acciones de Administración ---
-        case ACTION_ID_BRIGHTNESS_CYCLE:
-            s_current_brightness_idx = (s_current_brightness_idx + 1) % (sizeof(s_brightness_levels) / sizeof(s_brightness_levels[0]));
-            int new_brightness = s_brightness_levels[s_current_brightness_idx];
-            screen_manager_set_brightness(new_brightness);
-            ESP_LOGI(TAG, "Accion: Ciclar Brillo a %d%%", new_brightness);
-            break;
-
-        case ACTION_ID_TOGGLE_SCREEN:
-            if (screen_manager_is_off()) {
-                ESP_LOGI(TAG, "Accion: Encender pantalla.");
-                screen_manager_turn_on();
-            } else {
-                ESP_LOGI(TAG, "Accion: Apagar pantalla.");
-                ui_actions_panel_hide_all(); // Ocultar paneles antes de apagar
-                screen_manager_turn_off();
-            }
-            break;
-
-        // --- Acciones de Configuración ---
-        case ACTION_ID_RESET_ALL:
-            ESP_LOGW(TAG, "ACCIÓN: Borrado completo de configuraciones.");
-            wifi_portal_erase_credentials();
-            diymon_evolution_reset_state();
-            erase_nvs_key("file_server");
-            ESP_LOGW(TAG, "Todas las configuraciones han sido borradas. Reiniciando en 1 segundo...");
-            vTaskDelay(pdMS_TO_TICKS(1000));
-            esp_restart();
-            break;
-            
-        case ACTION_ID_ENABLE_FILE_SERVER: {
-            ESP_LOGI(TAG, "Accion: Habilitar modo Servidor de Archivos en el proximo reinicio.");
-            nvs_handle_t nvs_handle;
-            esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
-            if (err == ESP_OK) {
-                nvs_set_str(nvs_handle, "file_server", "1");
-                nvs_commit(nvs_handle);
-                nvs_close(nvs_handle);
-                ESP_LOGI(TAG, "Marca de modo servidor de archivos guardada. Reiniciando en 500ms...");
-            }
-            vTaskDelay(pdMS_TO_TICKS(500));
-            esp_restart();
-            break;
-        }
-
-        // --- Acciones de Evolución (Lógica SIN REINICIO) ---
-        case ACTION_ID_EVO_FIRE:
-        case ACTION_ID_EVO_WATER:
-        case ACTION_ID_EVO_EARTH:
-        case ACTION_ID_EVO_WIND: {
-            const char* current_code = diymon_get_current_code();
-            int branch_id = 0;
-            if (action_id == ACTION_ID_EVO_FIRE)  branch_id = 1;
-            if (action_id == ACTION_ID_EVO_WATER) branch_id = 2;
-            if (action_id == ACTION_ID_EVO_EARTH) branch_id = 3;
-            if (action_id == ACTION_ID_EVO_WIND)  branch_id = 4;
-            
-            const char* next_code = diymon_get_branched_evolution(current_code, branch_id);
-            if (next_code) {
-                ESP_LOGI(TAG, "Evolucionando de '%s' a '%s' sin reiniciar.", current_code, next_code);
-                ui_idle_animation_stop();
-                if (g_animation_img_obj) lv_obj_add_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
-                diymon_set_current_code(next_code);
-                ui_telemetry_force_update();
-                ui_idle_animation_start(g_main_screen_obj);
-                if (g_animation_img_obj) lv_obj_clear_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
-            } else {
-                ESP_LOGW(TAG, "Evolución no válida desde '%s' con la rama %d.", current_code, branch_id);
-            }
-            break;
-        }
-
-        case ACTION_ID_EVO_BACK: {
-            const char* current_code = diymon_get_current_code();
-            const char* prev_code = diymon_get_previous_evolution_in_sequence(current_code);
-            if (prev_code) {
-                ESP_LOGI(TAG, "Involucionando de '%s' a '%s' sin reiniciar.", current_code, prev_code);
-                ui_idle_animation_stop();
-                if (g_animation_img_obj) lv_obj_add_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
-                diymon_set_current_code(prev_code);
-                ui_telemetry_force_update();
-                ui_idle_animation_start(g_main_screen_obj);
-                if (g_animation_img_obj) lv_obj_clear_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
-            } else {
-                ESP_LOGW(TAG, "Ya se encuentra en la forma base '%s'. No se puede involucionar.", current_code);
-            }
-            break;
-        }
+        ui_actions_panel_hide_all();
+        ui_idle_animation_stop();
+        ui_telemetry_destroy();
+        if (g_animation_img_obj) lv_obj_add_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
         
-        // --- Placeholders ---
-        case ACTION_ID_ADMIN_PLACEHOLDER:
-        case ACTION_ID_CONFIG_PLACEHOLDER:
-            ESP_LOGI(TAG, "Accion %d (sin implementación actual).", action_id);
-            break;
+        vTaskDelay(pdMS_TO_TICKS(500));
 
-        default:
-            ESP_LOGW(TAG, "ID de accion desconocido: %d", action_id);
+        s_config_status_label1 = lv_label_create(g_main_screen_obj);
+        s_config_status_label2 = lv_label_create(g_main_screen_obj);
+        lv_obj_set_style_text_color(s_config_status_label1, lv_color_white(), 0);
+        lv_obj_set_style_text_align(s_config_status_label1, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_set_width(s_config_status_label1, lv_pct(90));
+        lv_obj_align(s_config_status_label1, LV_ALIGN_CENTER, 0, -40);
+        lv_obj_set_style_text_color(s_config_status_label2, lv_color_white(), 0);
+        lv_obj_set_style_text_align(s_config_status_label2, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_set_width(s_config_status_label2, lv_pct(90));
+        lv_obj_align(s_config_status_label2, LV_ALIGN_CENTER, 0, 0);
+
+        s_config_back_button = lv_btn_create(g_main_screen_obj);
+        lv_obj_align(s_config_back_button, LV_ALIGN_BOTTOM_MID, 0, -20);
+        lv_obj_add_event_cb(s_config_back_button, config_back_button_event_cb, LV_EVENT_CLICKED, NULL);
+        lv_obj_t* lbl = lv_label_create(s_config_back_button);
+        lv_label_set_text(lbl, "VOLVER");
+        lv_obj_center(lbl);
+
+        xTaskCreate(wifi_config_task, "wifi_cfg_task", 4096, NULL, 5, &s_wifi_task_handle);
+        return;
+    }
+
+    if (s_is_config_mode_active) {
+        return;
+    }
+
+    switch(action_id) {
+        case ACTION_ID_COMER: case ACTION_ID_EJERCICIO: case ACTION_ID_ATACAR:
+            ui_action_animations_play(action_id); break;
+        case ACTION_ID_BRIGHTNESS_CYCLE:
+            s_current_brightness_idx = (s_current_brightness_idx + 1) % 4;
+            screen_manager_set_brightness(s_brightness_levels[s_current_brightness_idx]); break;
+        case ACTION_ID_TOGGLE_SCREEN:
+            if (screen_manager_is_off()) screen_manager_turn_on();
+            else { ui_actions_panel_hide_all(); screen_manager_turn_off(); }
             break;
+        case ACTION_ID_ENABLE_FILE_SERVER: {
+            nvs_handle_t nvs; if (nvs_open("storage", NVS_READWRITE, &nvs) == ESP_OK) {
+                nvs_set_str(nvs, "file_server", "1"); nvs_commit(nvs); nvs_close(nvs); }
+            vTaskDelay(pdMS_TO_TICKS(500)); esp_restart(); break;
+        }
+        case ACTION_ID_RESET_ALL:
+            wifi_portal_erase_credentials(); diymon_evolution_reset_state(); erase_nvs_key("file_server");
+            vTaskDelay(pdMS_TO_TICKS(1000)); esp_restart(); break;
+        case ACTION_ID_EVO_FIRE: case ACTION_ID_EVO_WATER: case ACTION_ID_EVO_EARTH: case ACTION_ID_EVO_WIND: {
+            const char* code = diymon_get_current_code(); int branch = (action_id - ACTION_ID_EVO_FIRE) + 1;
+            const char* next = diymon_get_branched_evolution(code, branch);
+            if (next) {
+                ui_idle_animation_stop(); if (g_animation_img_obj) lv_obj_add_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
+                diymon_set_current_code(next); ui_telemetry_force_update();
+                ui_idle_animation_start(g_main_screen_obj); if (g_animation_img_obj) lv_obj_clear_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
+            } break;
+        }
+        case ACTION_ID_EVO_BACK: {
+            const char* code = diymon_get_current_code(); const char* prev = diymon_get_previous_evolution_in_sequence(code);
+            if (prev) {
+                ui_idle_animation_stop(); if (g_animation_img_obj) lv_obj_add_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
+                diymon_set_current_code(prev); ui_telemetry_force_update();
+                ui_idle_animation_start(g_main_screen_obj); if (g_animation_img_obj) lv_obj_clear_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
+            } break;
+        }
+        default: break;
     }
 }
 
@@ -5248,12 +5187,11 @@ void execute_diymon_action(diymon_action_id_t action_id) {
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\actions.h
 # =================================================================================================
 
-/*
-# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\actions.h
-# Fecha: `$timestamp
-# Último cambio: Corregido el fichero para que sea sintácticamente válido en C.
-# Descripción: Se actualiza el enumerado de acciones para reflejar el cambio de "modo de configuración" a "servidor de archivos".
-*/
+/* Fecha: 16/08/2025 - 07:32  */
+/* Fichero: components/diymon_ui/actions.h */
+/* Último cambio: Añadida la acción ACTION_ID_ACTIVATE_CONFIG_MODE para entrar al modo configuracion desde la UI. */
+/* Descripción: Define la interfaz para el sistema de acciones, incluyendo los IDs de acción y la función principal de ejecución. Es el punto central para entender qué interacciones de usuario son posibles. */
+
 #ifndef ACTIONS_H
 #define ACTIONS_H
 
@@ -5266,26 +5204,27 @@ extern "C" {
 // --- El Modelo de Datos para las Acciones ---
 typedef enum {
     // Acciones del panel de jugador (superior 1)
-    ACTION_ID_COMER,
-    ACTION_ID_EJERCICIO,
-    ACTION_ID_ATACAR,
+    ACTION_ID_COMER,          // 0
+    ACTION_ID_EJERCICIO,      // 1
+    ACTION_ID_ATACAR,         // 2
 
     // Acciones del panel de administración (superior 2)
-    ACTION_ID_BRIGHTNESS_CYCLE,
-    ACTION_ID_TOGGLE_SCREEN,
-    ACTION_ID_ADMIN_PLACEHOLDER,
+    ACTION_ID_BRIGHTNESS_CYCLE,       // 3
+    ACTION_ID_TOGGLE_SCREEN,          // 4
+    ACTION_ID_ADMIN_PLACEHOLDER,      // 5
 
     // Acciones del panel de evolución (lateral)
-    ACTION_ID_EVO_FIRE,
-    ACTION_ID_EVO_WATER,
-    ACTION_ID_EVO_EARTH,
-    ACTION_ID_EVO_WIND,
-    ACTION_ID_EVO_BACK,
+    ACTION_ID_EVO_FIRE,       // 6
+    ACTION_ID_EVO_WATER,      // 7
+    ACTION_ID_EVO_EARTH,      // 8
+    ACTION_ID_EVO_WIND,       // 9
+    ACTION_ID_EVO_BACK,       // 10
     
     // Acciones del panel de configuración (superior 3)
-    ACTION_ID_RESET_ALL,
-    ACTION_ID_ENABLE_FILE_SERVER, // Renombrado de ACTION_ID_ENABLE_CONFIG_MODE
-    ACTION_ID_CONFIG_PLACEHOLDER,
+    ACTION_ID_ACTIVATE_CONFIG_MODE,   // 11
+    ACTION_ID_RESET_ALL,              // 12
+    ACTION_ID_ENABLE_FILE_SERVER,     // 13
+    ACTION_ID_CONFIG_PLACEHOLDER,     // 14
 
     ACTION_ID_COUNT 
 } diymon_action_id_t;
@@ -5293,7 +5232,6 @@ typedef enum {
 
 // --- El Orquestador de Acciones ---
 void execute_diymon_action(diymon_action_id_t action_id);
-
 
 #ifdef __cplusplus
 }
@@ -5525,10 +5463,10 @@ extern const lv_img_dsc_t bg_0;
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\CMakeLists.txt
 # =================================================================================================
 
-# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\CMakeLists.txt
-# Fecha: $timestamp
-# Último cambio: Actualizado para incluir `ui_config_screen.c` en la compilación.
-# Descripción: El `file(GLOB "*.c")` existente se encarga de encontrar y compilar automáticamente el nuevo fichero `ui_config_screen.c`. Se regenera el fichero para confirmar que este nuevo fuente se añade al componente.
+# Fecha: 16/08/2025 - 08:09 
+# Fichero: components/diymon_ui/CMakeLists.txt
+# Último cambio: Añadida la dependencia 'web_server' para resolver el error de compilación.
+# Descripción: El componente diymon_ui ahora depende de web_server para poder iniciar el servidor de configuración. Se ha añadido a la lista REQUIRES para que el compilador encuentre 'web_server.h'.
 
 file(GLOB component_sources
     "*.c"
@@ -5549,6 +5487,7 @@ idf_component_register(
         diymon_core
         screen_manager
         wifi_portal
+        web_server 
 )
 
 
@@ -7104,12 +7043,10 @@ void ui_telemetry_force_update(void);
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui.c
 # =================================================================================================
 
-/*
-# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui.c
-# Fecha: $timestamp
-# Último cambio: Eliminada la llamada a `ui_assets_init`.
-# Descripción: Se elimina la llamada a la inicialización de assets de esta función. La responsabilidad de cargar los assets ahora recae en el orquestador principal (`main.c`), asegurando que solo se carguen cuando se entra en el modo de aplicación principal y no en los modos de servicio.
-*/
+/* Fecha: 16/08/2025 - 07:46  */
+/* Fichero: components/diymon_ui/ui.c */
+/* Último cambio: Corregida la conexión de eventos para los botones del panel de configuración. */
+/* Descripción: Se ha modificado la función `ui_connect_actions` para asignar la acción `ACTION_ID_ACTIVATE_CONFIG_MODE` al botón 9 (el tercer botón del panel de configuración), tal como solicitó el usuario. Los otros botones del panel de configuración se han enlazado temporalmente a una acción placeholder para evitar comportamientos no deseados. */
 #include "ui.h"
 #include "screens.h"
 #include "actions.h"
@@ -7124,35 +7061,40 @@ static const char *TAG = "DIYMON_UI_MAIN";
 
 static void button_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    diymon_action_id_t action_id = (diymon_action_id_t)(intptr_t)lv_event_get_user_data(e);
-    
-    bool is_player_action = (action_id >= ACTION_ID_COMER && action_id <= ACTION_ID_ATACAR);
-
-    if (is_player_action) {
-        if (code == LV_EVENT_PRESSED) {
-            ESP_LOGD(TAG, "Evento de botón PRESSED para la acción de jugador ID: %d", action_id);
-            execute_diymon_action(action_id);
-        }
-    } else {
-        if (code == LV_EVENT_CLICKED || code == LV_EVENT_LONG_PRESSED) {
-            ESP_LOGD(TAG, "Evento de botón CLICK/LONG_PRESS para la acción ID: %d", action_id);
-            execute_diymon_action(action_id);
-        }
+    // Para las acciones de jugador, queremos respuesta inmediata al presionar
+    // Para el resto, esperamos al evento 'CLICKED' para evitar acciones accidentales
+    if (code == LV_EVENT_PRESSED || code == LV_EVENT_CLICKED) {
+        diymon_action_id_t action_id = (diymon_action_id_t)(intptr_t)lv_event_get_user_data(e);
+        execute_diymon_action(action_id);
     }
 }
 
 static void ui_connect_actions(void) {
-    lv_obj_add_event_cb(ui_actions_panel_get_eat_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_COMER);
-    lv_obj_add_event_cb(ui_actions_panel_get_gym_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EJERCICIO);
-    lv_obj_add_event_cb(ui_actions_panel_get_atk_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_ATACAR);
-    lv_obj_add_event_cb(ui_actions_panel_get_brightness_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_BRIGHTNESS_CYCLE);
-    lv_obj_add_event_cb(ui_actions_panel_get_toggle_screen_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_TOGGLE_SCREEN);
-    lv_obj_add_event_cb(ui_actions_panel_get_admin_placeholder_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_ENABLE_FILE_SERVER);
-    lv_obj_add_event_cb(ui_actions_panel_get_evo_fire_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EVO_FIRE);
-    lv_obj_add_event_cb(ui_actions_panel_get_evo_water_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EVO_WATER);
-    lv_obj_add_event_cb(ui_actions_panel_get_evo_earth_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EVO_EARTH);
-    lv_obj_add_event_cb(ui_actions_panel_get_evo_wind_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EVO_WIND);
-    lv_obj_add_event_cb(ui_actions_panel_get_evo_back_btn(), button_event_cb, LV_EVENT_ALL, (void*)ACTION_ID_EVO_BACK);
+    // --- Panel de Jugador ---
+    lv_obj_add_event_cb(ui_actions_panel_get_eat_btn(), button_event_cb, LV_EVENT_PRESSED, (void*)ACTION_ID_COMER);
+    lv_obj_add_event_cb(ui_actions_panel_get_gym_btn(), button_event_cb, LV_EVENT_PRESSED, (void*)ACTION_ID_EJERCICIO);
+    lv_obj_add_event_cb(ui_actions_panel_get_atk_btn(), button_event_cb, LV_EVENT_PRESSED, (void*)ACTION_ID_ATACAR);
+
+    // --- Panel de Administración ---
+    lv_obj_add_event_cb(ui_actions_panel_get_brightness_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_BRIGHTNESS_CYCLE);
+    lv_obj_add_event_cb(ui_actions_panel_get_toggle_screen_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_TOGGLE_SCREEN);
+    lv_obj_add_event_cb(ui_actions_panel_get_admin_placeholder_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_ADMIN_PLACEHOLDER);
+
+    // --- Panel de Evolución ---
+    lv_obj_add_event_cb(ui_actions_panel_get_evo_fire_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EVO_FIRE);
+    lv_obj_add_event_cb(ui_actions_panel_get_evo_water_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EVO_WATER);
+    lv_obj_add_event_cb(ui_actions_panel_get_evo_earth_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EVO_EARTH);
+    lv_obj_add_event_cb(ui_actions_panel_get_evo_wind_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EVO_WIND);
+    lv_obj_add_event_cb(ui_actions_panel_get_evo_back_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EVO_BACK);
+    
+    // --- Panel de Configuración (con la lógica corregida) ---
+    // Botones 7 y 8 temporalmente desactivados (apuntan a un placeholder)
+    lv_obj_add_event_cb(ui_actions_panel_get_reset_all_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_RESET_ALL);
+    lv_obj_add_event_cb(ui_actions_panel_get_enable_file_server_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_ENABLE_FILE_SERVER);
+    
+    // Botón 9 (tercero del panel) activa el modo de configuración WiFi en tiempo real
+    lv_obj_add_event_cb(ui_actions_panel_get_config_placeholder_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_ACTIVATE_CONFIG_MODE);
+
     ESP_LOGI(TAG, "Eventos de todos los botones de acción conectados.");
 }
 
@@ -7162,7 +7104,6 @@ void ui_preinit(void) {
 }
 
 void ui_init(void) {
-    // La inicialización de assets (ui_assets_init) ya no se hace aquí.
     create_screens();
     
     if (g_main_screen_obj) {

@@ -1,7 +1,7 @@
-/* Fecha: 16/08/2025 - 08:04  */
+/* Fecha: 16/08/2025 - 08:08  */
 /* Fichero: components/diymon_ui/actions.c */
-/* Último cambio: Añadido include 'esp_lvgl_port.h' para resolver el error de compilación 'implicit declaration'. */
-/* Descripción: Orquestador central de acciones. Llama a la función correspondiente del módulo adecuado basado en la acción del usuario. La nueva acción para activar el modo de configuración establece una bandera en NVS y reinicia el dispositivo. */
+/* Último cambio: Añadida la llamada a `web_server_start()` en el modo de configuración para activar el servidor web. */
+/* Descripción: Se ha añadido el inicio del servidor web después de establecer la conexión WiFi en el modo de configuración en tiempo real. Esto soluciona el problema por el cual las páginas de gestión de archivos (index.html, backup.html) no se servían al activar este modo desde la UI principal. */
 
 #include "actions.h"
 #include "esp_log.h"
@@ -13,7 +13,7 @@
 #include "lvgl.h"
 #include "esp_wifi.h"
 #include "esp_netif.h"
-#include "esp_lvgl_port.h" // Necesario para lvgl_port_lock/unlock
+#include "esp_lvgl_port.h"
 
 // Includes de módulos con los que interactúa
 #include "diymon_evolution.h"
@@ -25,6 +25,7 @@
 #include "screens.h" 
 #include "ui_actions_panel.h"
 #include "bsp_api.h"
+#include "web_server.h" // Necesario para iniciar el servidor web
 
 static const char *TAG = "DIYMON_ACTIONS";
 
@@ -76,6 +77,13 @@ static void wifi_config_task(void *param) {
         }
     }
     lvgl_port_unlock();
+
+    // --- [CORRECCIÓN] ---
+    // Iniciar el servidor web una vez que la red esté activa.
+    if (s_is_config_mode_active) {
+        ESP_LOGI(TAG, "Iniciando servidor web para gestión de archivos.");
+        web_server_start();
+    }
 
     s_wifi_task_handle = NULL;
     vTaskDelete(NULL);

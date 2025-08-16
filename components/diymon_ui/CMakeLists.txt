@@ -1,7 +1,7 @@
-# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\CMakeLists.txt
-# Fecha: $timestamp
-# Último cambio: Actualizado para incluir `ui_config_screen.c` en la compilación.
-# Descripción: El `file(GLOB "*.c")` existente se encarga de encontrar y compilar automáticamente el nuevo fichero `ui_config_screen.c`. Se regenera el fichero para confirmar que este nuevo fuente se añade al componente.
+# Fecha: 16/08/2025 - 08:09 
+# Fichero: components/diymon_ui/CMakeLists.txt
+# Último cambio: Añadida la dependencia 'web_server' para resolver el error de compilación.
+# Descripción: El componente diymon_ui ahora depende de web_server para poder iniciar el servidor de configuración. Se ha añadido a la lista REQUIRES para que el compilador encuentre 'web_server.h'.
 
 file(GLOB component_sources
     "*.c"
@@ -22,4 +22,5 @@ idf_component_register(
         diymon_core
         screen_manager
         wifi_portal
+        web_server 
 )
