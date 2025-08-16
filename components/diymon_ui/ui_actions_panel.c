@@ -1,9 +1,8 @@
-/*
-# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_actions_panel.c
-# Fecha: `$timestamp
-# Último cambio: Corregido el fichero para que sea sintácticamente válido en C.
-# Descripción: Implementa la lógica de los paneles de acción deslizantes, incluyendo su creación, animación y manejo de gestos.
-*/
+/* Fecha: 16/08/2025 - 07:21  */
+/* Fichero: components/diymon_ui/ui_actions_panel.c */
+/* Último cambio: Implementada ui_actions_panel_hide_all() para ocultar paneles mediante programación. */
+/* Descripción: Implementa la lógica de los paneles de acción deslizantes, incluyendo su creación, animación, manejo de gestos y una nueva función para forzar su ocultado, útil al apagar la pantalla. */
+
 #include "ui_actions_panel.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
@@ -51,10 +50,9 @@ static void anim_ready_hide_cb(lv_anim_t *a);
 static void animation_finish_cb(lv_anim_t *a);
 static void last_button_out_anim_ready_cb(lv_anim_t *a);
 
-
 static lv_obj_t* create_top_action_button(lv_obj_t *parent, ui_asset_id_t asset_id, int index) {
     lv_obj_t *btn = lv_btn_create(parent);
-    lv_obj_remove_style_all(btn); // Eliminar estilos por defecto
+    lv_obj_remove_style_all(btn);
     lv_obj_set_size(btn, BUTTON_SIZE, BUTTON_SIZE);
     
     lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, LV_STATE_ANY);
@@ -73,7 +71,7 @@ static lv_obj_t* create_top_action_button(lv_obj_t *parent, ui_asset_id_t asset_
 
 static lv_obj_t* create_side_action_button(lv_obj_t *parent, ui_asset_id_t asset_id, int index) {
     lv_obj_t *btn = lv_btn_create(parent);
-    lv_obj_remove_style_all(btn); // Eliminar estilos por defecto
+    lv_obj_remove_style_all(btn);
     lv_obj_set_size(btn, BUTTON_SIZE, BUTTON_SIZE);
 
     lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, LV_STATE_ANY);
@@ -127,7 +125,6 @@ lv_obj_t* ui_actions_panel_get_evo_earth_btn(void) { return s_side_btns[2]; }
 lv_obj_t* ui_actions_panel_get_evo_wind_btn(void) { return s_side_btns[3]; }
 lv_obj_t* ui_actions_panel_get_evo_back_btn(void) { return s_side_btns[4]; }
 
-
 static void timer_auto_hide_callback(lv_timer_t *timer) {
     if (s_panel_state == PANEL_STATE_PLAYER_VISIBLE) animate_panel_out_top(s_player_btns);
     if (s_panel_state == PANEL_STATE_ADMIN_VISIBLE) animate_panel_out_top(s_admin_btns);
@@ -147,19 +144,15 @@ static void anim_ready_hide_cb(lv_anim_t *a) {
 
 static void animation_finish_cb(lv_anim_t *a) {
     s_is_animating = false;
-    ESP_LOGD(TAG, "Panel IN animation finished. Gesture lock released.");
 }
 
 static void last_button_out_anim_ready_cb(lv_anim_t *a) {
     lv_obj_add_flag((lv_obj_t *)a->var, LV_OBJ_FLAG_HIDDEN);
     s_is_animating = false;
-    ESP_LOGD(TAG, "Panel OUT animation finished. Gesture lock released.");
 }
-
 
 static void animate_panel_in_top(lv_obj_t **buttons) {
     if (s_hide_timer) lv_timer_del(s_hide_timer);
-    
     s_is_animating = true;
     for (int i = 0; i < NUM_TOP_BUTTONS; i++) {
         if (buttons[i]) {
@@ -172,9 +165,7 @@ static void animate_panel_in_top(lv_obj_t **buttons) {
             lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_y);
             lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
             lv_anim_set_delay(&a, i * 50);
-            if (i == NUM_TOP_BUTTONS - 1) {
-                lv_anim_set_ready_cb(&a, animation_finish_cb);
-            }
+            if (i == NUM_TOP_BUTTONS - 1) lv_anim_set_ready_cb(&a, animation_finish_cb);
             lv_anim_start(&a);
         }
     }
@@ -198,11 +189,8 @@ static void animate_panel_out_top(lv_obj_t **buttons) {
             lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_y);
             lv_anim_set_path_cb(&a, lv_anim_path_ease_in);
             lv_anim_set_delay(&a, i * 50);
-            if (i == NUM_TOP_BUTTONS - 1) {
-                lv_anim_set_ready_cb(&a, last_button_out_anim_ready_cb);
-            } else {
-                lv_anim_set_ready_cb(&a, anim_ready_hide_cb);
-            }
+            if (i == NUM_TOP_BUTTONS - 1) lv_anim_set_ready_cb(&a, last_button_out_anim_ready_cb);
+            else lv_anim_set_ready_cb(&a, anim_ready_hide_cb);
             lv_anim_start(&a);
         }
     }
@@ -210,7 +198,6 @@ static void animate_panel_out_top(lv_obj_t **buttons) {
 
 static void animate_panel_in_side(lv_obj_t **buttons) {
     if (s_hide_timer) lv_timer_del(s_hide_timer);
-    
     s_is_animating = true;
     for (int i = 0; i < NUM_SIDE_BUTTONS; i++) {
         if (buttons[i]) {
@@ -223,9 +210,7 @@ static void animate_panel_in_side(lv_obj_t **buttons) {
             lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_x);
             lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
             lv_anim_set_delay(&a, i * 50);
-            if (i == NUM_SIDE_BUTTONS - 1) {
-                lv_anim_set_ready_cb(&a, animation_finish_cb);
-            }
+            if (i == NUM_SIDE_BUTTONS - 1) lv_anim_set_ready_cb(&a, animation_finish_cb);
             lv_anim_start(&a);
         }
     }
@@ -249,43 +234,30 @@ static void animate_panel_out_side(lv_obj_t **buttons) {
             lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_x);
             lv_anim_set_path_cb(&a, lv_anim_path_ease_in);
             lv_anim_set_delay(&a, i * 50);
-            if (i == NUM_SIDE_BUTTONS - 1) {
-                lv_anim_set_ready_cb(&a, last_button_out_anim_ready_cb);
-            } else {
-                lv_anim_set_ready_cb(&a, anim_ready_hide_cb);
-            }
+            if (i == NUM_SIDE_BUTTONS - 1) lv_anim_set_ready_cb(&a, last_button_out_anim_ready_cb);
+            else lv_anim_set_ready_cb(&a, anim_ready_hide_cb);
             lv_anim_start(&a);
         }
     }
 }
 
 void ui_actions_panel_handle_gesture(lv_dir_t dir, lv_coord_t start_x, lv_coord_t start_y) {
-    if (s_is_animating) {
-        ESP_LOGD(TAG, "Animation in progress, gesture ignored.");
-        return;
-    }
-
-    ESP_LOGD(TAG, "Gesture: Dir=%d, X=%d, Y=%d, State=%d", dir, start_x, start_y, s_panel_state);
+    if (s_is_animating) return;
 
     switch(s_panel_state) {
         case PANEL_STATE_HIDDEN:
             if ((dir == LV_DIR_BOTTOM && start_y < EDGE_SWIPE_THRESHOLD) || (dir == LV_DIR_RIGHT && start_x < EDGE_SWIPE_THRESHOLD)) {
-                // El gesto es válido, no hacemos nada más aquí.
+                 if (dir == LV_DIR_BOTTOM) {
+                    animate_panel_in_top(s_player_btns);
+                    s_panel_state = PANEL_STATE_PLAYER_VISIBLE;
+                } else if (dir == LV_DIR_RIGHT) {
+                    animate_panel_in_side(s_side_btns);
+                    s_panel_state = PANEL_STATE_SIDE_VISIBLE;
+                }
             } else {
-                ESP_LOGD(TAG, "Invalid gesture. Resuming idle animation.");
                 ui_idle_animation_resume();
-                return;
-            }
-
-            if (dir == LV_DIR_BOTTOM) {
-                animate_panel_in_top(s_player_btns);
-                s_panel_state = PANEL_STATE_PLAYER_VISIBLE;
-            } else if (dir == LV_DIR_RIGHT) {
-                animate_panel_in_side(s_side_btns);
-                s_panel_state = PANEL_STATE_SIDE_VISIBLE;
             }
             break;
-
         case PANEL_STATE_PLAYER_VISIBLE:
             if (dir == LV_DIR_BOTTOM) {
                 animate_panel_out_top(s_player_btns);
@@ -297,7 +269,6 @@ void ui_actions_panel_handle_gesture(lv_dir_t dir, lv_coord_t start_x, lv_coord_
                 ui_idle_animation_resume();
             }
             break;
-
         case PANEL_STATE_ADMIN_VISIBLE:
             if (dir == LV_DIR_BOTTOM) {
                 animate_panel_out_top(s_admin_btns);
@@ -309,19 +280,13 @@ void ui_actions_panel_handle_gesture(lv_dir_t dir, lv_coord_t start_x, lv_coord_
                 ui_idle_animation_resume();
             }
             break;
-            
         case PANEL_STATE_CONFIG_VISIBLE:
-             if (dir == LV_DIR_BOTTOM) { // Navegación circular
-                animate_panel_out_top(s_config_btns);
-                animate_panel_in_top(s_player_btns);
-                s_panel_state = PANEL_STATE_PLAYER_VISIBLE;
-            } else if (dir == LV_DIR_TOP) {
+             if (dir == LV_DIR_TOP) {
                 animate_panel_out_top(s_config_btns);
                 s_panel_state = PANEL_STATE_HIDDEN;
                 ui_idle_animation_resume();
             }
             break;
-        
         case PANEL_STATE_SIDE_VISIBLE:
             if (dir == LV_DIR_LEFT) {
                 animate_panel_out_side(s_side_btns);
@@ -332,11 +297,28 @@ void ui_actions_panel_handle_gesture(lv_dir_t dir, lv_coord_t start_x, lv_coord_
     }
 }
 
+void ui_actions_panel_hide_all(void) {
+    if (s_panel_state == PANEL_STATE_HIDDEN || s_is_animating) {
+        return;
+    }
+    ESP_LOGD(TAG, "Forzando el ocultado de todos los paneles visibles.");
+
+    if (s_panel_state == PANEL_STATE_PLAYER_VISIBLE) animate_panel_out_top(s_player_btns);
+    else if (s_panel_state == PANEL_STATE_ADMIN_VISIBLE) animate_panel_out_top(s_admin_btns);
+    else if (s_panel_state == PANEL_STATE_CONFIG_VISIBLE) animate_panel_out_top(s_config_btns);
+    else if (s_panel_state == PANEL_STATE_SIDE_VISIBLE) animate_panel_out_side(s_side_btns);
+    
+    s_panel_state = PANEL_STATE_HIDDEN;
+    if (s_hide_timer) {
+        lv_timer_del(s_hide_timer);
+        s_hide_timer = NULL;
+    }
+    ui_idle_animation_resume();
+}
+
 static void button_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_PRESSED) {
-        if (s_hide_timer) {
-            lv_timer_reset(s_hide_timer);
-        }
+    if (code == LV_EVENT_PRESSED && s_hide_timer) {
+        lv_timer_reset(s_hide_timer);
     }
 }

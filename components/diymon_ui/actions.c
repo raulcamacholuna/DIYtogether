@@ -1,26 +1,39 @@
-/* Fecha: 16/08/2025 - 11:54  */
-/* Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\actions.c */
-/* Último cambio: Modificada la acción de apagar pantalla para que también oculte los paneles de acciones. */
-/* Descripción: Orquestador de acciones de la UI. Al apagar la pantalla, ahora se simulan gestos de deslizamiento hacia arriba y hacia la izquierda para forzar el cierre de cualquier panel de acciones que esté abierto. Esto evita que los botones del panel puedan ser presionados accidentalmente mientras la pantalla está apagada. */
+/* Fecha: 16/08/2025 - 07:22  */
+/* Fichero: components/diymon_ui/actions.c */
+/* Último cambio: Añadida llamada para ocultar paneles de acciones al apagar la pantalla. */
+/* Descripción: Orquestador central de acciones. Llama a la función correspondiente del módulo adecuado basado en la acción del usuario. Ahora se asegura de que los paneles de acción se oculten al apagar la pantalla. */
 
 #include "actions.h"
-#include "ui_action_animations.h" 
 #include "esp_log.h"
-#include "diymon_evolution.h"
-#include "screen_manager.h" 
-#include "wifi_portal.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "nvs_flash.h"
 #include "nvs.h"
-#include "ui_actions_panel.h" // Se necesita para ocultar los paneles
+#include "lvgl.h"
+
+// Includes de módulos con los que interactúa
+#include "diymon_evolution.h"
+#include "screen_manager.h"
+#include "wifi_portal.h"
+#include "ui_action_animations.h"
+#include "ui_idle_animation.h"
+#include "ui_telemetry.h"
+#include "screens.h" 
+#include "ui_actions_panel.h" // Necesario para ocultar los paneles
 
 static const char *TAG = "DIYMON_ACTIONS";
 
+// Variables estáticas para la gestión del brillo
 static int s_brightness_levels[] = {25, 50, 75, 100};
 static int s_current_brightness_idx = 3;
 
+// Declaración externa para la variable global del objeto de imagen de la animación.
+extern lv_obj_t *g_animation_img_obj;
+
+/**
+ * @brief Función de ayuda para borrar una clave específica de la NVS.
+ */
 static void erase_nvs_key(const char* key) {
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
@@ -28,18 +41,24 @@ static void erase_nvs_key(const char* key) {
         nvs_erase_key(nvs_handle, key);
         nvs_commit(nvs_handle);
         nvs_close(nvs_handle);
+        ESP_LOGI(TAG, "NVS key '%s' borrada.", key);
+    } else {
+        ESP_LOGE(TAG, "Error abriendo NVS para borrar la clave '%s'.", key);
     }
 }
 
 void execute_diymon_action(diymon_action_id_t action_id) {
+    ESP_LOGI(TAG, "Ejecutando acción ID: %d", action_id);
+
     switch(action_id) {
+        // --- Acciones de Jugador ---
         case ACTION_ID_COMER:
         case ACTION_ID_EJERCICIO:
         case ACTION_ID_ATACAR:
-            ESP_LOGD(TAG, "Accion de jugador. Delegando a reproductor.");
             ui_action_animations_play(action_id);
             break;
 
+        // --- Acciones de Administración ---
         case ACTION_ID_BRIGHTNESS_CYCLE:
             s_current_brightness_idx = (s_current_brightness_idx + 1) % (sizeof(s_brightness_levels) / sizeof(s_brightness_levels[0]));
             int new_brightness = s_brightness_levels[s_current_brightness_idx];
@@ -52,14 +71,13 @@ void execute_diymon_action(diymon_action_id_t action_id) {
                 ESP_LOGI(TAG, "Accion: Encender pantalla.");
                 screen_manager_turn_on();
             } else {
-                ESP_LOGI(TAG, "Accion: Apagar pantalla y ocultar paneles.");
-                // Simula gestos para ocultar cualquier panel abierto (superior o lateral)
-                ui_actions_panel_handle_gesture(LV_DIR_TOP, 0, 0);
-                ui_actions_panel_handle_gesture(LV_DIR_LEFT, 0, 0);
+                ESP_LOGI(TAG, "Accion: Apagar pantalla.");
+                ui_actions_panel_hide_all(); // Ocultar paneles antes de apagar
                 screen_manager_turn_off();
             }
             break;
 
+        // --- Acciones de Configuración ---
         case ACTION_ID_RESET_ALL:
             ESP_LOGW(TAG, "ACCIÓN: Borrado completo de configuraciones.");
             wifi_portal_erase_credentials();
@@ -75,20 +93,17 @@ void execute_diymon_action(diymon_action_id_t action_id) {
             nvs_handle_t nvs_handle;
             esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
             if (err == ESP_OK) {
-                err = nvs_set_str(nvs_handle, "file_server", "1");
-                if (err == ESP_OK) {
-                    err = nvs_commit(nvs_handle);
-                    if (err == ESP_OK) {
-                        ESP_LOGI(TAG, "Marca de modo servidor de archivos guardada. Reiniciando en 500ms...");
-                    }
-                }
+                nvs_set_str(nvs_handle, "file_server", "1");
+                nvs_commit(nvs_handle);
                 nvs_close(nvs_handle);
+                ESP_LOGI(TAG, "Marca de modo servidor de archivos guardada. Reiniciando en 500ms...");
             }
             vTaskDelay(pdMS_TO_TICKS(500));
             esp_restart();
             break;
         }
 
+        // --- Acciones de Evolución (Lógica SIN REINICIO) ---
         case ACTION_ID_EVO_FIRE:
         case ACTION_ID_EVO_WATER:
         case ACTION_ID_EVO_EARTH:
@@ -102,10 +117,13 @@ void execute_diymon_action(diymon_action_id_t action_id) {
             
             const char* next_code = diymon_get_branched_evolution(current_code, branch_id);
             if (next_code) {
-                ESP_LOGI(TAG, "Evolucionando de '%s' a '%s'. Reiniciando...", current_code, next_code);
+                ESP_LOGI(TAG, "Evolucionando de '%s' a '%s' sin reiniciar.", current_code, next_code);
+                ui_idle_animation_stop();
+                if (g_animation_img_obj) lv_obj_add_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
                 diymon_set_current_code(next_code);
-                vTaskDelay(pdMS_TO_TICKS(500));
-                esp_restart();
+                ui_telemetry_force_update();
+                ui_idle_animation_start(g_main_screen_obj);
+                if (g_animation_img_obj) lv_obj_clear_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
             } else {
                 ESP_LOGW(TAG, "Evolución no válida desde '%s' con la rama %d.", current_code, branch_id);
             }
@@ -116,16 +134,20 @@ void execute_diymon_action(diymon_action_id_t action_id) {
             const char* current_code = diymon_get_current_code();
             const char* prev_code = diymon_get_previous_evolution_in_sequence(current_code);
             if (prev_code) {
-                ESP_LOGI(TAG, "Involucionando de '%s' a '%s'. Reiniciando...", current_code, prev_code);
+                ESP_LOGI(TAG, "Involucionando de '%s' a '%s' sin reiniciar.", current_code, prev_code);
+                ui_idle_animation_stop();
+                if (g_animation_img_obj) lv_obj_add_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
                 diymon_set_current_code(prev_code);
-                vTaskDelay(pdMS_TO_TICKS(500));
-                esp_restart();
+                ui_telemetry_force_update();
+                ui_idle_animation_start(g_main_screen_obj);
+                if (g_animation_img_obj) lv_obj_clear_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
             } else {
                 ESP_LOGW(TAG, "Ya se encuentra en la forma base '%s'. No se puede involucionar.", current_code);
             }
             break;
         }
         
+        // --- Placeholders ---
         case ACTION_ID_ADMIN_PLACEHOLDER:
         case ACTION_ID_CONFIG_PLACEHOLDER:
             ESP_LOGI(TAG, "Accion %d (sin implementación actual).", action_id);

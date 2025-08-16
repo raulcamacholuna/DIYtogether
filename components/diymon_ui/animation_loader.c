@@ -1,7 +1,7 @@
-/* Fecha: 15/08/2025 - 05:27  */
-/* Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\animation_loader.c */
-/* Último cambio: Añadido un log de depuración hexadecimal para la comparación de nombres de fichero. */
-/* Descripción: Se ha añadido un log de diagnóstico avanzado en nimation_loader_count_frames. Ahora, para cada fichero leído del directorio, se imprimirá su nombre en formato de texto y en hexadecimal, y se hará lo mismo con el prefijo buscado. Esto permitirá una comparación byte a byte para identificar la causa raíz del fallo en strncmp, ya sea por nombres 8.3, caracteres ocultos u otros problemas. */
+/* Fecha: 16/08/2025 - 07:14  */
+/* Fichero: components/diymon_ui/animation_loader.c */
+/* Último cambio: Eliminados los logs de depuración hexadecimal para optimizar el tiempo de carga de las animaciones. */
+/* Descripción: Se ha eliminado el log de diagnóstico que imprimía el contenido hexadecimal de los nombres de fichero, ya que causaba un retardo notable al iniciar las animaciones. Se mantiene la lógica de comparación esencial, mejorando el rendimiento. */
 
 #include "animation_loader.h"
 #include "esp_log.h"
@@ -35,7 +35,7 @@ animation_t animation_loader_init(const char *path, uint16_t width, uint16_t hei
     anim.img_dsc.header.cf = LV_COLOR_FORMAT_RGB565A8;
     anim.img_dsc.data_size = buffer_size;
     
-    ESP_LOGI(TAG, "Gestor de animación inicializado. Buffer de %u bytes.", (unsigned int)buffer_size);
+    ESP_LOGD(TAG, "Gestor de animación inicializado. Buffer de %u bytes.", (unsigned int)buffer_size);
     return anim;
 }
 
@@ -78,7 +78,7 @@ uint16_t animation_loader_count_frames(const char *path, const char *prefix) {
     }
 
     uint16_t count = 0;
-    ESP_LOGI(TAG, "Intentando abrir el directorio de animación (LVGL): '%s'", path);
+    ESP_LOGD(TAG, "Abriendo directorio de animación (LVGL): '%s' para contar frames con prefijo '%s'", path, prefix);
     
     lv_fs_dir_t d;
     lv_fs_res_t res = lv_fs_dir_open(&d, path);
@@ -88,35 +88,17 @@ uint16_t animation_loader_count_frames(const char *path, const char *prefix) {
         return 0;
     }
 
-    ESP_LOGI(TAG, "Directorio '%s' abierto. Leyendo y comparando entradas con prefijo '%s'...", path, prefix);
     char fn[256];
     size_t prefix_len = strlen(prefix);
 
     while(lv_fs_dir_read(&d, fn, sizeof(fn)) == LV_FS_RES_OK && fn[0] != '\0') {
-        // --- INICIO DE LOG DE DIAGNÓSTICO AVANZADO ---
-        ESP_LOGI(TAG, "Candidato: '%s'", fn);
-        
-        char hex_buf[128] = {0};
-        size_t name_len = strlen(fn);
-        for(int i = 0; i < name_len && i < 32; i++) {
-            sprintf(hex_buf + strlen(hex_buf), "%02X ", (unsigned char)fn[i]);
-        }
-        ESP_LOGI(TAG, "  -> HEX Fichero: %s", hex_buf);
-
-        memset(hex_buf, 0, sizeof(hex_buf));
-        for(int i = 0; i < prefix_len && i < 32; i++) {
-            sprintf(hex_buf + strlen(hex_buf), "%02X ", (unsigned char)prefix[i]);
-        }
-        ESP_LOGI(TAG, "  -> HEX Prefijo: %s", hex_buf);
-
+        // Compara si el nombre del fichero empieza con el prefijo deseado.
         if (strncmp(fn, prefix, prefix_len) == 0) {
-            ESP_LOGI(TAG, "  -> ¡COINCIDENCIA!");
             count++;
         }
-        // --- FIN DE LOG DE DIAGNÓSTICO AVANZADO ---
     }
 
     lv_fs_dir_close(&d);
-    ESP_LOGI(TAG, "Cierre de directorio. Total de fotogramas con prefijo '%s': %d", prefix, count);
+    ESP_LOGD(TAG, "Cierre de directorio. Total de fotogramas con prefijo '%s': %d", prefix, count);
     return count;
 }
