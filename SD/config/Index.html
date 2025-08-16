@@ -381,7 +381,15 @@
                 const promptText = type === 'dir' ? 'Nombre de la nueva carpeta:' : 'Nombre del nuevo archivo:';
                 const name = prompt(promptText);
                 if (!name) return;
-                const fd = new FormData(); fd.append('path', currentPath); fd.append('filename', name); fd.append('type', type);
+                const fd = new FormData();
+                fd.append('path', currentPath);
+                // [CORRECCIÓN] Se usa 'dirname' para carpetas y 'filename' para archivos, según lo que espera el firmware.
+                if (type === 'dir') {
+                    fd.append('dirname', name);
+                } else {
+                    fd.append('filename', name);
+                }
+                fd.append('type', type);
                 try {
                     const resp = await fetch('/create', { method: 'POST', body: fd });
                     if (!resp.ok) throw new Error('El servidor no pudo crear el item.');

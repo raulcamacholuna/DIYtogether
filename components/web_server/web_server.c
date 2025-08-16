@@ -1,7 +1,7 @@
-/* Fecha: 15/08/2025 - 06:34  */
+/* Fecha: 16/08/2025 - 09:55  */
 /* Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server.c */
-/* Último cambio: Modificados los manejadores raíz y de backup para servir ficheros HTML desde la tarjeta SD. */
-/* Descripción: Servidor web para la configuración del dispositivo. Se ha eliminado el contenido HTML incrustado en el código. Ahora, los endpoints '/' y '/backup' leen y sirven los ficheros 'index.html' y 'backup.html' respectivamente desde el directorio '/sdcard/config/', haciendo el contenido web completamente dinámico y gestionable desde la SD. */
+/* Último cambio: Añadido el manejador POST /create para la creación de directorios. */
+/* Descripción: Servidor web para la configuración del dispositivo. Se ha añadido un nuevo manejador de endpoint para la ruta '/create' que responde a peticiones POST. Este manejador extrae una ruta y un nombre de directorio del cuerpo de la petición, construye la ruta completa en la tarjeta SD y utiliza 'mkdir' para crear el nuevo directorio. Esto soluciona un error 404 (Not Found) que ocurría al intentar crear carpetas desde la interfaz web de gestión de archivos. */
 
 #include "web_server.h"
 #include "esp_http_server.h"
@@ -283,6 +283,45 @@ static esp_err_t delete_file_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+// --- Manejador para crear un nuevo directorio ---
+static esp_err_t create_dir_handler(httpd_req_t *req) {
+    char buf[512];
+    int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
+    if (ret <= 0) {
+        if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+            httpd_resp_send_408(req);
+        }
+        return ESP_FAIL;
+    }
+    buf[ret] = '\0';
+
+    char path[128] = "";
+    char dirname[64] = "";
+
+    // Asumimos que el formulario envía 'path' para el directorio padre y 'dirname' para el nuevo.
+    get_multipart_value(buf, "path", path, sizeof(path));
+    get_multipart_value(buf, "dirname", dirname, sizeof(dirname));
+    
+    if (strlen(dirname) == 0 || strstr(path, "..") || strstr(dirname, "..")) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Nombre de directorio o ruta inválidos.");
+        return ESP_FAIL;
+    }
+
+    char full_path[256];
+    snprintf(full_path, sizeof(full_path), "%s%s/%s", WEB_MOUNT_POINT, strcmp(path, "/") == 0 ? "" : path, dirname);
+
+    // Intentar crear el directorio
+    if (mkdir(full_path, 0755) == 0) {
+        ESP_LOGI(TAG, "Directorio creado: %s", full_path);
+        httpd_resp_send(req, "Directorio creado con éxito.", HTTPD_RESP_USE_STRLEN);
+    } else {
+        ESP_LOGE(TAG, "Fallo al crear el directorio: %s", full_path);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "No se pudo crear el directorio. Puede que ya exista.");
+    }
+    return ESP_OK;
+}
+
+
 // --- Manejador para guardar credenciales WiFi ---
 static esp_err_t save_post_handler(httpd_req_t *req) {
     char buf[256];
@@ -347,10 +386,16 @@ static httpd_handle_t start_webserver(void) {
         
         httpd_uri_t upload_uri = { .uri = "/upload", .method = HTTP_POST, .handler = upload_post_handler };
         httpd_register_uri_handler(server, &upload_uri);
+
+        httpd_uri_t create_dir_uri = { .uri = "/create", .method = HTTP_POST, .handler = create_dir_handler };
+        httpd_register_uri_handler(server, &create_dir_uri);
+
         httpd_uri_t list_uri = { .uri = "/listfiles*", .method = HTTP_GET, .handler = list_files_handler };
         httpd_register_uri_handler(server, &list_uri);
+        
         httpd_uri_t delete_uri = { .uri = "/delete", .method = HTTP_POST, .handler = delete_file_handler };
         httpd_register_uri_handler(server, &delete_uri);
+
         httpd_uri_t save_uri = { .uri = "/save", .method = HTTP_POST, .handler = save_post_handler };
         httpd_register_uri_handler(server, &save_uri);
     }
