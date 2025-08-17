@@ -363,7 +363,7 @@ static esp_err_t save_post_handler(httpd_req_t *req) {
 
 // --- Manejador para servir la página principal desde la SD ---
 static esp_err_t root_get_handler(httpd_req_t *req) {
-    return serve_file_from_sd(req, "/sdcard/config/index.html");
+    return serve_file_from_sd(req, "/sdcard/config/Index.html");
 }
 
 // --- Manejador para servir la página de backup desde la SD ---
