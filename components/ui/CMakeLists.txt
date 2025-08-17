@@ -1,7 +1,7 @@
-# Fecha: 17/08/2025 - 04:32 
+# Fecha: 17/08/2025 - 05:53 
 # Fichero: components/ui/CMakeLists.txt
-# Último cambio: Corregido un error de sintaxis en el comentario de PowerShell y refinada la lógica de compilación de assets.
-# Descripción: Se elimina el uso de acentos graves (backticks) en los comentarios para evitar errores del parser de PowerShell. La lógica de CMake ahora es más explícita: se listan los ficheros de assets C requeridos ('BG.c', 'ui_assets.c') y se excluye 'BG_config.c' para resolver definitivamente los errores de enlazador 'multiple definition' y 'undefined reference'.
+# Último cambio: Modificado para compilar automáticamente TODOS los ficheros .c de assets/images/.
+# Descripción: El problema de los botones invisibles (ruido) se debía a que sus ficheros C de definición de imagen (ej. asset_btn_1.c) no se estaban incluyendo en la compilación, causando errores de enlazador. Esta modificación utiliza `file(GLOB ...)` para encontrar y compilar automáticamente todos los ficheros .c del directorio `assets/images/`. Esto elimina la necesidad de listarlos manualmente, resuelve el error de 'undefined reference' para el botón 1 y asegura que todos los iconos se enlacen y rendericen correctamente.
 
 file(GLOB component_sources
     "*.c"
@@ -12,14 +12,10 @@ file(GLOB component_sources
     "buttons/*.c"
 )
 
-# Se añaden explícitamente los ficheros C que definen los assets de imagen.
-# Esto evita compilar ficheros redundantes (como BG_config.c, cuyo contenido
-# ya está en ui_assets.c) y asegura que todos los símbolos necesarios (como bg_0 de BG.c)
-# estén disponibles para el enlazador.
-list(APPEND component_sources
-    "assets/images/BG.c"
-    "assets/images/ui_assets.c"
-)
+# [CORRECCIÓN] Buscar y añadir automáticamente TODOS los ficheros .c del directorio de imágenes.
+# Esto asegura que BG.c, BG_config.c y todos los asset_btn_*.c se compilen y enlacen correctamente.
+file(GLOB asset_sources "assets/images/*.c")
+list(APPEND component_sources ${asset_sources})
 
 idf_component_register(
     SRCS ${component_sources}

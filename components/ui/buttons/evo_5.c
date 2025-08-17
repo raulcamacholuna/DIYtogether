@@ -1,15 +1,17 @@
-/* Fecha: 17/08/2025 - 01:28 
-# Fichero: components\ui\buttons\evo_5.c
-# Último cambio: Implementación del módulo para el botón 'Involucionar' (EVO_5).
-# Descripción: Encapsula la lógica del botón 'Involucionar', incluyendo creación, posicionamiento en el panel lateral, icono (ASSET_ICON_EVO_BACK) y conexión de evento a la acción ACTION_ID_EVO_BACK.
-*/
+/* Fecha: 17/08/2025 - 05:24  */
+/* Fichero: components/ui/buttons/evo_5.c */
+/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
+/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+
 #include "evo_5.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
+#include "esp_log.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
 #define BUTTON_PADDING 10
+static const char *TAG = "EVO_5";
 
 // --- Variable estática para el manejador del botón ---
 static lv_obj_t *s_evo_5_handle = NULL;
@@ -21,7 +23,8 @@ static lv_obj_t *s_evo_5_handle = NULL;
  */
 static void evo_5_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_CLICKED) {
+    if (code == LV_EVENT_PRESSED) {
+        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de involucionar.");
         execute_diymon_action(ACTION_ID_EVO_BACK);
     }
 }
@@ -41,16 +44,22 @@ void evo_5_create(lv_obj_t *parent) {
 
     // --- Icono del botón ---
     lv_obj_t *img = lv_img_create(s_evo_5_handle);
-    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_EVO_BACK));
+    const lv_img_dsc_t* icon_src = ui_assets_get_icon(ASSET_ICON_EVO_BACK);
+    if (icon_src) {
+        lv_img_set_src(img, icon_src);
+    } else {
+        ESP_LOGE(TAG, "Fallo al cargar el icono 'ASSET_ICON_EVO_BACK'.");
+    }
     lv_obj_center(img);
 
-    // --- Posición inicial (para animación de entrada) ---
-    // El índice de este botón es 4 en el panel lateral.
-    lv_obj_set_pos(s_evo_5_handle, -BUTTON_SIZE, BUTTON_PADDING + (BUTTON_SIZE + BUTTON_PADDING) * 4);
-    lv_obj_add_flag(s_evo_5_handle, LV_OBJ_FLAG_HIDDEN);
+    // --- Posición DENTRO de su panel padre ---
+    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
+    lv_obj_align(s_evo_5_handle, LV_ALIGN_TOP_MID, 0, (BUTTON_SIZE + BUTTON_PADDING) * 4);
 
     // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_evo_5_handle, evo_5_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(s_evo_5_handle, evo_5_event_cb, LV_EVENT_PRESSED, NULL);
+
+    ESP_LOGI(TAG, "Botón 'Involucionar' (EVO_5) creado y posicionado dentro de su panel.");
 }
 
 /**

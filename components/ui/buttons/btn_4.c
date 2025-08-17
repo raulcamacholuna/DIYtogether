@@ -1,15 +1,17 @@
-/* Fecha: 17/08/2025 - 01:20 
-# Fichero: components/ui/buttons/btn_4.c
-# Último cambio: Implementación del módulo para el botón 'Brillo' (BTN_4).
-# Descripción: Encapsula la lógica del botón 'Brillo', incluyendo creación, estilo, icono (ASSET_ICON_BRIGHTNESS) y conexión de evento a la acción ACTION_ID_BRIGHTNESS_CYCLE.
-*/
+/* Fecha: 17/08/2025 - 05:19  */
+/* Fichero: components/ui/buttons/btn_4.c */
+/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
+/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+
 #include "btn_4.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
+#include "esp_log.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
 #define BUTTON_PADDING 10
+static const char *TAG = "BTN_4";
 
 // --- Variable estática para el manejador del botón ---
 static lv_obj_t *s_btn_4_handle = NULL;
@@ -21,7 +23,8 @@ static lv_obj_t *s_btn_4_handle = NULL;
  */
 static void btn_4_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_CLICKED) {
+    if (code == LV_EVENT_PRESSED) {
+        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de brillo.");
         execute_diymon_action(ACTION_ID_BRIGHTNESS_CYCLE);
     }
 }
@@ -41,16 +44,22 @@ void btn_4_create(lv_obj_t *parent) {
 
     // --- Icono del botón ---
     lv_obj_t *img = lv_img_create(s_btn_4_handle);
-    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_BRIGHTNESS));
+    const lv_img_dsc_t* icon_src = ui_assets_get_icon(ASSET_ICON_BRIGHTNESS);
+    if (icon_src) {
+        lv_img_set_src(img, icon_src);
+    } else {
+        ESP_LOGE(TAG, "Fallo al cargar el icono 'ASSET_ICON_BRIGHTNESS'.");
+    }
     lv_obj_center(img);
 
-    // --- Posición inicial (para animación de entrada) ---
-    // El índice de este botón es 0 en su panel.
-    lv_obj_set_pos(s_btn_4_handle, (BUTTON_SIZE + BUTTON_PADDING) * 0, -BUTTON_SIZE);
-    lv_obj_add_flag(s_btn_4_handle, LV_OBJ_FLAG_HIDDEN);
+    // --- Posición DENTRO de su panel padre ---
+    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
+    lv_obj_align(s_btn_4_handle, LV_ALIGN_LEFT_MID, (BUTTON_SIZE + BUTTON_PADDING) * 0, 0);
 
     // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_btn_4_handle, btn_4_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(s_btn_4_handle, btn_4_event_cb, LV_EVENT_PRESSED, NULL);
+
+    ESP_LOGI(TAG, "Botón 'Brillo' (BTN_4) creado y posicionado dentro de su panel.");
 }
 
 /**

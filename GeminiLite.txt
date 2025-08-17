@@ -2724,13 +2724,12 @@ CONFIG_LV_USE_GRID=y
 # CONFIG_LV_USE_FS_FATFS is not set
 # CONFIG_LV_USE_FS_MEMFS is not set
 # CONFIG_LV_USE_FS_LITTLEFS is not set
-CONFIG_LV_USE_LODEPNG=y
-CONFIG_LV_USE_LIBPNG=y
-CONFIG_LV_USE_BMP=y
-CONFIG_LV_USE_TJPGD=y
+# CONFIG_LV_USE_LODEPNG is not set
+# CONFIG_LV_USE_LIBPNG is not set
+# CONFIG_LV_USE_BMP is not set
+# CONFIG_LV_USE_TJPGD is not set
 # CONFIG_LV_USE_LIBJPEG_TURBO is not set
-CONFIG_LV_USE_GIF=y
-CONFIG_LV_GIF_CACHE_DECODE_DATA=y
+# CONFIG_LV_USE_GIF is not set
 # CONFIG_LV_BIN_DECODER_RAM_LOAD is not set
 # CONFIG_LV_USE_RLE is not set
 # CONFIG_LV_USE_QRCODE is not set
@@ -8822,6 +8821,7 @@ void action_system_reset_all(void);
 #include "btn_1.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
+#include "esp_log.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
@@ -8916,18 +8916,20 @@ lv_obj_t* btn_1_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\btn_1.h ---
 
 --- START OF FILE: .\components\ui\buttons\btn_2.c ---
-/* Fecha: 17/08/2025 - 01:19 
-# Fichero: components/ui/buttons/btn_2.c
-# Último cambio: Implementación del módulo para el botón 'Ejercicio' (BTN_2).
-# Descripción: Encapsula la lógica del botón 'Ejercicio', incluyendo creación, estilo, icono (ASSET_ICON_GYM) y conexión de evento a la acción ACTION_ID_EJERCICIO. Continúa la refactorización modular.
-*/
+/* Fecha: 17/08/2025 - 05:17  */
+/* Fichero: components/ui/buttons/btn_2.c */
+/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
+/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+
 #include "btn_2.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
+#include "esp_log.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
 #define BUTTON_PADDING 10
+static const char *TAG = "BTN_2";
 
 // --- Variable estática para el manejador del botón ---
 static lv_obj_t *s_btn_2_handle = NULL;
@@ -8940,6 +8942,7 @@ static lv_obj_t *s_btn_2_handle = NULL;
 static void btn_2_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_PRESSED) {
+        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de ejercicio.");
         execute_diymon_action(ACTION_ID_EJERCICIO);
     }
 }
@@ -8959,16 +8962,22 @@ void btn_2_create(lv_obj_t *parent) {
 
     // --- Icono del botón ---
     lv_obj_t *img = lv_img_create(s_btn_2_handle);
-    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_GYM));
+    const lv_img_dsc_t* icon_src = ui_assets_get_icon(ASSET_ICON_GYM);
+    if (icon_src) {
+        lv_img_set_src(img, icon_src);
+    } else {
+        ESP_LOGE(TAG, "Fallo al cargar el icono 'ASSET_ICON_GYM'.");
+    }
     lv_obj_center(img);
 
-    // --- Posición inicial (para animación de entrada) ---
-    // El índice de este botón es 1 en su panel.
-    lv_obj_set_pos(s_btn_2_handle, (BUTTON_SIZE + BUTTON_PADDING) * 1, -BUTTON_SIZE);
-    lv_obj_add_flag(s_btn_2_handle, LV_OBJ_FLAG_HIDDEN);
-
+    // --- Posición DENTRO de su panel padre ---
+    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
+    lv_obj_align(s_btn_2_handle, LV_ALIGN_LEFT_MID, (BUTTON_SIZE + BUTTON_PADDING) * 1, 0);
+    
     // --- Conexión del evento ---
     lv_obj_add_event_cb(s_btn_2_handle, btn_2_event_cb, LV_EVENT_PRESSED, NULL);
+    
+    ESP_LOGI(TAG, "Botón 'Ejercicio' (BTN_2) creado y posicionado dentro de su panel.");
 }
 
 /**
@@ -9018,18 +9027,20 @@ lv_obj_t* btn_2_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\btn_2.h ---
 
 --- START OF FILE: .\components\ui\buttons\btn_3.c ---
-/* Fecha: 17/08/2025 - 01:20 
-# Fichero: components/ui/buttons/btn_3.c
-# Último cambio: Implementación del módulo para el botón 'Atacar' (BTN_3).
-# Descripción: Encapsula la lógica del botón 'Atacar', incluyendo creación, estilo, icono (ASSET_ICON_ATK) y conexión de evento a la acción ACTION_ID_ATACAR.
-*/
+/* Fecha: 17/08/2025 - 05:18  */
+/* Fichero: components/ui/buttons/btn_3.c */
+/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
+/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+
 #include "btn_3.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
+#include "esp_log.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
 #define BUTTON_PADDING 10
+static const char *TAG = "BTN_3";
 
 // --- Variable estática para el manejador del botón ---
 static lv_obj_t *s_btn_3_handle = NULL;
@@ -9042,6 +9053,7 @@ static lv_obj_t *s_btn_3_handle = NULL;
 static void btn_3_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_PRESSED) {
+        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de atacar.");
         execute_diymon_action(ACTION_ID_ATACAR);
     }
 }
@@ -9061,16 +9073,22 @@ void btn_3_create(lv_obj_t *parent) {
 
     // --- Icono del botón ---
     lv_obj_t *img = lv_img_create(s_btn_3_handle);
-    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_ATK));
+    const lv_img_dsc_t* icon_src = ui_assets_get_icon(ASSET_ICON_ATK);
+    if (icon_src) {
+        lv_img_set_src(img, icon_src);
+    } else {
+        ESP_LOGE(TAG, "Fallo al cargar el icono 'ASSET_ICON_ATK'.");
+    }
     lv_obj_center(img);
 
-    // --- Posición inicial (para animación de entrada) ---
-    // El índice de este botón es 2 en su panel.
-    lv_obj_set_pos(s_btn_3_handle, (BUTTON_SIZE + BUTTON_PADDING) * 2, -BUTTON_SIZE);
-    lv_obj_add_flag(s_btn_3_handle, LV_OBJ_FLAG_HIDDEN);
-
+    // --- Posición DENTRO de su panel padre ---
+    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
+    lv_obj_align(s_btn_3_handle, LV_ALIGN_LEFT_MID, (BUTTON_SIZE + BUTTON_PADDING) * 2, 0);
+    
     // --- Conexión del evento ---
     lv_obj_add_event_cb(s_btn_3_handle, btn_3_event_cb, LV_EVENT_PRESSED, NULL);
+    
+    ESP_LOGI(TAG, "Botón 'Atacar' (BTN_3) creado y posicionado dentro de su panel.");
 }
 
 /**
@@ -9120,18 +9138,20 @@ lv_obj_t* btn_3_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\btn_3.h ---
 
 --- START OF FILE: .\components\ui\buttons\btn_4.c ---
-/* Fecha: 17/08/2025 - 01:20 
-# Fichero: components/ui/buttons/btn_4.c
-# Último cambio: Implementación del módulo para el botón 'Brillo' (BTN_4).
-# Descripción: Encapsula la lógica del botón 'Brillo', incluyendo creación, estilo, icono (ASSET_ICON_BRIGHTNESS) y conexión de evento a la acción ACTION_ID_BRIGHTNESS_CYCLE.
-*/
+/* Fecha: 17/08/2025 - 05:19  */
+/* Fichero: components/ui/buttons/btn_4.c */
+/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
+/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+
 #include "btn_4.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
+#include "esp_log.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
 #define BUTTON_PADDING 10
+static const char *TAG = "BTN_4";
 
 // --- Variable estática para el manejador del botón ---
 static lv_obj_t *s_btn_4_handle = NULL;
@@ -9143,7 +9163,8 @@ static lv_obj_t *s_btn_4_handle = NULL;
  */
 static void btn_4_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_CLICKED) {
+    if (code == LV_EVENT_PRESSED) {
+        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de brillo.");
         execute_diymon_action(ACTION_ID_BRIGHTNESS_CYCLE);
     }
 }
@@ -9163,16 +9184,22 @@ void btn_4_create(lv_obj_t *parent) {
 
     // --- Icono del botón ---
     lv_obj_t *img = lv_img_create(s_btn_4_handle);
-    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_BRIGHTNESS));
+    const lv_img_dsc_t* icon_src = ui_assets_get_icon(ASSET_ICON_BRIGHTNESS);
+    if (icon_src) {
+        lv_img_set_src(img, icon_src);
+    } else {
+        ESP_LOGE(TAG, "Fallo al cargar el icono 'ASSET_ICON_BRIGHTNESS'.");
+    }
     lv_obj_center(img);
 
-    // --- Posición inicial (para animación de entrada) ---
-    // El índice de este botón es 0 en su panel.
-    lv_obj_set_pos(s_btn_4_handle, (BUTTON_SIZE + BUTTON_PADDING) * 0, -BUTTON_SIZE);
-    lv_obj_add_flag(s_btn_4_handle, LV_OBJ_FLAG_HIDDEN);
+    // --- Posición DENTRO de su panel padre ---
+    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
+    lv_obj_align(s_btn_4_handle, LV_ALIGN_LEFT_MID, (BUTTON_SIZE + BUTTON_PADDING) * 0, 0);
 
     // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_btn_4_handle, btn_4_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(s_btn_4_handle, btn_4_event_cb, LV_EVENT_PRESSED, NULL);
+
+    ESP_LOGI(TAG, "Botón 'Brillo' (BTN_4) creado y posicionado dentro de su panel.");
 }
 
 /**
@@ -9222,18 +9249,20 @@ lv_obj_t* btn_4_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\btn_4.h ---
 
 --- START OF FILE: .\components\ui\buttons\btn_5.c ---
-/* Fecha: 17/08/2025 - 01:21 
-# Fichero: components/ui/buttons/btn_5.c
-# Último cambio: Implementación del módulo para el botón 'Apagar Pantalla' (BTN_5).
-# Descripción: Encapsula la lógica del botón 'Apagar Pantalla', incluyendo creación, estilo, icono (ASSET_ICON_SCREEN_OFF) y conexión de evento a la acción ACTION_ID_TOGGLE_SCREEN.
-*/
+/* Fecha: 17/08/2025 - 05:19  */
+/* Fichero: components/ui/buttons/btn_5.c */
+/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
+/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+
 #include "btn_5.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
+#include "esp_log.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
 #define BUTTON_PADDING 10
+static const char *TAG = "BTN_5";
 
 // --- Variable estática para el manejador del botón ---
 static lv_obj_t *s_btn_5_handle = NULL;
@@ -9245,7 +9274,8 @@ static lv_obj_t *s_btn_5_handle = NULL;
  */
 static void btn_5_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_CLICKED) {
+    if (code == LV_EVENT_PRESSED) {
+        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de apagar/encender pantalla.");
         execute_diymon_action(ACTION_ID_TOGGLE_SCREEN);
     }
 }
@@ -9265,16 +9295,22 @@ void btn_5_create(lv_obj_t *parent) {
 
     // --- Icono del botón ---
     lv_obj_t *img = lv_img_create(s_btn_5_handle);
-    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_SCREEN_OFF));
+    const lv_img_dsc_t* icon_src = ui_assets_get_icon(ASSET_ICON_SCREEN_OFF);
+    if (icon_src) {
+        lv_img_set_src(img, icon_src);
+    } else {
+        ESP_LOGE(TAG, "Fallo al cargar el icono 'ASSET_ICON_SCREEN_OFF'.");
+    }
     lv_obj_center(img);
 
-    // --- Posición inicial (para animación de entrada) ---
-    // El índice de este botón es 1 en su panel.
-    lv_obj_set_pos(s_btn_5_handle, (BUTTON_SIZE + BUTTON_PADDING) * 1, -BUTTON_SIZE);
-    lv_obj_add_flag(s_btn_5_handle, LV_OBJ_FLAG_HIDDEN);
+    // --- Posición DENTRO de su panel padre ---
+    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
+    lv_obj_align(s_btn_5_handle, LV_ALIGN_LEFT_MID, (BUTTON_SIZE + BUTTON_PADDING) * 1, 0);
 
     // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_btn_5_handle, btn_5_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(s_btn_5_handle, btn_5_event_cb, LV_EVENT_PRESSED, NULL);
+
+    ESP_LOGI(TAG, "Botón 'Apagar Pantalla' (BTN_5) creado y posicionado dentro de su panel.");
 }
 
 /**
@@ -9324,18 +9360,20 @@ lv_obj_t* btn_5_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\btn_5.h ---
 
 --- START OF FILE: .\components\ui\buttons\btn_6.c ---
-/* Fecha: 17/08/2025 - 01:21 
-# Fichero: components\ui\buttons\btn_6.c
-# Último cambio: Implementación del módulo para el botón 'Modo Config' (BTN_6).
-# Descripción: Encapsula la lógica del botón que activa el modo de configuración WiFi. Utiliza el icono 'ASSET_ICON_ADMIN_PLACEHOLDER' y conecta el evento de clic a la acción 'ACTION_ID_ACTIVATE_CONFIG_MODE', reflejando la refactorización previa.
-*/
+/* Fecha: 17/08/2025 - 05:20  */
+/* Fichero: components/ui/buttons/btn_6.c */
+/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
+/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+
 #include "btn_6.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
+#include "esp_log.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
 #define BUTTON_PADDING 10
+static const char *TAG = "BTN_6";
 
 // --- Variable estática para el manejador del botón ---
 static lv_obj_t *s_btn_6_handle = NULL;
@@ -9347,7 +9385,8 @@ static lv_obj_t *s_btn_6_handle = NULL;
  */
 static void btn_6_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_CLICKED) {
+    if (code == LV_EVENT_PRESSED) {
+        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de modo config.");
         execute_diymon_action(ACTION_ID_ACTIVATE_CONFIG_MODE);
     }
 }
@@ -9367,16 +9406,22 @@ void btn_6_create(lv_obj_t *parent) {
 
     // --- Icono del botón ---
     lv_obj_t *img = lv_img_create(s_btn_6_handle);
-    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_ADMIN_PLACEHOLDER));
+    const lv_img_dsc_t* icon_src = ui_assets_get_icon(ASSET_ICON_ADMIN_PLACEHOLDER);
+    if (icon_src) {
+        lv_img_set_src(img, icon_src);
+    } else {
+        ESP_LOGE(TAG, "Fallo al cargar el icono 'ASSET_ICON_ADMIN_PLACEHOLDER'.");
+    }
     lv_obj_center(img);
 
-    // --- Posición inicial (para animación de entrada) ---
-    // El índice de este botón es 2 en su panel.
-    lv_obj_set_pos(s_btn_6_handle, (BUTTON_SIZE + BUTTON_PADDING) * 2, -BUTTON_SIZE);
-    lv_obj_add_flag(s_btn_6_handle, LV_OBJ_FLAG_HIDDEN);
+    // --- Posición DENTRO de su panel padre ---
+    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
+    lv_obj_align(s_btn_6_handle, LV_ALIGN_LEFT_MID, (BUTTON_SIZE + BUTTON_PADDING) * 2, 0);
 
     // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_btn_6_handle, btn_6_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(s_btn_6_handle, btn_6_event_cb, LV_EVENT_PRESSED, NULL);
+    
+    ESP_LOGI(TAG, "Botón 'Modo Config' (BTN_6) creado y posicionado dentro de su panel.");
 }
 
 /**
@@ -9426,18 +9471,20 @@ lv_obj_t* btn_6_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\btn_6.h ---
 
 --- START OF FILE: .\components\ui\buttons\btn_7.c ---
-/* Fecha: 17/08/2025 - 01:23 
-# Fichero: components\ui\buttons\btn_7.c
-# Último cambio: Implementación del módulo para el botón 'Reset Total' (BTN_7).
-# Descripción: Encapsula la lógica del botón 'Reset Total', incluyendo creación, estilo, icono (ASSET_ICON_RESET_ALL) y conexión de evento a la acción ACTION_ID_RESET_ALL.
-*/
+/* Fecha: 17/08/2025 - 05:21  */
+/* Fichero: components/ui/buttons/btn_7.c */
+/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
+/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+
 #include "btn_7.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
+#include "esp_log.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
 #define BUTTON_PADDING 10
+static const char *TAG = "BTN_7";
 
 // --- Variable estática para el manejador del botón ---
 static lv_obj_t *s_btn_7_handle = NULL;
@@ -9449,7 +9496,8 @@ static lv_obj_t *s_btn_7_handle = NULL;
  */
 static void btn_7_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_CLICKED) {
+    if (code == LV_EVENT_PRESSED) {
+        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de reset total.");
         execute_diymon_action(ACTION_ID_RESET_ALL);
     }
 }
@@ -9469,16 +9517,22 @@ void btn_7_create(lv_obj_t *parent) {
 
     // --- Icono del botón ---
     lv_obj_t *img = lv_img_create(s_btn_7_handle);
-    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_RESET_ALL));
+    const lv_img_dsc_t* icon_src = ui_assets_get_icon(ASSET_ICON_RESET_ALL);
+    if (icon_src) {
+        lv_img_set_src(img, icon_src);
+    } else {
+        ESP_LOGE(TAG, "Fallo al cargar el icono 'ASSET_ICON_RESET_ALL'.");
+    }
     lv_obj_center(img);
 
-    // --- Posición inicial (para animación de entrada) ---
-    // El índice de este botón es 0 en su panel.
-    lv_obj_set_pos(s_btn_7_handle, (BUTTON_SIZE + BUTTON_PADDING) * 0, -BUTTON_SIZE);
-    lv_obj_add_flag(s_btn_7_handle, LV_OBJ_FLAG_HIDDEN);
+    // --- Posición DENTRO de su panel padre ---
+    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
+    lv_obj_align(s_btn_7_handle, LV_ALIGN_LEFT_MID, (BUTTON_SIZE + BUTTON_PADDING) * 0, 0);
 
     // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_btn_7_handle, btn_7_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(s_btn_7_handle, btn_7_event_cb, LV_EVENT_PRESSED, NULL);
+
+    ESP_LOGI(TAG, "Botón 'Reset Total' (BTN_7) creado y posicionado dentro de su panel.");
 }
 
 /**
@@ -9528,18 +9582,20 @@ lv_obj_t* btn_7_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\btn_7.h ---
 
 --- START OF FILE: .\components\ui\buttons\btn_8.c ---
-/* Fecha: 17/08/2025 - 01:24 
-# Fichero: components\ui\buttons\btn_8.c
-# Último cambio: Implementación del módulo para el botón 'Servidor de Ficheros' (BTN_8).
-# Descripción: Encapsula la lógica del botón 'Servidor de Ficheros', incluyendo creación, estilo, icono (ASSET_ICON_ENABLE_FILE_SERVER) y conexión de evento a la acción ACTION_ID_ENABLE_FILE_SERVER.
-*/
+/* Fecha: 17/08/2025 - 05:21  */
+/* Fichero: components/ui/buttons/btn_8.c */
+/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
+/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+
 #include "btn_8.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
+#include "esp_log.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
 #define BUTTON_PADDING 10
+static const char *TAG = "BTN_8";
 
 // --- Variable estática para el manejador del botón ---
 static lv_obj_t *s_btn_8_handle = NULL;
@@ -9551,7 +9607,8 @@ static lv_obj_t *s_btn_8_handle = NULL;
  */
 static void btn_8_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_CLICKED) {
+    if (code == LV_EVENT_PRESSED) {
+        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de servidor de ficheros.");
         execute_diymon_action(ACTION_ID_ENABLE_FILE_SERVER);
     }
 }
@@ -9571,16 +9628,22 @@ void btn_8_create(lv_obj_t *parent) {
 
     // --- Icono del botón ---
     lv_obj_t *img = lv_img_create(s_btn_8_handle);
-    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_ENABLE_FILE_SERVER));
+    const lv_img_dsc_t* icon_src = ui_assets_get_icon(ASSET_ICON_ENABLE_FILE_SERVER);
+    if (icon_src) {
+        lv_img_set_src(img, icon_src);
+    } else {
+        ESP_LOGE(TAG, "Fallo al cargar el icono 'ASSET_ICON_ENABLE_FILE_SERVER'.");
+    }
     lv_obj_center(img);
 
-    // --- Posición inicial (para animación de entrada) ---
-    // El índice de este botón es 1 en su panel.
-    lv_obj_set_pos(s_btn_8_handle, (BUTTON_SIZE + BUTTON_PADDING) * 1, -BUTTON_SIZE);
-    lv_obj_add_flag(s_btn_8_handle, LV_OBJ_FLAG_HIDDEN);
+    // --- Posición DENTRO de su panel padre ---
+    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
+    lv_obj_align(s_btn_8_handle, LV_ALIGN_LEFT_MID, (BUTTON_SIZE + BUTTON_PADDING) * 1, 0);
 
     // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_btn_8_handle, btn_8_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(s_btn_8_handle, btn_8_event_cb, LV_EVENT_PRESSED, NULL);
+    
+    ESP_LOGI(TAG, "Botón 'Servidor Ficheros' (BTN_8) creado y posicionado dentro de su panel.");
 }
 
 /**
@@ -9630,18 +9693,20 @@ lv_obj_t* btn_8_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\btn_8.h ---
 
 --- START OF FILE: .\components\ui\buttons\btn_9.c ---
-/* Fecha: 17/08/2025 - 01:25 
-# Fichero: components\ui\buttons\btn_9.c
-# Último cambio: Implementación del módulo para el botón 'Placeholder de Config' (BTN_9).
-# Descripción: Encapsula la lógica del botón placeholder del panel de configuración, incluyendo creación, estilo, icono (ASSET_ICON_CONFIG_PLACEHOLDER) y conexión de evento a la acción ACTION_ID_CONFIG_PLACEHOLDER.
-*/
+/* Fecha: 17/08/2025 - 05:21  */
+/* Fichero: components/ui/buttons/btn_9.c */
+/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
+/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+
 #include "btn_9.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
+#include "esp_log.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
 #define BUTTON_PADDING 10
+static const char *TAG = "BTN_9";
 
 // --- Variable estática para el manejador del botón ---
 static lv_obj_t *s_btn_9_handle = NULL;
@@ -9653,7 +9718,8 @@ static lv_obj_t *s_btn_9_handle = NULL;
  */
 static void btn_9_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_CLICKED) {
+    if (code == LV_EVENT_PRESSED) {
+        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de placeholder.");
         execute_diymon_action(ACTION_ID_CONFIG_PLACEHOLDER);
     }
 }
@@ -9673,16 +9739,22 @@ void btn_9_create(lv_obj_t *parent) {
 
     // --- Icono del botón ---
     lv_obj_t *img = lv_img_create(s_btn_9_handle);
-    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_CONFIG_PLACEHOLDER));
+    const lv_img_dsc_t* icon_src = ui_assets_get_icon(ASSET_ICON_CONFIG_PLACEHOLDER);
+    if (icon_src) {
+        lv_img_set_src(img, icon_src);
+    } else {
+        ESP_LOGE(TAG, "Fallo al cargar el icono 'ASSET_ICON_CONFIG_PLACEHOLDER'.");
+    }
     lv_obj_center(img);
 
-    // --- Posición inicial (para animación de entrada) ---
-    // El índice de este botón es 2 en su panel.
-    lv_obj_set_pos(s_btn_9_handle, (BUTTON_SIZE + BUTTON_PADDING) * 2, -BUTTON_SIZE);
-    lv_obj_add_flag(s_btn_9_handle, LV_OBJ_FLAG_HIDDEN);
+    // --- Posición DENTRO de su panel padre ---
+    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
+    lv_obj_align(s_btn_9_handle, LV_ALIGN_LEFT_MID, (BUTTON_SIZE + BUTTON_PADDING) * 2, 0);
 
     // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_btn_9_handle, btn_9_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(s_btn_9_handle, btn_9_event_cb, LV_EVENT_PRESSED, NULL);
+    
+    ESP_LOGI(TAG, "Botón 'Placeholder Config' (BTN_9) creado y posicionado dentro de su panel.");
 }
 
 /**
@@ -9851,18 +9923,20 @@ lv_obj_t* ui_buttons_get_evo_5(void); // Involucionar
 --- END OF FILE: .\components\ui\buttons\buttons_manager.h ---
 
 --- START OF FILE: .\components\ui\buttons\evo_1.c ---
-/* Fecha: 17/08/2025 - 01:26 
-# Fichero: components\ui\buttons\evo_1.c
-# Último cambio: Implementación del módulo para el botón 'Evo Fuego' (EVO_1).
-# Descripción: Encapsula la lógica del botón 'Evo Fuego', incluyendo creación, posicionamiento en el panel lateral, icono (ASSET_ICON_EVO_FIRE) y conexión de evento a la acción ACTION_ID_EVO_FIRE.
-*/
+/* Fecha: 17/08/2025 - 05:22  */
+/* Fichero: components/ui/buttons/evo_1.c */
+/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
+/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+
 #include "evo_1.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
+#include "esp_log.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
 #define BUTTON_PADDING 10
+static const char *TAG = "EVO_1";
 
 // --- Variable estática para el manejador del botón ---
 static lv_obj_t *s_evo_1_handle = NULL;
@@ -9874,7 +9948,8 @@ static lv_obj_t *s_evo_1_handle = NULL;
  */
 static void evo_1_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_CLICKED) {
+    if (code == LV_EVENT_PRESSED) {
+        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de evo fuego.");
         execute_diymon_action(ACTION_ID_EVO_FIRE);
     }
 }
@@ -9894,16 +9969,22 @@ void evo_1_create(lv_obj_t *parent) {
 
     // --- Icono del botón ---
     lv_obj_t *img = lv_img_create(s_evo_1_handle);
-    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_EVO_FIRE));
+    const lv_img_dsc_t* icon_src = ui_assets_get_icon(ASSET_ICON_EVO_FIRE);
+    if (icon_src) {
+        lv_img_set_src(img, icon_src);
+    } else {
+        ESP_LOGE(TAG, "Fallo al cargar el icono 'ASSET_ICON_EVO_FIRE'.");
+    }
     lv_obj_center(img);
 
-    // --- Posición inicial (para animación de entrada) ---
-    // El índice de este botón es 0 en el panel lateral.
-    lv_obj_set_pos(s_evo_1_handle, -BUTTON_SIZE, BUTTON_PADDING + (BUTTON_SIZE + BUTTON_PADDING) * 0);
-    lv_obj_add_flag(s_evo_1_handle, LV_OBJ_FLAG_HIDDEN);
+    // --- Posición DENTRO de su panel padre ---
+    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
+    lv_obj_align(s_evo_1_handle, LV_ALIGN_TOP_MID, 0, (BUTTON_SIZE + BUTTON_PADDING) * 0);
 
     // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_evo_1_handle, evo_1_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(s_evo_1_handle, evo_1_event_cb, LV_EVENT_PRESSED, NULL);
+
+    ESP_LOGI(TAG, "Botón 'Evo Fuego' (EVO_1) creado y posicionado dentro de su panel.");
 }
 
 /**
@@ -9953,18 +10034,20 @@ lv_obj_t* evo_1_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\evo_1.h ---
 
 --- START OF FILE: .\components\ui\buttons\evo_2.c ---
-/* Fecha: 17/08/2025 - 01:26 
-# Fichero: components\ui\buttons\evo_2.c
-# Último cambio: Implementación del módulo para el botón 'Evo Agua' (EVO_2).
-# Descripción: Encapsula la lógica del botón 'Evo Agua', incluyendo creación, posicionamiento en el panel lateral, icono (ASSET_ICON_EVO_WATER) y conexión de evento a la acción ACTION_ID_EVO_WATER.
-*/
+/* Fecha: 17/08/2025 - 05:22  */
+/* Fichero: components/ui/buttons/evo_2.c */
+/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
+/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+
 #include "evo_2.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
+#include "esp_log.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
 #define BUTTON_PADDING 10
+static const char *TAG = "EVO_2";
 
 // --- Variable estática para el manejador del botón ---
 static lv_obj_t *s_evo_2_handle = NULL;
@@ -9976,7 +10059,8 @@ static lv_obj_t *s_evo_2_handle = NULL;
  */
 static void evo_2_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_CLICKED) {
+    if (code == LV_EVENT_PRESSED) {
+        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de evo agua.");
         execute_diymon_action(ACTION_ID_EVO_WATER);
     }
 }
@@ -9996,16 +10080,22 @@ void evo_2_create(lv_obj_t *parent) {
 
     // --- Icono del botón ---
     lv_obj_t *img = lv_img_create(s_evo_2_handle);
-    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_EVO_WATER));
+    const lv_img_dsc_t* icon_src = ui_assets_get_icon(ASSET_ICON_EVO_WATER);
+    if (icon_src) {
+        lv_img_set_src(img, icon_src);
+    } else {
+        ESP_LOGE(TAG, "Fallo al cargar el icono 'ASSET_ICON_EVO_WATER'.");
+    }
     lv_obj_center(img);
 
-    // --- Posición inicial (para animación de entrada) ---
-    // El índice de este botón es 1 en el panel lateral.
-    lv_obj_set_pos(s_evo_2_handle, -BUTTON_SIZE, BUTTON_PADDING + (BUTTON_SIZE + BUTTON_PADDING) * 1);
-    lv_obj_add_flag(s_evo_2_handle, LV_OBJ_FLAG_HIDDEN);
+    // --- Posición DENTRO de su panel padre ---
+    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
+    lv_obj_align(s_evo_2_handle, LV_ALIGN_TOP_MID, 0, (BUTTON_SIZE + BUTTON_PADDING) * 1);
 
     // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_evo_2_handle, evo_2_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(s_evo_2_handle, evo_2_event_cb, LV_EVENT_PRESSED, NULL);
+
+    ESP_LOGI(TAG, "Botón 'Evo Agua' (EVO_2) creado y posicionado dentro de su panel.");
 }
 
 /**
@@ -10055,18 +10145,20 @@ lv_obj_t* evo_2_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\evo_2.h ---
 
 --- START OF FILE: .\components\ui\buttons\evo_3.c ---
-/* Fecha: 17/08/2025 - 01:27 
-# Fichero: components\ui\buttons\evo_3.c
-# Último cambio: Implementación del módulo para el botón 'Evo Tierra' (EVO_3).
-# Descripción: Encapsula la lógica del botón 'Evo Tierra', incluyendo creación, posicionamiento en el panel lateral, icono (ASSET_ICON_EVO_EARTH) y conexión de evento a la acción ACTION_ID_EVO_EARTH.
-*/
+/* Fecha: 17/08/2025 - 05:23  */
+/* Fichero: components/ui/buttons/evo_3.c */
+/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
+/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+
 #include "evo_3.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
+#include "esp_log.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
 #define BUTTON_PADDING 10
+static const char *TAG = "EVO_3";
 
 // --- Variable estática para el manejador del botón ---
 static lv_obj_t *s_evo_3_handle = NULL;
@@ -10078,7 +10170,8 @@ static lv_obj_t *s_evo_3_handle = NULL;
  */
 static void evo_3_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_CLICKED) {
+    if (code == LV_EVENT_PRESSED) {
+        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de evo tierra.");
         execute_diymon_action(ACTION_ID_EVO_EARTH);
     }
 }
@@ -10098,16 +10191,22 @@ void evo_3_create(lv_obj_t *parent) {
 
     // --- Icono del botón ---
     lv_obj_t *img = lv_img_create(s_evo_3_handle);
-    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_EVO_EARTH));
+    const lv_img_dsc_t* icon_src = ui_assets_get_icon(ASSET_ICON_EVO_EARTH);
+    if (icon_src) {
+        lv_img_set_src(img, icon_src);
+    } else {
+        ESP_LOGE(TAG, "Fallo al cargar el icono 'ASSET_ICON_EVO_EARTH'.");
+    }
     lv_obj_center(img);
 
-    // --- Posición inicial (para animación de entrada) ---
-    // El índice de este botón es 2 en el panel lateral.
-    lv_obj_set_pos(s_evo_3_handle, -BUTTON_SIZE, BUTTON_PADDING + (BUTTON_SIZE + BUTTON_PADDING) * 2);
-    lv_obj_add_flag(s_evo_3_handle, LV_OBJ_FLAG_HIDDEN);
+    // --- Posición DENTRO de su panel padre ---
+    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
+    lv_obj_align(s_evo_3_handle, LV_ALIGN_TOP_MID, 0, (BUTTON_SIZE + BUTTON_PADDING) * 2);
 
     // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_evo_3_handle, evo_3_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(s_evo_3_handle, evo_3_event_cb, LV_EVENT_PRESSED, NULL);
+
+    ESP_LOGI(TAG, "Botón 'Evo Tierra' (EVO_3) creado y posicionado dentro de su panel.");
 }
 
 /**
@@ -10157,18 +10256,20 @@ lv_obj_t* evo_3_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\evo_3.h ---
 
 --- START OF FILE: .\components\ui\buttons\evo_4.c ---
-/* Fecha: 17/08/2025 - 01:27 
-# Fichero: components\ui\buttons\evo_4.c
-# Último cambio: Implementación del módulo para el botón 'Evo Viento' (EVO_4).
-# Descripción: Encapsula la lógica del botón 'Evo Viento', incluyendo creación, posicionamiento en el panel lateral, icono (ASSET_ICON_EVO_WIND) y conexión de evento a la acción ACTION_ID_EVO_WIND.
-*/
+/* Fecha: 17/08/2025 - 05:24  */
+/* Fichero: components/ui/buttons/evo_4.c */
+/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
+/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+
 #include "evo_4.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
+#include "esp_log.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
 #define BUTTON_PADDING 10
+static const char *TAG = "EVO_4";
 
 // --- Variable estática para el manejador del botón ---
 static lv_obj_t *s_evo_4_handle = NULL;
@@ -10180,7 +10281,8 @@ static lv_obj_t *s_evo_4_handle = NULL;
  */
 static void evo_4_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_CLICKED) {
+    if (code == LV_EVENT_PRESSED) {
+        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de evo viento.");
         execute_diymon_action(ACTION_ID_EVO_WIND);
     }
 }
@@ -10200,16 +10302,22 @@ void evo_4_create(lv_obj_t *parent) {
 
     // --- Icono del botón ---
     lv_obj_t *img = lv_img_create(s_evo_4_handle);
-    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_EVO_WIND));
+    const lv_img_dsc_t* icon_src = ui_assets_get_icon(ASSET_ICON_EVO_WIND);
+    if (icon_src) {
+        lv_img_set_src(img, icon_src);
+    } else {
+        ESP_LOGE(TAG, "Fallo al cargar el icono 'ASSET_ICON_EVO_WIND'.");
+    }
     lv_obj_center(img);
 
-    // --- Posición inicial (para animación de entrada) ---
-    // El índice de este botón es 3 en el panel lateral.
-    lv_obj_set_pos(s_evo_4_handle, -BUTTON_SIZE, BUTTON_PADDING + (BUTTON_SIZE + BUTTON_PADDING) * 3);
-    lv_obj_add_flag(s_evo_4_handle, LV_OBJ_FLAG_HIDDEN);
+    // --- Posición DENTRO de su panel padre ---
+    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
+    lv_obj_align(s_evo_4_handle, LV_ALIGN_TOP_MID, 0, (BUTTON_SIZE + BUTTON_PADDING) * 3);
 
     // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_evo_4_handle, evo_4_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(s_evo_4_handle, evo_4_event_cb, LV_EVENT_PRESSED, NULL);
+
+    ESP_LOGI(TAG, "Botón 'Evo Viento' (EVO_4) creado y posicionado dentro de su panel.");
 }
 
 /**
@@ -10259,18 +10367,20 @@ lv_obj_t* evo_4_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\evo_4.h ---
 
 --- START OF FILE: .\components\ui\buttons\evo_5.c ---
-/* Fecha: 17/08/2025 - 01:28 
-# Fichero: components\ui\buttons\evo_5.c
-# Último cambio: Implementación del módulo para el botón 'Involucionar' (EVO_5).
-# Descripción: Encapsula la lógica del botón 'Involucionar', incluyendo creación, posicionamiento en el panel lateral, icono (ASSET_ICON_EVO_BACK) y conexión de evento a la acción ACTION_ID_EVO_BACK.
-*/
+/* Fecha: 17/08/2025 - 05:24  */
+/* Fichero: components/ui/buttons/evo_5.c */
+/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
+/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+
 #include "evo_5.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
+#include "esp_log.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
 #define BUTTON_PADDING 10
+static const char *TAG = "EVO_5";
 
 // --- Variable estática para el manejador del botón ---
 static lv_obj_t *s_evo_5_handle = NULL;
@@ -10282,7 +10392,8 @@ static lv_obj_t *s_evo_5_handle = NULL;
  */
 static void evo_5_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_CLICKED) {
+    if (code == LV_EVENT_PRESSED) {
+        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de involucionar.");
         execute_diymon_action(ACTION_ID_EVO_BACK);
     }
 }
@@ -10302,16 +10413,22 @@ void evo_5_create(lv_obj_t *parent) {
 
     // --- Icono del botón ---
     lv_obj_t *img = lv_img_create(s_evo_5_handle);
-    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_EVO_BACK));
+    const lv_img_dsc_t* icon_src = ui_assets_get_icon(ASSET_ICON_EVO_BACK);
+    if (icon_src) {
+        lv_img_set_src(img, icon_src);
+    } else {
+        ESP_LOGE(TAG, "Fallo al cargar el icono 'ASSET_ICON_EVO_BACK'.");
+    }
     lv_obj_center(img);
 
-    // --- Posición inicial (para animación de entrada) ---
-    // El índice de este botón es 4 en el panel lateral.
-    lv_obj_set_pos(s_evo_5_handle, -BUTTON_SIZE, BUTTON_PADDING + (BUTTON_SIZE + BUTTON_PADDING) * 4);
-    lv_obj_add_flag(s_evo_5_handle, LV_OBJ_FLAG_HIDDEN);
+    // --- Posición DENTRO de su panel padre ---
+    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
+    lv_obj_align(s_evo_5_handle, LV_ALIGN_TOP_MID, 0, (BUTTON_SIZE + BUTTON_PADDING) * 4);
 
     // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_evo_5_handle, evo_5_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(s_evo_5_handle, evo_5_event_cb, LV_EVENT_PRESSED, NULL);
+
+    ESP_LOGI(TAG, "Botón 'Involucionar' (EVO_5) creado y posicionado dentro de su panel.");
 }
 
 /**
@@ -11575,10 +11692,10 @@ extern const lv_img_dsc_t bg_config;
 --- END OF FILE: .\components\ui\BG_config.h ---
 
 --- START OF FILE: .\components\ui\CMakeLists.txt ---
-# Fecha: 17/08/2025 - 03:53 
+# Fecha: 17/08/2025 - 05:53 
 # Fichero: components/ui/CMakeLists.txt
-# Último cambio: Modificado el listado de fuentes para excluir explícitamente 'BG_config.c' y resolver el error de 'multiple definition'.
-# Descripción: El enlazador reportó que la variable 'bg_config' estaba definida tanto en 'BG_config.c' como en 'ui_assets.c'. Se ha cambiado el `file(GLOB ...)` por un listado explícito de los ficheros de assets a compilar, omitiendo el fichero redundante 'BG_config.c' para solucionar el conflicto de símbolos duplicados.
+# Último cambio: Modificado para compilar automáticamente TODOS los ficheros .c de assets/images/.
+# Descripción: El problema de los botones invisibles (ruido) se debía a que sus ficheros C de definición de imagen (ej. asset_btn_1.c) no se estaban incluyendo en la compilación, causando errores de enlazador. Esta modificación utiliza `file(GLOB ...)` para encontrar y compilar automáticamente todos los ficheros .c del directorio `assets/images/`. Esto elimina la necesidad de listarlos manualmente, resuelve el error de 'undefined reference' para el botón 1 y asegura que todos los iconos se enlacen y rendericen correctamente.
 
 file(GLOB component_sources
     "*.c"
@@ -11587,10 +11704,12 @@ file(GLOB component_sources
     "actions/*.c"
     "assets/styles/*.c"
     "buttons/*.c"
-    # Se añade explícitamente el fichero de assets consolidado.
-    # Se omite 'BG_config.c' para evitar la definición duplicada.
-    "assets/images/ui_assets.c"
 )
+
+# [CORRECCIÓN] Buscar y añadir automáticamente TODOS los ficheros .c del directorio de imágenes.
+# Esto asegura que BG.c, BG_config.c y todos los asset_btn_*.c se compilen y enlacen correctamente.
+file(GLOB asset_sources "assets/images/*.c")
+list(APPEND component_sources ${asset_sources})
 
 idf_component_register(
     SRCS ${component_sources}
@@ -12201,16 +12320,31 @@ animation_t* ui_action_animations_get_player(void);
 --- END OF FILE: .\components\ui\ui_action_animations.h ---
 
 --- START OF FILE: .\components\ui\ui_actions_panel.c ---
-/* Fecha: 17/08/2025 - 01:31 
-# Fichero: components/ui/ui_actions_panel.c
-# Último cambio: Refactorizado para usar el nuevo 'buttons_manager' y eliminar la lógica de creación de botones local.
-# Descripción: Este fichero ahora solo gestiona la LÓGICA de los paneles (animaciones, estado, gestos). La creación y gestión de los botones individuales se ha delegado al 'buttons_manager'. Las funciones de animación ahora obtienen los manejadores de los botones del manager en lugar de usar arrays estáticos locales, completando la refactorización.
-*/
+/* Fecha: 17/08/2025 - 05:12  */
+/* Fichero: components/ui/ui_actions_panel.c */
+/* Último cambio: Eliminada la bandera LV_OBJ_FLAG_CLICKABLE de los paneles contenedores para solucionar el problema de eventos no recibidos. */
+/* Descripción: Se ha corregido el error por el cual los botones no respondían a los clics. Los paneles contenedores, aunque transparentes, interceptaban los eventos de toque por defecto. Al hacerlos no-clicables con 'lv_obj_remove_flag', los eventos ahora se propagan correctamente a los botones hijos, que es el comportamiento esperado. Se han añadido logs para confirmar la creación y configuración de cada panel. */
+
 #include "ui_actions_panel.h"
-#include "buttons_manager.h" // <-- NUEVO include
 #include "ui_idle_animation.h"
 #include "esp_log.h"
 #include <stdio.h>
+
+// --- Inclusión directa de los módulos de botones ---
+#include "buttons/btn_1.h"
+#include "buttons/btn_2.h"
+#include "buttons/btn_3.h"
+#include "buttons/btn_4.h"
+#include "buttons/btn_5.h"
+#include "buttons/btn_6.h"
+#include "buttons/btn_7.h"
+#include "buttons/btn_8.h"
+#include "buttons/btn_9.h"
+#include "buttons/evo_1.h"
+#include "buttons/evo_2.h"
+#include "buttons/evo_3.h"
+#include "buttons/evo_4.h"
+#include "buttons/evo_5.h"
 
 static const char *TAG = "UI_PANELS";
 
@@ -12219,9 +12353,12 @@ static const char *TAG = "UI_PANELS";
 #define BUTTON_SIZE 50
 #define BUTTON_PADDING 10
 #define ANIM_TIME_MS 300
-#define NUM_TOP_BUTTONS 3
-#define NUM_SIDE_BUTTONS 5
 #define EDGE_SWIPE_THRESHOLD 50
+#define TOP_PANEL_WIDTH (BUTTON_SIZE * 3 + BUTTON_PADDING * 2)
+#define TOP_PANEL_HEIGHT (BUTTON_SIZE)
+#define SIDE_PANEL_WIDTH (BUTTON_SIZE)
+#define SIDE_PANEL_HEIGHT (BUTTON_SIZE * 5 + BUTTON_PADDING * 4)
+
 
 typedef enum {
     PANEL_STATE_HIDDEN,
@@ -12232,154 +12369,171 @@ typedef enum {
 } panel_state_t;
 
 // --- Variables estáticas del módulo ---
+static lv_obj_t *s_panel_player;
+static lv_obj_t *s_panel_admin;
+static lv_obj_t *s_panel_config;
+static lv_obj_t *s_panel_evo;
+
 static lv_timer_t *s_hide_timer = NULL;
 static panel_state_t s_panel_state = PANEL_STATE_HIDDEN;
 static bool s_is_animating = false;
 
 // --- Declaraciones de funciones internas ---
-static void animate_panel_in_top(lv_obj_t **buttons);
-static void animate_panel_out_top(lv_obj_t **buttons);
-static void animate_panel_in_side(lv_obj_t **buttons);
-static void animate_panel_out_side(lv_obj_t **buttons);
+static void animate_panel_in_top(lv_obj_t *panel);
+static void animate_panel_out_top(lv_obj_t *panel);
+static void animate_panel_in_side(lv_obj_t *panel);
+static void animate_panel_out_side(lv_obj_t *panel);
 static void timer_auto_hide_callback(lv_timer_t *timer);
-static void anim_ready_hide_cb(lv_anim_t *a);
 static void animation_finish_cb(lv_anim_t *a);
-static void last_button_out_anim_ready_cb(lv_anim_t *a);
 
 // --- Implementación de Funciones Públicas ---
 
 void ui_actions_panel_create(lv_obj_t *parent) {
-    // La creación de botones se delega completamente al manager.
-    ui_buttons_init(parent);
-    ESP_LOGI(TAG, "Creación de botones delegada al buttons_manager.");
+    // --- Crear Contenedor Panel Player ---
+    s_panel_player = lv_obj_create(parent);
+    lv_obj_remove_style_all(s_panel_player);
+    lv_obj_set_size(s_panel_player, TOP_PANEL_WIDTH, TOP_PANEL_HEIGHT);
+    lv_obj_align(s_panel_player, LV_ALIGN_TOP_MID, 0, -TOP_PANEL_HEIGHT);
+    lv_obj_add_flag(s_panel_player, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(s_panel_player, LV_OBJ_FLAG_CLICKABLE); // [CORRECCIÓN CLAVE]
+    btn_1_create(s_panel_player);
+    btn_2_create(s_panel_player);
+    btn_3_create(s_panel_player);
+    ESP_LOGI(TAG, "Panel 'Player' creado y configurado para no interceptar clics.");
+
+    // --- Crear Contenedor Panel Admin ---
+    s_panel_admin = lv_obj_create(parent);
+    lv_obj_remove_style_all(s_panel_admin);
+    lv_obj_set_size(s_panel_admin, TOP_PANEL_WIDTH, TOP_PANEL_HEIGHT);
+    lv_obj_align(s_panel_admin, LV_ALIGN_TOP_MID, 0, -TOP_PANEL_HEIGHT);
+    lv_obj_add_flag(s_panel_admin, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(s_panel_admin, LV_OBJ_FLAG_CLICKABLE); // [CORRECCIÓN CLAVE]
+    btn_4_create(s_panel_admin);
+    btn_5_create(s_panel_admin);
+    btn_6_create(s_panel_admin);
+    ESP_LOGI(TAG, "Panel 'Admin' creado y configurado para no interceptar clics.");
+
+
+    // --- Crear Contenedor Panel Config ---
+    s_panel_config = lv_obj_create(parent);
+    lv_obj_remove_style_all(s_panel_config);
+    lv_obj_set_size(s_panel_config, TOP_PANEL_WIDTH, TOP_PANEL_HEIGHT);
+    lv_obj_align(s_panel_config, LV_ALIGN_TOP_MID, 0, -TOP_PANEL_HEIGHT);
+    lv_obj_add_flag(s_panel_config, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(s_panel_config, LV_OBJ_FLAG_CLICKABLE); // [CORRECCIÓN CLAVE]
+    btn_7_create(s_panel_config);
+    btn_8_create(s_panel_config);
+    btn_9_create(s_panel_config);
+    ESP_LOGI(TAG, "Panel 'Config' creado y configurado para no interceptar clics.");
+
+
+    // --- Crear Contenedor Panel Evolución ---
+    s_panel_evo = lv_obj_create(parent);
+    lv_obj_remove_style_all(s_panel_evo);
+    lv_obj_set_size(s_panel_evo, SIDE_PANEL_WIDTH, SIDE_PANEL_HEIGHT);
+    lv_obj_align(s_panel_evo, LV_ALIGN_LEFT_MID, -SIDE_PANEL_WIDTH, 0);
+    lv_obj_add_flag(s_panel_evo, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(s_panel_evo, LV_OBJ_FLAG_CLICKABLE); // [CORRECCIÓN CLAVE]
+    evo_1_create(s_panel_evo);
+    evo_2_create(s_panel_evo);
+    evo_3_create(s_panel_evo);
+    evo_4_create(s_panel_evo);
+    evo_5_create(s_panel_evo);
+    ESP_LOGI(TAG, "Panel 'Evo' creado y configurado para no interceptar clics.");
+
 }
 
-// --- Lógica de Animación (sin cambios, ya que aceptan arrays) ---
-static void anim_ready_hide_cb(lv_anim_t *a) { lv_obj_add_flag((lv_obj_t *)a->var, LV_OBJ_FLAG_HIDDEN); }
-static void animation_finish_cb(lv_anim_t *a) { s_is_animating = false; }
-static void last_button_out_anim_ready_cb(lv_anim_t *a) { lv_obj_add_flag((lv_obj_t *)a->var, LV_OBJ_FLAG_HIDDEN); s_is_animating = false; }
+static void animation_finish_cb(lv_anim_t *a) { 
+    s_is_animating = false; 
+    if(lv_obj_get_y((lv_obj_t *)a->var) < 0 || lv_obj_get_x((lv_obj_t *)a->var) < 0) {
+        lv_obj_add_flag((lv_obj_t *)a->var, LV_OBJ_FLAG_HIDDEN);
+    }
+}
 
-static void animate_panel_in_top(lv_obj_t **buttons) {
+static void animate_panel_in_top(lv_obj_t *panel) {
     if (s_hide_timer) lv_timer_del(s_hide_timer);
     s_is_animating = true;
-    for (int i = 0; i < NUM_TOP_BUTTONS; i++) {
-        if (buttons[i]) {
-            lv_obj_clear_flag(buttons[i], LV_OBJ_FLAG_HIDDEN);
-            lv_anim_t a;
-            lv_anim_init(&a);
-            lv_anim_set_var(&a, buttons[i]);
-            lv_anim_set_values(&a, lv_obj_get_y(buttons[i]), BUTTON_PADDING);
-            lv_anim_set_time(&a, ANIM_TIME_MS);
-            lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_y);
-            lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
-            lv_anim_set_delay(&a, i * 50);
-            if (i == NUM_TOP_BUTTONS - 1) lv_anim_set_ready_cb(&a, animation_finish_cb);
-            lv_anim_start(&a);
-        }
-    }
+    lv_obj_clear_flag(panel, LV_OBJ_FLAG_HIDDEN);
+
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, panel);
+    lv_anim_set_values(&a, lv_obj_get_y(panel), BUTTON_PADDING);
+    lv_anim_set_time(&a, ANIM_TIME_MS);
+    lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_y);
+    lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+    lv_anim_set_ready_cb(&a, animation_finish_cb);
+    lv_anim_start(&a);
+
     s_hide_timer = lv_timer_create(timer_auto_hide_callback, PANEL_AUTO_HIDE_DELAY, NULL);
     lv_timer_set_repeat_count(s_hide_timer, 1);
 }
 
-static void animate_panel_out_top(lv_obj_t **buttons) {
-    if (s_hide_timer) {
-        lv_timer_del(s_hide_timer);
-        s_hide_timer = NULL;
-    }
+static void animate_panel_out_top(lv_obj_t *panel) {
+    if (s_hide_timer) { lv_timer_del(s_hide_timer); s_hide_timer = NULL; }
     s_is_animating = true;
-    for (int i = 0; i < NUM_TOP_BUTTONS; i++) {
-        if (buttons[i]) {
-            lv_anim_t a;
-            lv_anim_init(&a);
-            lv_anim_set_var(&a, buttons[i]);
-            lv_anim_set_values(&a, lv_obj_get_y(buttons[i]), -BUTTON_SIZE);
-            lv_anim_set_time(&a, ANIM_TIME_MS);
-            lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_y);
-            lv_anim_set_path_cb(&a, lv_anim_path_ease_in);
-            lv_anim_set_delay(&a, i * 50);
-            if (i == NUM_TOP_BUTTONS - 1) lv_anim_set_ready_cb(&a, last_button_out_anim_ready_cb);
-            else lv_anim_set_ready_cb(&a, anim_ready_hide_cb);
-            lv_anim_start(&a);
-        }
-    }
+
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, panel);
+    lv_anim_set_values(&a, lv_obj_get_y(panel), -TOP_PANEL_HEIGHT);
+    lv_anim_set_time(&a, ANIM_TIME_MS);
+    lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_y);
+    lv_anim_set_path_cb(&a, lv_anim_path_ease_in);
+    lv_anim_set_ready_cb(&a, animation_finish_cb);
+    lv_anim_start(&a);
 }
 
-static void animate_panel_in_side(lv_obj_t **buttons) {
+static void animate_panel_in_side(lv_obj_t *panel) {
     if (s_hide_timer) lv_timer_del(s_hide_timer);
     s_is_animating = true;
-    for (int i = 0; i < NUM_SIDE_BUTTONS; i++) {
-        if (buttons[i]) {
-            lv_obj_clear_flag(buttons[i], LV_OBJ_FLAG_HIDDEN);
-            lv_anim_t a;
-            lv_anim_init(&a);
-            lv_anim_set_var(&a, buttons[i]);
-            lv_anim_set_values(&a, lv_obj_get_x(buttons[i]), BUTTON_PADDING);
-            lv_anim_set_time(&a, ANIM_TIME_MS);
-            lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_x);
-            lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
-            lv_anim_set_delay(&a, i * 50);
-            if (i == NUM_SIDE_BUTTONS - 1) lv_anim_set_ready_cb(&a, animation_finish_cb);
-            lv_anim_start(&a);
-        }
-    }
+    lv_obj_clear_flag(panel, LV_OBJ_FLAG_HIDDEN);
+
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, panel);
+    lv_anim_set_values(&a, lv_obj_get_x(panel), BUTTON_PADDING);
+    lv_anim_set_time(&a, ANIM_TIME_MS);
+    lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_x);
+    lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+    lv_anim_set_ready_cb(&a, animation_finish_cb);
+    lv_anim_start(&a);
+
     s_hide_timer = lv_timer_create(timer_auto_hide_callback, PANEL_AUTO_HIDE_DELAY, NULL);
     lv_timer_set_repeat_count(s_hide_timer, 1);
 }
 
-static void animate_panel_out_side(lv_obj_t **buttons) {
-    if (s_hide_timer) {
-        lv_timer_del(s_hide_timer);
-        s_hide_timer = NULL;
-    }
+static void animate_panel_out_side(lv_obj_t *panel) {
+    if (s_hide_timer) { lv_timer_del(s_hide_timer); s_hide_timer = NULL; }
     s_is_animating = true;
-    for (int i = 0; i < NUM_SIDE_BUTTONS; i++) {
-        if (buttons[i]) {
-            lv_anim_t a;
-            lv_anim_init(&a);
-            lv_anim_set_var(&a, buttons[i]);
-            lv_anim_set_values(&a, lv_obj_get_x(buttons[i]), -BUTTON_SIZE);
-            lv_anim_set_time(&a, ANIM_TIME_MS);
-            lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_x);
-            lv_anim_set_path_cb(&a, lv_anim_path_ease_in);
-            lv_anim_set_delay(&a, i * 50);
-            if (i == NUM_SIDE_BUTTONS - 1) lv_anim_set_ready_cb(&a, last_button_out_anim_ready_cb);
-            else lv_anim_set_ready_cb(&a, anim_ready_hide_cb);
-            lv_anim_start(&a);
-        }
-    }
+
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, panel);
+    lv_anim_set_values(&a, lv_obj_get_x(panel), -SIDE_PANEL_WIDTH);
+    lv_anim_set_time(&a, ANIM_TIME_MS);
+    lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_x);
+    lv_anim_set_path_cb(&a, lv_anim_path_ease_in);
+    lv_anim_set_ready_cb(&a, animation_finish_cb);
+    lv_anim_start(&a);
 }
-
-
-// --- Lógica de Gestos y Temporizadores (Modificada para usar el manager) ---
 
 static void timer_auto_hide_callback(lv_timer_t *timer) {
-    ui_actions_panel_hide_all(); // Usar la función pública para centralizar
+    ui_actions_panel_hide_all();
     s_hide_timer = NULL;
 }
 
 void ui_actions_panel_handle_gesture(lv_dir_t dir, lv_coord_t start_x, lv_coord_t start_y) {
     if (s_is_animating) return;
-
-    if (s_hide_timer) {
-        lv_timer_reset(s_hide_timer);
-    } else {
-        s_hide_timer = lv_timer_create(timer_auto_hide_callback, PANEL_AUTO_HIDE_DELAY, NULL);
-        lv_timer_set_repeat_count(s_hide_timer, 1);
-    }
-
-    // Definición de los grupos de botones obtenidos del manager
-    lv_obj_t* player_buttons[] = { ui_buttons_get_btn_1(), ui_buttons_get_btn_2(), ui_buttons_get_btn_3() };
-    lv_obj_t* admin_buttons[] = { ui_buttons_get_btn_4(), ui_buttons_get_btn_5(), ui_buttons_get_btn_6() };
-    lv_obj_t* config_buttons[] = { ui_buttons_get_btn_7(), ui_buttons_get_btn_8(), ui_buttons_get_btn_9() };
-    lv_obj_t* side_buttons[] = { ui_buttons_get_evo_1(), ui_buttons_get_evo_2(), ui_buttons_get_evo_3(), ui_buttons_get_evo_4(), ui_buttons_get_evo_5() };
+    if (s_hide_timer) lv_timer_reset(s_hide_timer);
 
     switch(s_panel_state) {
         case PANEL_STATE_HIDDEN:
             if (dir == LV_DIR_BOTTOM && start_y < EDGE_SWIPE_THRESHOLD) {
-                animate_panel_in_top(player_buttons);
+                animate_panel_in_top(s_panel_player);
                 s_panel_state = PANEL_STATE_PLAYER_VISIBLE;
             } else if (dir == LV_DIR_RIGHT && start_x < EDGE_SWIPE_THRESHOLD) {
-                animate_panel_in_side(side_buttons);
+                animate_panel_in_side(s_panel_evo);
                 s_panel_state = PANEL_STATE_SIDE_VISIBLE;
             } else {
                 ui_idle_animation_resume();
@@ -12387,36 +12541,36 @@ void ui_actions_panel_handle_gesture(lv_dir_t dir, lv_coord_t start_x, lv_coord_
             break;
         case PANEL_STATE_PLAYER_VISIBLE:
             if (dir == LV_DIR_BOTTOM) {
-                animate_panel_out_top(player_buttons);
-                animate_panel_in_top(admin_buttons);
+                animate_panel_out_top(s_panel_player);
+                animate_panel_in_top(s_panel_admin);
                 s_panel_state = PANEL_STATE_ADMIN_VISIBLE;
             } else if (dir == LV_DIR_TOP) {
-                animate_panel_out_top(player_buttons);
+                animate_panel_out_top(s_panel_player);
                 s_panel_state = PANEL_STATE_HIDDEN;
                 ui_idle_animation_resume();
             }
             break;
         case PANEL_STATE_ADMIN_VISIBLE:
             if (dir == LV_DIR_BOTTOM) {
-                animate_panel_out_top(admin_buttons);
-                animate_panel_in_top(config_buttons);
+                animate_panel_out_top(s_panel_admin);
+                animate_panel_in_top(s_panel_config);
                 s_panel_state = PANEL_STATE_CONFIG_VISIBLE;
             } else if (dir == LV_DIR_TOP) {
-                animate_panel_out_top(admin_buttons);
-                s_panel_state = PANEL_STATE_HIDDEN;
-                ui_idle_animation_resume();
+                animate_panel_out_top(s_panel_admin);
+                animate_panel_in_top(s_panel_player);
+                s_panel_state = PANEL_STATE_PLAYER_VISIBLE;
             }
             break;
         case PANEL_STATE_CONFIG_VISIBLE:
              if (dir == LV_DIR_TOP) {
-                animate_panel_out_top(config_buttons);
-                s_panel_state = PANEL_STATE_HIDDEN;
-                ui_idle_animation_resume();
+                animate_panel_out_top(s_panel_config);
+                animate_panel_in_top(s_panel_admin);
+                s_panel_state = PANEL_STATE_ADMIN_VISIBLE;
             }
             break;
         case PANEL_STATE_SIDE_VISIBLE:
             if (dir == LV_DIR_LEFT) {
-                animate_panel_out_side(side_buttons);
+                animate_panel_out_side(s_panel_evo);
                 s_panel_state = PANEL_STATE_HIDDEN;
                 ui_idle_animation_resume();
             }
@@ -12425,27 +12579,15 @@ void ui_actions_panel_handle_gesture(lv_dir_t dir, lv_coord_t start_x, lv_coord_
 }
 
 void ui_actions_panel_hide_all(void) {
-    if (s_panel_state == PANEL_STATE_HIDDEN || s_is_animating) {
-        return;
-    }
-    ESP_LOGD(TAG, "Forzando el ocultado de todos los paneles visibles.");
+    if (s_panel_state == PANEL_STATE_HIDDEN || s_is_animating) return;
 
-    // Definición de los grupos de botones para ocultar
-    lv_obj_t* player_buttons[] = { ui_buttons_get_btn_1(), ui_buttons_get_btn_2(), ui_buttons_get_btn_3() };
-    lv_obj_t* admin_buttons[] = { ui_buttons_get_btn_4(), ui_buttons_get_btn_5(), ui_buttons_get_btn_6() };
-    lv_obj_t* config_buttons[] = { ui_buttons_get_btn_7(), ui_buttons_get_btn_8(), ui_buttons_get_btn_9() };
-    lv_obj_t* side_buttons[] = { ui_buttons_get_evo_1(), ui_buttons_get_evo_2(), ui_buttons_get_evo_3(), ui_buttons_get_evo_4(), ui_buttons_get_evo_5() };
-
-    if (s_panel_state == PANEL_STATE_PLAYER_VISIBLE) animate_panel_out_top(player_buttons);
-    else if (s_panel_state == PANEL_STATE_ADMIN_VISIBLE) animate_panel_out_top(admin_buttons);
-    else if (s_panel_state == PANEL_STATE_CONFIG_VISIBLE) animate_panel_out_top(config_buttons);
-    else if (s_panel_state == PANEL_STATE_SIDE_VISIBLE) animate_panel_out_side(side_buttons);
+    if (s_panel_state == PANEL_STATE_PLAYER_VISIBLE) animate_panel_out_top(s_panel_player);
+    else if (s_panel_state == PANEL_STATE_ADMIN_VISIBLE) animate_panel_out_top(s_panel_admin);
+    else if (s_panel_state == PANEL_STATE_CONFIG_VISIBLE) animate_panel_out_top(s_panel_config);
+    else if (s_panel_state == PANEL_STATE_SIDE_VISIBLE) animate_panel_out_side(s_panel_evo);
     
     s_panel_state = PANEL_STATE_HIDDEN;
-    if (s_hide_timer) {
-        lv_timer_del(s_hide_timer);
-        s_hide_timer = NULL;
-    }
+    if (s_hide_timer) { lv_timer_del(s_hide_timer); s_hide_timer = NULL; }
     ui_idle_animation_resume();
 }
 
@@ -12606,12 +12748,10 @@ const lv_img_dsc_t* ui_assets_get_icon(ui_asset_id_t asset_id);
 --- END OF FILE: .\components\ui\ui_asset_loader.h ---
 
 --- START OF FILE: .\components\ui\ui_assets.h ---
-/*
-# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_assets.h
-# Fecha: $timestamp
-# Último cambio: Creado para declarar todos los assets de iconos del firmware.
-# Descripción: Este fichero de cabecera centraliza las declaraciones de todas las imágenes de los botones que se compilan en el firmware. Permite que `ui_asset_loader.c` acceda a ellas de forma segura.
-*/
+/* Fecha: $timestamp */
+/* Fichero: components/ui/ui_assets.h */
+/* Último cambio: Centralizadas las declaraciones de TODOS los assets de imagen del firmware. */
+/* Descripción: Este fichero de cabecera ahora sirve como el único punto de declaración para todos los assets gráficos compilados en el firmware (fondos de pantalla e iconos). Al centralizar las declaraciones de 'bg_0', 'bg_config' y todos los 'asset_btn_*', se simplifica la gestión de recursos y se soluciona la fragmentación que causaba confusión y errores de compilación. Este es el primer paso para eliminar el cargador de assets indirecto y usar los recursos de forma directa. */
 
 #ifndef UI_ASSETS_H
 #define UI_ASSETS_H
@@ -12622,23 +12762,27 @@ const lv_img_dsc_t* ui_assets_get_icon(ui_asset_id_t asset_id);
 extern "C" {
 #endif
 
-// --- Declaración de Assets de Botones (BTN) ---
-extern const lv_img_dsc_t asset_btn_1;
-extern const lv_img_dsc_t asset_btn_2;
-extern const lv_img_dsc_t asset_btn_3;
-extern const lv_img_dsc_t asset_btn_4;
-extern const lv_img_dsc_t asset_btn_5;
-extern const lv_img_dsc_t asset_btn_6;
-extern const lv_img_dsc_t asset_btn_7;
-extern const lv_img_dsc_t asset_btn_8;
-extern const lv_img_dsc_t asset_btn_9;
+// --- Assets de Fondos de Pantalla ---
+extern const lv_img_dsc_t bg_0;      // Fondo principal de la aplicación.
+extern const lv_img_dsc_t bg_config; // Fondo para las pantallas de servicio/configuración.
 
-// --- Declaración de Assets de Evolución (EVO) ---
-extern const lv_img_dsc_t asset_evo_1;
-extern const lv_img_dsc_t asset_evo_2;
-extern const lv_img_dsc_t asset_evo_3;
-extern const lv_img_dsc_t asset_evo_4;
-extern const lv_img_dsc_t asset_evo_5;
+// --- Assets de Iconos de Botones (BTN) ---
+extern const lv_img_dsc_t asset_btn_1; // Comer
+extern const lv_img_dsc_t asset_btn_2; // Ejercicio
+extern const lv_img_dsc_t asset_btn_3; // Atacar
+extern const lv_img_dsc_t asset_btn_4; // Brillo
+extern const lv_img_dsc_t asset_btn_5; // Apagar Pantalla
+extern const lv_img_dsc_t asset_btn_6; // Placeholder Admin (antes Modo Config)
+extern const lv_img_dsc_t asset_btn_7; // Reset Total
+extern const lv_img_dsc_t asset_btn_8; // Servidor Ficheros
+extern const lv_img_dsc_t asset_btn_9; // Placeholder Config
+
+// --- Assets de Iconos de Evolución (EVO) ---
+extern const lv_img_dsc_t asset_evo_1; // Fuego
+extern const lv_img_dsc_t asset_evo_2; // Agua
+extern const lv_img_dsc_t asset_evo_3; // Tierra
+extern const lv_img_dsc_t asset_evo_4; // Viento
+extern const lv_img_dsc_t asset_evo_5; // Involucionar
 
 
 #ifdef __cplusplus
