@@ -1,7 +1,7 @@
-# Fecha: 17/08/2025 - 03:46 
+# Fecha: 17/08/2025 - 04:32 
 # Fichero: components/ui/CMakeLists.txt
-# Último cambio: Excluida la compilación de 'BG_config.c' para resolver un error de 'multiple definition'.
-# Descripción: El enlazador reportó que la variable 'bg_config' estaba definida tanto en 'BG_config.c' como en 'ui_assets.c'. Asumiendo que 'ui_assets.c' es el fichero de assets consolidado que ya contiene esta definición, se ha modificado este CMakeLists para excluir explícitamente a 'BG_config.c' de la compilación, solucionando el conflicto de símbolos duplicados.
+# Último cambio: Corregido un error de sintaxis en el comentario de PowerShell y refinada la lógica de compilación de assets.
+# Descripción: Se elimina el uso de acentos graves (backticks) en los comentarios para evitar errores del parser de PowerShell. La lógica de CMake ahora es más explícita: se listan los ficheros de assets C requeridos ('BG.c', 'ui_assets.c') y se excluye 'BG_config.c' para resolver definitivamente los errores de enlazador 'multiple definition' y 'undefined reference'.
 
 file(GLOB component_sources
     "*.c"
@@ -12,10 +12,14 @@ file(GLOB component_sources
     "buttons/*.c"
 )
 
-# Glob para los ficheros de assets de imagen, y luego se excluye el fichero redundante.
-file(GLOB image_assets "assets/images/*.c")
-list(REMOVE_ITEM image_assets "${CMAKE_CURRENT_LIST_DIR}/assets/images/BG_config.c")
-list(APPEND component_sources ${image_assets})
+# Se añaden explícitamente los ficheros C que definen los assets de imagen.
+# Esto evita compilar ficheros redundantes (como BG_config.c, cuyo contenido
+# ya está en ui_assets.c) y asegura que todos los símbolos necesarios (como bg_0 de BG.c)
+# estén disponibles para el enlazador.
+list(APPEND component_sources
+    "assets/images/BG.c"
+    "assets/images/ui_assets.c"
+)
 
 idf_component_register(
     SRCS ${component_sources}

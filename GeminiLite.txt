@@ -1,14 +1,31 @@
 --- START OF FILE: .\CMakeLists.txt ---
-# The following lines of boilerplate have to be in your project's
-# CMakeLists in this exact order for cmake to work correctly
+# Fecha: 17/08/2025 - 04:03 
+# Fichero: ./CMakeLists.txt
+# Último cambio: Reestructurados y mejorados los comentarios para mayor claridad.
+# Descripción: Fichero raíz de configuración de CMake para el proyecto. Define la versión mínima de CMake,
+#              el nombre del proyecto, y rutas adicionales para componentes de terceros. El error 'Permission denied'
+#              del sistema de compilación (Ninja) no se origina en este fichero, sino en un problema externo
+#              como un antivirus o permisos del sistema de ficheros. Se mejora este fichero como acción proactiva.
+
+# Versión mínima de CMake requerida por ESP-IDF.
 cmake_minimum_required(VERSION 3.16)
 
-# Le decimos al sistema que, además de 'components', también busque herramientas en nuestro almacén local.
+# Añade el directorio 'components_dependencies' a la ruta de búsqueda de componentes.
+# Esto permite que el sistema de compilación encuentre librerías de terceros (ej. esp_lvgl_port)
+# que no forman parte de los componentes estándar ni del propio proyecto.
 set(EXTRA_COMPONENT_DIRS components_dependencies)
+
+# Define una macro de preprocesador global para todo el proyecto.
+# En este caso, se usa para informar a los componentes que se está utilizando LVGL v9.
 add_compile_definitions(LVGL_VERSION_MAJOR=9)
 
+# Incluye el script principal de ESP-IDF que gestiona toda la lógica de compilación de proyectos.
+# Esta línea es fundamental y debe ir después de las configuraciones iniciales.
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+
+# Declara el nombre del proyecto.
 project(DIYTOGETHER)
+
 --- END OF FILE: .\CMakeLists.txt ---
 
 --- START OF FILE: .\partitions.csv ---
@@ -66,10 +83,10 @@ build_flags = -D LVGL_VERSION_MAJOR=9
 --- END OF FILE: .\platformio.ini ---
 
 --- START OF FILE: .\README.md ---
-/* Fecha: 17/08/2025 - 03:11  */
+/* Fecha: 17/08/2025 - 03:39  */
 /* Fichero: .\README.md */
-/* Último cambio: Actualizada la nota de compilación para reflejar la refactorización de la UI con el nuevo directorio 'assets'. */
-/* Descripción: Documentación principal del proyecto, guía de inicio y visión general. */
+/* Último cambio: Actualizada la nota de compilación para reflejar la arquitectura de UI refactorizada y corregido el escapado de caracteres para PowerShell. */
+/* Descripción: Documentación principal del proyecto. La nota sobre la estructura del componente 'ui' ahora detalla la nueva organización modular en subdirectorios (assets, core, screens, etc.) para reflejar la reciente refactorización. Se han escapado los caracteres de acento grave (backticks) para evitar errores de parser en PowerShell. */
 
 # DIYTogether - Tu Mascota Virtual DIY
 
@@ -81,7 +98,7 @@ build_flags = -D LVGL_VERSION_MAJOR=9
 
 Constantemente sueño despierto.
 
-Fantaseo con ser *"ese tío guay"* para mis sobrinos, el que les enseña a crear, a entender la tecnología, a jugar con la electrónica y la domótica. Quería construir algo que nos uniera, un juego que les apasionara y despertara su curiosidad por dentro. Una excusa perfecta para aprender divirtiéndose y pasar tiempo de calidad juntos.
+Fantaseo con ser *`ese tío guay`* para mis sobrinos, el que les enseña a crear, a entender la tecnología, a jugar con la electrónica y la domótica. Quería construir algo que nos uniera, un juego que les apasionara y despertara su curiosidad por dentro. Una excusa perfecta para aprender divirtiéndose y pasar tiempo de calidad juntos.
 
 De esa idea nace **DIYTogether**.
 
@@ -91,9 +108,9 @@ Un proyecto que empezó con mis mejores amigos y que ahora abro al mundo, invita
 
 ## ¿Qué es DIYTogether?
 
-DIYTogether es un proyecto de mascota virtual open-source basada en hardware ESP32. Es un **"Tamagotchi para Hackers"** diseñado desde cero para ser:
+DIYTogether es un proyecto de mascota virtual open-source basada en hardware ESP32. Es un **`Tamagotchi para Hackers`** diseñado desde cero para ser:
 
-*   �� **Personalizable**: Crea y carga tus propios "Skins" (gráficos, animaciones y sonidos) sin necesidad de reprogramar nada. ¡Haz tu DIYTogether verdaderamente tuyo!
+*   🎨 **Personalizable**: Crea y carga tus propios "Skins" (gráficos, animaciones y sonidos) sin necesidad de reprogramar nada. ¡Haz tu DIYTogether verdaderamente tuyo!
 *   🧠 **Educativo**: Aprende electrónica, programación (C++/ESP-IDF) y conectividad IoT de una forma práctica y progresiva. Cada paso es una lección, y los errores son parte del viaje.
 *   🌍 **Interactivo**: Utiliza sensores como el acelerómetro y la conectividad Bluetooth para interactuar con tu criatura de formas nuevas y creativas.
 *   ❤️ **Abierto y Comunitario**: Todo el proyecto (firmware, hardware, diseños 3D) es libre. Queremos que lo copies, lo modifiques, lo mejores y lo compartas.
@@ -134,13 +151,19 @@ DIYTogether es un proyecto de mascota virtual open-source basada en hardware ESP
 ### 2. Compilación y Subida del Firmware
 Este proyecto está configurado para ser compilado y subido fácilmente con PlatformIO.
 
-*(Nota: La estructura interna, especialmente en el componente 'ui', se está refactorizando continuamente para aislar la lógica en subdirectorios como 'core', 'screens', 'widgets' y 'assets'. A pesar de estos cambios, el proceso de compilación con PlatformIO sigue siendo el mismo y es el método recomendado.)*
+*(Nota: La arquitectura del componente `ui` ha sido completamente refactorizada para seguir principios de diseño modular y de responsabilidad única. La lógica ahora está organizada en subdirectorios bien definidos:*
+*   ***`assets/`***: *Contiene todos los recursos estáticos (imágenes, fuentes).*
+*   ***`core/`***: *Orquesta la UI, gestiona el estado y la telemetría.*
+*   ***`screens/`***: *Define y controla las diferentes pantallas de la aplicación.*
+*   ***`actions/`***: *Encapsula la lógica de cada acción del usuario (comer, reiniciar, etc.).*
+*   ***`buttons/`***: *Módulos individuales para cada botón, encapsulando su creación y eventos.*
+*A pesar de esta estructura interna avanzada, el proceso de compilación con PlatformIO sigue siendo el mismo y es el método recomendado.)*
 
 1.  **Clona el repositorio**:
-    ```bash
+    `ash
     git clone [URL de tu repositorio]
     cd DIYtogether
-    ```
+    `
 2.  **Abre el proyecto en VS Code**:
     *   Abre VS Code.
     *   Ve a File > Open Folder... y selecciona la carpeta DIYtogether que acabas de clonar.
@@ -165,7 +188,7 @@ Este proyecto vive gracias a gente como tú. Si te gusta la idea, ¡involúcrate
 
 *   ⭐ **Dale una estrella a este repositorio**: ¡Nos ayuda a ganar visibilidad!
 *   💬 **Únete a nuestro canal de Discord/Telegram**: El mejor lugar para charlar, pedir ayuda y compartir tus creaciones.
-*   💡 **Aporta ideas o reporta bugs**: Abre un "Issue" aquí en GitHub.
+*   💡 **Aporta ideas o reporta bugs**: Abre un `Issue` aquí en GitHub.
 *   🚀 **Contribuye con código o diseños**: ¡Los Pull Requests son bienvenidos! Revisa nuestra [guía de contribución].
 
 Gracias por tu apoyo y por creer en un proyecto hecho con cariño y curiosidad.
@@ -8756,10 +8779,10 @@ void action_system_reset_all(void) {
 --- END OF FILE: .\components\ui\actions\action_system.c ---
 
 --- START OF FILE: .\components\ui\actions\action_system.h ---
-/* Fecha: 17/08/2025 - 01:50  */
+/* Fecha: 17/08/2025 - 03:35  */
 /* Fichero: components/ui/actions/action_system.h */
-/* Último cambio: Creación del módulo para agrupar las acciones de sistema. */
-/* Descripción: Interfaz pública para las acciones de sistema como 'activar servidor de ficheros' y 'reset total'. Continúa la modularización de la lógica de acciones. */
+/* Último cambio: Creación del módulo para agrupar las acciones de sistema como primer paso de la refactorización de 'actions.c'. */
+/* Descripción: Interfaz pública para las acciones de sistema como 'activar servidor de ficheros' y 'reset total'. Este es el primer paso para descomponer el monolítico 'actions.c', siguiendo el Principio de Responsabilidad Única. */
 
 #ifndef ACTION_SYSTEM_H
 #define ACTION_SYSTEM_H
@@ -8770,14 +8793,15 @@ extern "C" {
 
 /**
  * @brief Activa el modo de servidor de ficheros.
- *        Establece una bandera en NVS y reinicia el dispositivo.
+ *        Establece una bandera en NVS y reinicia el dispositivo para que
+ *        app_main entre en el modo de servicio correspondiente.
  */
 void action_system_enable_file_server(void);
 
 /**
  * @brief Realiza un reseteo total del dispositivo.
  *        Borra las credenciales WiFi, el estado de evolución y la bandera
- *        del servidor de ficheros, y luego reinicia.
+ *        del servidor de ficheros de la NVS, y luego reinicia.
  */
 void action_system_reset_all(void);
 
@@ -10821,10 +10845,10 @@ void ui_init(void);
 --- END OF FILE: .\components\ui\core\ui.h ---
 
 --- START OF FILE: .\components\ui\screens\config.c ---
-/* Fecha: 17/08/2025 - 03:10  */
+/* Fecha: 17/08/2025 - 03:42  */
 /* Fichero: components/ui/screens/config.c */
-/* Último cambio: Actualizada la ruta de inclusión del asset de fondo 'BG_config.h' para reflejar la refactorización. */
-/* Descripción: Implementación de la pantalla de configuración. Se ha corregido la inclusión del asset de fondo para que apunte a 'assets/images/BG_config.h', adaptándose a la nueva estructura de directorios, y se ha eliminado la declaración 'extern' local redundante. */
+/* Último cambio: Renombrada la función 'config_screen_show' a 'config_show' para que coincida con su declaración y resolver el error del enlazador. */
+/* Descripción: Implementación de la pantalla de configuración. El error de 'undefined reference' se debía a que la definición de la función en este fichero no coincidía con la declaración en el header y la llamada en main.c. Se ha estandarizado el nombre a 'config_show'. */
 
 #include "config.h"
 #include "esp_log.h"
@@ -10850,7 +10874,7 @@ static void reset_button_event_cb(lv_event_t *e) {
 /**
  * @brief Crea y muestra la pantalla de configuración estática.
  */
-void config_screen_show(void) {
+void config_show(void) {
     // Crear una pantalla nueva y limpia
     lv_obj_t *scr = lv_obj_create(NULL);
     lv_obj_remove_style_all(scr); // Empezamos sin estilos por defecto
@@ -10879,10 +10903,10 @@ void config_screen_show(void) {
 --- END OF FILE: .\components\ui\screens\config.c ---
 
 --- START OF FILE: .\components\ui\screens\config.h ---
-/* Fecha: 17/08/2025 - 02:48  */
+/* Fecha: 17/08/2025 - 03:32  */
 /* Fichero: components/ui/screens/config.h */
-/* Último cambio: Refactorizado y movido a 'screens/', renombrado de 'ui_config_screen.h'. */
-/* Descripción: Define la interfaz pública para la pantalla de configuración. Encapsula la lógica de esta vista específica como parte de la refactorización de la UI. */
+/* Último cambio: Renombrada la función 'config_screen_show' a 'config_show' para estandarizar y eliminar redundancia. */
+/* Descripción: Define la interfaz pública para la pantalla de configuración. La estandarización de nombres (eliminando '_screen') mejora la legibilidad y sigue el principio DRY, ya que el contexto del directorio 'screens' es suficiente. */
 
 #ifndef CONFIG_H
 #define CONFIG_H
@@ -10896,7 +10920,7 @@ extern "C" {
 /**
  * @brief Crea y muestra la pantalla de configuración estática con una imagen de fondo y un botón de reinicio.
  */
-void config_screen_show(void);
+void config_show(void);
 
 #ifdef __cplusplus
 }
@@ -10905,6 +10929,58 @@ void config_screen_show(void);
 #endif // CONFIG_H
 
 --- END OF FILE: .\components\ui\screens\config.h ---
+
+--- START OF FILE: .\components\ui\screens\screen_interface.h ---
+/* Fecha: 17/08/2025 - 03:35  */
+/* Fichero: components/ui/screens/screen_interface.h */
+/* Último cambio: Creación de la interfaz común para las pantallas para estandarizar su ciclo de vida. */
+/* Descripción: Define una interfaz común (un 'contrato') para todas las pantallas de la aplicación. Esto permite que un futuro gestor de navegación trate a todas las pantallas de manera uniforme, llamando a sus funciones de ciclo de vida (crear, mostrar, etc.) sin conocer su implementación específica, reduciendo así el acoplamiento y mejorando la modularidad. */
+
+#ifndef SCREEN_INTERFACE_H
+#define SCREEN_INTERFACE_H
+
+#include "lvgl.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Define una interfaz común para el ciclo de vida de una pantalla.
+ *
+ * Esta estructura de punteros a función permite manejar diferentes pantallas
+ * de forma polimórfica.
+ */
+typedef struct {
+    /**
+     * @brief Crea los widgets de la pantalla sobre un objeto padre.
+     * @param parent El objeto LVGL que actuará como contenedor.
+     */
+    void (*create)(lv_obj_t *parent);
+
+    /**
+     * @brief Hace visible la pantalla y sus elementos.
+     */
+    void (*show)(void);
+
+    /**
+     * @brief Oculta la pantalla y sus elementos.
+     */
+    void (*hide)(void);
+
+    /**
+     * @brief Destruye la pantalla y libera todos sus recursos.
+     */
+    void (*destroy)(void);
+} screen_interface_t;
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // SCREEN_INTERFACE_H
+
+--- END OF FILE: .\components\ui\screens\screen_interface.h ---
 
 --- START OF FILE: .\components\ui\screens\screens.c ---
 /* Fecha: 17/08/2025 - 02:50  */
@@ -11498,30 +11574,11 @@ extern const lv_img_dsc_t bg_config;
 
 --- END OF FILE: .\components\ui\BG_config.h ---
 
---- START OF FILE: .\components\ui\BG.h ---
-/*
- * Fichero: ./components/diymon_ui/BG.h
- * Fecha: 13/08/2025 - 05:59 
- * Último cambio: Creación del fichero.
- * Descripción: Declara el descriptor de la imagen de fondo `bg_0` que está
- *              definida en BG.c para que sea accesible desde otros módulos.
- */
-#ifndef BG_H
-#define BG_H
-
-#include <lvgl.h>
-
-extern const lv_img_dsc_t bg_0;
-
-#endif // BG_H
-
---- END OF FILE: .\components\ui\BG.h ---
-
 --- START OF FILE: .\components\ui\CMakeLists.txt ---
-# Fecha: 17/08/2025 - 03:20
+# Fecha: 17/08/2025 - 03:53 
 # Fichero: components/ui/CMakeLists.txt
-# Último cambio: Añadida la compilación de ficheros de assets de imagen para resolver el error del enlazador.
-# Descripción: El error 'undefined reference to asset_btn_1' ocurre porque los ficheros .c que definen las imágenes no se estaban compilando. Se ha añadido 'assets/images/*.c' a la lista de ficheros fuente para que el enlazador pueda encontrar las definiciones de los assets.
+# Último cambio: Modificado el listado de fuentes para excluir explícitamente 'BG_config.c' y resolver el error de 'multiple definition'.
+# Descripción: El enlazador reportó que la variable 'bg_config' estaba definida tanto en 'BG_config.c' como en 'ui_assets.c'. Se ha cambiado el `file(GLOB ...)` por un listado explícito de los ficheros de assets a compilar, omitiendo el fichero redundante 'BG_config.c' para solucionar el conflicto de símbolos duplicados.
 
 file(GLOB component_sources
     "*.c"
@@ -11529,8 +11586,10 @@ file(GLOB component_sources
     "screens/*.c"
     "actions/*.c"
     "assets/styles/*.c"
-    "assets/images/*.c"
     "buttons/*.c"
+    # Se añade explícitamente el fichero de assets consolidado.
+    # Se omite 'BG_config.c' para evitar la definición duplicada.
+    "assets/images/ui_assets.c"
 )
 
 idf_component_register(
@@ -11553,6 +11612,7 @@ idf_component_register(
         wifi_portal
         web_server
 )
+
 --- END OF FILE: .\components\ui\CMakeLists.txt ---
 
 --- START OF FILE: .\components\ui\diymon_ui_helpers.c ---
@@ -11652,22 +11712,6 @@ extern "C" {
 
 #endif /*EEZ_LVGL_UI_FONTS_H*/
 --- END OF FILE: .\components\ui\fonts.h ---
-
---- START OF FILE: .\components\ui\images.h ---
-/*
-# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\images.h
-# Fecha: $timestamp
-# Último cambio: Fichero obsoleto. El contenido ha sido eliminado.
-# Descripción: Este fichero declaraba los assets de iconos como símbolos 'extern'. Ha sido reemplazado por el 'ui_asset_loader' que carga los iconos dinámicamente desde la tarjeta SD.
-*/
-#ifndef IMAGES_H
-#define IMAGES_H
-
-// Contenido eliminado. Este fichero ya no es necesario.
-
-#endif // IMAGES_H
-
---- END OF FILE: .\components\ui\images.h ---
 
 --- START OF FILE: .\components\ui\screens.c ---
 /* Fecha: 16/08/2025 - 08:42  */
@@ -11819,32 +11863,6 @@ void create_screens(void);
 #endif // SCREENS_H
 
 --- END OF FILE: .\components\ui\screens.h ---
-
---- START OF FILE: .\components\ui\structs.h ---
-#ifndef EEZ_LVGL_UI_STRUCTS_H
-#define EEZ_LVGL_UI_STRUCTS_H
-
-
-
-#if defined(EEZ_FOR_LVGL)
-
-#include <eez/flow/flow.h>
-#include <stdint.h>
-#include <stdbool.h>
-
-#include "vars.h"
-
-using namespace eez;
-
-
-
-
-
-#endif
-
-#endif /*EEZ_LVGL_UI_STRUCTS_H*/
-
---- END OF FILE: .\components\ui\structs.h ---
 
 --- START OF FILE: .\components\ui\styles.c ---
 /*
@@ -13348,40 +13366,6 @@ void ui_init(void);
 
 --- END OF FILE: .\components\ui\ui.h ---
 
---- START OF FILE: .\components\ui\vars.h ---
-#ifndef EEZ_LVGL_UI_VARS_H
-#define EEZ_LVGL_UI_VARS_H
-
-#include <stdint.h>
-#include <stdbool.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-// enum declarations
-
-
-
-// Flow global variables
-
-enum FlowGlobalVariables {
-    FLOW_GLOBAL_VARIABLE_NONE
-};
-
-// Native global variables
-
-extern int32_t get_var_brightness();
-extern void set_var_brightness(int32_t value);
-
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /*EEZ_LVGL_UI_VARS_H*/
---- END OF FILE: .\components\ui\vars.h ---
-
 --- START OF FILE: .\components\ui\welcome_screen.c ---
 #include "welcome_screen.h"
 #include "esp_log.h"
@@ -13465,333 +13449,6 @@ void welcome_screen_show(void (*on_start_cb)(void));
 
 #endif // WELCOME_SCREEN_H
 --- END OF FILE: .\components\ui\welcome_screen.h ---
-
---- START OF FILE: .\components\ui_panels\include\diymon_ui_panels.h ---
-/*
-  Fichero: ./components/diymon_ui/ui_actions_panel.h
-  Fecha: 12/08/2025 - 08:00 pm
-  Último cambio: Creado como parte de la unificación de la UI.
-  Descripción: Interfaz pública para el gestor de paneles de acciones, ahora
-               integrado dentro del componente `diymon_ui`.
-*/
-#ifndef UI_ACTIONS_PANEL_H
-#define UI_ACTIONS_PANEL_H
-
-#include <lvgl.h>
-
-void ui_actions_panel_create(lv_obj_t *parent);
-void ui_actions_panel_handle_gesture(lv_dir_t dir, lv_coord_t start_x, lv_coord_t start_y);
-
-#endif // UI_ACTIONS_PANEL_H
---- END OF FILE: .\components\ui_panels\include\diymon_ui_panels.h ---
-
---- START OF FILE: .\components\ui_panels\action_panels.c ---
-/*
-  Fichero: ./components/diymon_ui_panels/action_panels.c
-  Fecha: 12/08/2025 - 07:45
-  Último cambio: Creación del componente.
-  Descripción: Corazón de la nueva arquitectura de paneles. Centraliza la definición 
-               de los botones, sus iconos y acciones en un único lugar fácil de editar.
-*/
-#include "ui_actions_panel.h"
-#include "ui_asset_loader.h"
-#include "actions.h"
-#include "esp_log.h"
-#include <stdio.h>
-
-static const char *TAG = "UI_PANELS";
-
-// --- Constantes de configuración ---
-#define PANEL_AUTO_HIDE_DELAY 10000 
-#define BUTTON_SIZE 50
-#define BUTTON_PADDING 10
-#define ANIM_TIME_MS 300
-#define NUM_TOP_BUTTONS 3
-#define NUM_SIDE_BUTTONS 5
-#define EDGE_SWIPE_THRESHOLD 50
-
-// --- Definición de estados del panel ---
-typedef enum {
-    PANEL_STATE_HIDDEN,
-    PANEL_STATE_PLAYER_VISIBLE,
-    PANEL_STATE_ADMIN_VISIBLE,
-    PANEL_STATE_CONFIG_VISIBLE,
-    PANEL_STATE_SIDE_VISIBLE,
-} panel_state_t;
-
-// --- Variables estáticas del módulo ---
-static lv_obj_t *s_player_btns[NUM_TOP_BUTTONS];
-static lv_obj_t *s_admin_btns[NUM_TOP_BUTTONS];
-static lv_obj_t *s_config_btns[NUM_TOP_BUTTONS];
-static lv_obj_t *s_side_btns[NUM_SIDE_BUTTONS];
-
-static lv_timer_t *s_hide_timer = NULL;
-static panel_state_t s_panel_state = PANEL_STATE_HIDDEN;
-
-// --- Declaraciones de funciones internas ---
-static void animate_panel_in_top(lv_obj_t **buttons);
-static void animate_panel_out_top(lv_obj_t **buttons);
-static void animate_panel_in_side(lv_obj_t **buttons);
-static void animate_panel_out_side(lv_obj_t **buttons);
-static void timer_auto_hide_callback(lv_timer_t *timer);
-static lv_obj_t* create_button(lv_obj_t *parent, ui_asset_id_t asset_id, int index, bool is_top);
-static void button_event_cb(lv_event_t *e);
-static void anim_ready_hide_cb(lv_anim_t *a);
-
-/**
- * @brief Función de utilidad para crear un botón de acción.
- */
-static lv_obj_t* create_button(lv_obj_t *parent, ui_asset_id_t asset_id, int index, bool is_top) {
-    lv_obj_t *btn = lv_btn_create(parent);
-    lv_obj_remove_style_all(btn);
-    lv_obj_set_size(btn, BUTTON_SIZE, BUTTON_SIZE);
-    lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, 0);
-
-    lv_obj_t *img = lv_img_create(btn);
-    lv_img_set_src(img, ui_assets_get_icon(asset_id));
-    lv_obj_center(img);
-
-    if (is_top) {
-        lv_obj_set_pos(btn, (BUTTON_SIZE + BUTTON_PADDING) * index, -BUTTON_SIZE);
-    } else {
-        lv_obj_set_pos(btn, -BUTTON_SIZE, BUTTON_PADDING + (BUTTON_SIZE + BUTTON_PADDING) * index);
-    }
-    
-    lv_obj_add_flag(btn, LV_OBJ_FLAG_HIDDEN);
-    return btn;
-}
-
-/**
- * @brief Orquestador principal de la creación de todos los paneles y botones.
- */
-void ui_actions_panel_create(lv_obj_t *parent) {
-    // Panel 1: Jugador
-    s_player_btns[0] = create_button(parent, ASSET_BTN_1, 0, true);
-    s_player_btns[1] = create_button(parent, ASSET_BTN_2, 1, true);
-    s_player_btns[2] = create_button(parent, ASSET_BTN_3, 2, true);
-    lv_obj_add_event_cb(s_player_btns[0], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_COMER);
-    lv_obj_add_event_cb(s_player_btns[1], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EJERCICIO);
-    lv_obj_add_event_cb(s_player_btns[2], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_ATACAR);
-
-    // Panel 2: Admin
-    s_admin_btns[0] = create_button(parent, ASSET_BTN_4, 0, true);
-    s_admin_btns[1] = create_button(parent, ASSET_BTN_5, 1, true);
-    s_admin_btns[2] = create_button(parent, ASSET_BTN_6, 2, true);
-    lv_obj_add_event_cb(s_admin_btns[0], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_BRIGHTNESS_CYCLE);
-    lv_obj_add_event_cb(s_admin_btns[1], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_TOGGLE_SCREEN);
-    lv_obj_add_event_cb(s_admin_btns[2], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_ADMIN_PLACEHOLDER);
-
-    // Panel 3: Configuración
-    s_config_btns[0] = create_button(parent, ASSET_BTN_7, 0, true);
-    s_config_btns[1] = create_button(parent, ASSET_BTN_8, 1, true);
-    s_config_btns[2] = create_button(parent, ASSET_BTN_9, 2, true);
-    lv_obj_add_event_cb(s_config_btns[0], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_RESET_ALL);
-    lv_obj_add_event_cb(s_config_btns[1], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_ENABLE_FTP);
-    lv_obj_add_event_cb(s_config_btns[2], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_CONFIG_PLACEHOLDER);
-
-    // Panel 4: Lateral (Evolución)
-    s_side_btns[0] = create_button(parent, ASSET_EVO_1, 0, false);
-    s_side_btns[1] = create_button(parent, ASSET_EVO_2, 1, false);
-    s_side_btns[2] = create_button(parent, ASSET_EVO_3, 2, false);
-    s_side_btns[3] = create_button(parent, ASSET_EVO_4, 3, false);
-    s_side_btns[4] = create_button(parent, ASSET_EVO_5, 4, false);
-    lv_obj_add_event_cb(s_side_btns[0], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EVO_FIRE);
-    lv_obj_add_event_cb(s_side_btns[1], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EVO_WATER);
-    lv_obj_add_event_cb(s_side_btns[2], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EVO_EARTH);
-    lv_obj_add_event_cb(s_side_btns[3], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EVO_WIND);
-    lv_obj_add_event_cb(s_side_btns[4], button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EVO_BACK);
-    
-    ESP_LOGI(TAG, "Paneles de acción modulares creados.");
-}
-
-/**
- * @brief Callback que se ejecuta cuando la animación de ocultar termina.
- */
-static void anim_ready_hide_cb(lv_anim_t *a) {
-    lv_obj_add_flag((lv_obj_t *)a->var, LV_OBJ_FLAG_HIDDEN);
-}
-
-/**
- * @brief Lógica para animar la entrada de un panel superior.
- */
-static void animate_panel_in_top(lv_obj_t **buttons) {
-    for (int i = 0; i < NUM_TOP_BUTTONS; i++) {
-        if (buttons[i]) {
-            lv_obj_clear_flag(buttons[i], LV_OBJ_FLAG_HIDDEN);
-            lv_anim_t a;
-            lv_anim_init(&a);
-            lv_anim_set_var(&a, buttons[i]);
-            lv_anim_set_values(&a, lv_obj_get_y(buttons[i]), BUTTON_PADDING);
-            lv_anim_set_time(&a, ANIM_TIME_MS);
-            lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_y);
-            lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
-            lv_anim_set_delay(&a, i * 50);
-            lv_anim_start(&a);
-        }
-    }
-}
-
-/**
- * @brief Lógica para animar la salida de un panel superior.
- */
-static void animate_panel_out_top(lv_obj_t **buttons) {
-    for (int i = 0; i < NUM_TOP_BUTTONS; i++) {
-        if (buttons[i]) {
-            lv_anim_t a;
-            lv_anim_init(&a);
-            lv_anim_set_var(&a, buttons[i]);
-            lv_anim_set_values(&a, lv_obj_get_y(buttons[i]), -BUTTON_SIZE);
-            lv_anim_set_time(&a, ANIM_TIME_MS);
-            lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_y);
-            lv_anim_set_path_cb(&a, lv_anim_path_ease_in);
-            lv_anim_set_delay(&a, i * 50);
-            lv_anim_set_ready_cb(&a, anim_ready_hide_cb);
-            lv_anim_start(&a);
-        }
-    }
-}
-
-/**
- * @brief Lógica para animar la entrada de un panel lateral.
- */
-static void animate_panel_in_side(lv_obj_t **buttons) {
-    for (int i = 0; i < NUM_SIDE_BUTTONS; i++) {
-        if (buttons[i]) {
-            lv_obj_clear_flag(buttons[i], LV_OBJ_FLAG_HIDDEN);
-            lv_anim_t a;
-            lv_anim_init(&a);
-            lv_anim_set_var(&a, buttons[i]);
-            lv_anim_set_values(&a, lv_obj_get_x(buttons[i]), BUTTON_PADDING);
-            lv_anim_set_time(&a, ANIM_TIME_MS);
-            lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_x);
-            lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
-            lv_anim_set_delay(&a, i * 50);
-            lv_anim_start(&a);
-        }
-    }
-}
-
-/**
- * @brief Lógica para animar la salida de un panel lateral.
- */
-static void animate_panel_out_side(lv_obj_t **buttons) {
-    for (int i = 0; i < NUM_SIDE_BUTTONS; i++) {
-        if (buttons[i]) {
-            lv_anim_t a;
-            lv_anim_init(&a);
-            lv_anim_set_var(&a, buttons[i]);
-            lv_anim_set_values(&a, lv_obj_get_x(buttons[i]), -BUTTON_SIZE);
-            lv_anim_set_time(&a, ANIM_TIME_MS);
-            lv_anim_set_exec_cb(&a, (lv_anim_exec_xcb_t)lv_obj_set_x);
-            lv_anim_set_path_cb(&a, lv_anim_path_ease_in);
-            lv_anim_set_delay(&a, i * 50);
-            lv_anim_set_ready_cb(&a, anim_ready_hide_cb);
-            lv_anim_start(&a);
-        }
-    }
-}
-
-/**
- * @brief Callback del temporizador de auto-ocultado.
- */
-static void timer_auto_hide_callback(lv_timer_t *timer) {
-    ESP_LOGI(TAG, "Temporizador de auto-ocultado disparado.");
-    if (s_panel_state == PANEL_STATE_PLAYER_VISIBLE) animate_panel_out_top(s_player_btns);
-    if (s_panel_state == PANEL_STATE_ADMIN_VISIBLE) animate_panel_out_top(s_admin_btns);
-    if (s_panel_state == PANEL_STATE_CONFIG_VISIBLE) animate_panel_out_top(s_config_btns);
-    if (s_panel_state == PANEL_STATE_SIDE_VISIBLE) animate_panel_out_side(s_side_btns);
-    s_panel_state = PANEL_STATE_HIDDEN;
-    s_hide_timer = NULL;
-}
-
-/**
- * @brief Máquina de estados que gestiona la visibilidad de los paneles según los gestos.
- */
-void ui_actions_panel_handle_gesture(lv_dir_t dir, lv_coord_t start_x, lv_coord_t start_y) {
-    if (s_hide_timer) {
-        lv_timer_reset(s_hide_timer);
-    } else {
-        s_hide_timer = lv_timer_create(timer_auto_hide_callback, PANEL_AUTO_HIDE_DELAY, NULL);
-        lv_timer_set_repeat_count(s_hide_timer, 1);
-    }
-
-    switch(s_panel_state) {
-        case PANEL_STATE_HIDDEN:
-            if (dir == LV_DIR_BOTTOM && start_y < EDGE_SWIPE_THRESHOLD) {
-                animate_panel_in_top(s_player_btns);
-                s_panel_state = PANEL_STATE_PLAYER_VISIBLE;
-            } else if (dir == LV_DIR_RIGHT && start_x < EDGE_SWIPE_THRESHOLD) {
-                animate_panel_in_side(s_side_btns);
-                s_panel_state = PANEL_STATE_SIDE_VISIBLE;
-            }
-            break;
-
-        case PANEL_STATE_PLAYER_VISIBLE:
-            if (dir == LV_DIR_BOTTOM) {
-                animate_panel_out_top(s_player_btns);
-                animate_panel_in_top(s_admin_btns);
-                s_panel_state = PANEL_STATE_ADMIN_VISIBLE;
-            } else if (dir == LV_DIR_TOP) {
-                animate_panel_out_top(s_player_btns);
-                s_panel_state = PANEL_STATE_HIDDEN;
-            }
-            break;
-
-        case PANEL_STATE_ADMIN_VISIBLE:
-            if (dir == LV_DIR_BOTTOM) {
-                animate_panel_out_top(s_admin_btns);
-                animate_panel_in_top(s_config_btns);
-                s_panel_state = PANEL_STATE_CONFIG_VISIBLE;
-            } else if (dir == LV_DIR_TOP) {
-                animate_panel_out_top(s_admin_btns);
-                s_panel_state = PANEL_STATE_HIDDEN;
-            }
-            break;
-            
-        case PANEL_STATE_CONFIG_VISIBLE:
-            if (dir == LV_DIR_TOP) {
-                animate_panel_out_top(s_config_btns);
-                s_panel_state = PANEL_STATE_HIDDEN;
-            }
-            break;
-        
-        case PANEL_STATE_SIDE_VISIBLE:
-            if (dir == LV_DIR_LEFT) {
-                animate_panel_out_side(s_side_btns);
-                s_panel_state = PANEL_STATE_HIDDEN;
-            }
-            break;
-    }
-}
-
-/**
- * @brief Callback para todos los eventos de clic en los botones de acción.
- */
-static void button_event_cb(lv_event_t *e) {
-    if (s_hide_timer) {
-        lv_timer_reset(s_hide_timer);
-    }
-    diymon_action_id_t action_id = (diymon_action_id_t)(intptr_t)lv_event_get_user_data(e);
-    execute_diymon_action(action_id);
-}
---- END OF FILE: .\components\ui_panels\action_panels.c ---
-
---- START OF FILE: .\components\ui_panels\CMakeLists.txt ---
-# Fichero: ./components/diymon_ui_panels/CMakeLists.txt
-# Fecha: 14/08/2025 - 10:15 am
-# Último cambio: Desactivado el componente para evitar conflictos de compilación.
-# Descripción: Fichero de compilación para el componente de paneles de la UI. Se ha comentado su contenido para excluir este componente obsoleto del proceso de compilación y resolver errores de identificadores no declarados y dependencias incorrectas.
-
-# idf_component_register(
-#     SRCS "action_panels.c"
-#     INCLUDE_DIRS "include"
-#     
-#     REQUIRES 
-#         lvgl
-#         diymon_ui
-#         log
-# )
---- END OF FILE: .\components\ui_panels\CMakeLists.txt ---
 
 --- START OF FILE: .\components\web_server\CMakeLists.txt ---
 # Fecha: 16/08/2025 - 09:29 
@@ -14745,10 +14402,10 @@ endmenu
 --- END OF FILE: .\main\Kconfig.projbuild ---
 
 --- START OF FILE: .\main\main.c ---
-/* Fecha: 17/08/2025 - 02:51  */
+/* Fecha: 17/08/2025 - 03:40  */
 /* Fichero: main/main.c */
-/* Último cambio: Actualizadas las inclusiones y llamadas a funciones para reflejar la refactorización de la UI a subdirectorios (core/, screens/). */
-/* Descripción: Orquestador principal. Se han corregido las rutas de inclusión y los nombres de funciones para los módulos de pantallas y gestión de estado (e.g., 'ui_config_screen.h' -> 'screens/config.h'), resolviendo los errores de compilación 'undefined reference' tras la reorganización de la UI. */
+/* Último cambio: Corregida la llamada a la función de la pantalla de configuración para que coincida con la refactorización. */
+/* Descripción: Orquestador principal. Se ha reemplazado la llamada a la función obsoleta 'config_screen_show' por la nueva 'config_show' en los modos de servicio. Esto resuelve el error de compilación 'implicit declaration of function' que impedía que el proyecto compilara. */
 
 #include <stdio.h>
 #include <string.h>
@@ -14861,8 +14518,8 @@ static void run_main_application_mode(void) {
 }
 
 static void run_headless_wifi_portal_mode(void) { bsp_init_minimal_headless(); bsp_wifi_init_stack(); wifi_portal_start(); }
-static void run_file_server_mode(void) { bsp_init_service_mode(); init_lvgl_for_service_screen(); if (lvgl_port_lock(0)) { config_screen_show(); state_manager_init(); lvgl_port_unlock(); } display_waiting_for_network_on_screen(); bsp_wifi_init_stack(); bsp_wifi_init_sta_from_nvs(); bool ip_ok = bsp_wifi_wait_for_ip(15000); char ip_addr_buffer[16] = "N/A"; if (ip_ok) { bsp_wifi_get_ip(ip_addr_buffer); } else { bsp_wifi_start_ap(); } display_network_status_on_screen(ip_ok, ip_addr_buffer); web_server_start(); }
-static void run_wifi_portal_mode(void) { bsp_init_service_mode(); init_lvgl_for_service_screen(); if (lvgl_port_lock(0)) { config_screen_show(); state_manager_init(); lvgl_port_unlock(); } display_waiting_for_network_on_screen(); vTaskDelay(pdMS_TO_TICKS(1500)); display_network_status_on_screen(false, NULL); bsp_wifi_init_stack(); wifi_portal_start(); }
+static void run_file_server_mode(void) { bsp_init_service_mode(); init_lvgl_for_service_screen(); if (lvgl_port_lock(0)) { config_show(); state_manager_init(); lvgl_port_unlock(); } display_waiting_for_network_on_screen(); bsp_wifi_init_stack(); bsp_wifi_init_sta_from_nvs(); bool ip_ok = bsp_wifi_wait_for_ip(15000); char ip_addr_buffer[16] = "N/A"; if (ip_ok) { bsp_wifi_get_ip(ip_addr_buffer); } else { bsp_wifi_start_ap(); } display_network_status_on_screen(ip_ok, ip_addr_buffer); web_server_start(); }
+static void run_wifi_portal_mode(void) { bsp_init_service_mode(); init_lvgl_for_service_screen(); if (lvgl_port_lock(0)) { config_show(); state_manager_init(); lvgl_port_unlock(); } display_waiting_for_network_on_screen(); vTaskDelay(pdMS_TO_TICKS(1500)); display_network_status_on_screen(false, NULL); bsp_wifi_init_stack(); wifi_portal_start(); }
 static bool check_file_server_mode_flag(void) { nvs_handle_t nvs; esp_err_t err = nvs_open("storage", NVS_READONLY, &nvs); if (err != ESP_OK) return false; char flag[8] = {0}; size_t len = sizeof(flag); err = nvs_get_str(nvs, "file_server", flag, &len); nvs_close(nvs); return (err == ESP_OK && strcmp(flag, "1") == 0); }
 static void erase_file_server_mode_flag(void) { nvs_handle_t nvs; if (nvs_open("storage", NVS_READWRITE, &nvs) == ESP_OK) { nvs_erase_key(nvs, "file_server"); nvs_commit(nvs); nvs_close(nvs); } }
 static void init_lvgl_for_service_screen(void) { const lvgl_port_cfg_t c = ESP_LVGL_PORT_INIT_CONFIG(); lvgl_port_init(&c); const lvgl_port_display_cfg_t d = { .io_handle=bsp_get_panel_io_handle(), .panel_handle=bsp_get_display_handle(), .buffer_size=bsp_get_display_buffer_size(), .double_buffer=1, .hres=bsp_get_display_hres(), .vres=bsp_get_display_vres(), .flags={.swap_bytes=true}}; lv_disp_t* disp=lvgl_port_add_disp(&d); const lvgl_port_touch_cfg_t t = {.disp=disp, .handle=bsp_get_touch_handle()}; lvgl_port_add_touch(&t); }
