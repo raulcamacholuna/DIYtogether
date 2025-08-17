@@ -8813,11 +8813,10 @@ void action_system_reset_all(void);
 --- END OF FILE: .\components\ui\actions\action_system.h ---
 
 --- START OF FILE: .\components\ui\buttons\btn_1.c ---
-/* Fecha: 17/08/2025 - 01:18 
-# Fichero: components/ui/buttons/btn_1.c
-# Último cambio: Implementación del módulo para el botón 'Comer' (BTN_1) como parte de la refactorización.
-# Descripción: Este fichero encapsula toda la lógica para el botón 'Comer': su creación, la asignación del icono, el posicionamiento inicial y la conexión de su evento de clic a la acción ACTION_ID_COMER. Esto elimina la dependencia de ui_actions_panel.c y ui.c para este botón específico.
-*/
+/* Fecha: 17/08/2025 - 07:11  */
+/* Fichero: components/ui/buttons/btn_1.c */
+/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
+/* Descripción: Se ha corregido un error de posicionamiento del botón que impedía su correcta visualización. Se ha reemplazado la lógica de posicionamiento absoluto (lv_obj_set_pos) y ocultación explícita por un alineamiento relativo (lv_obj_align) dentro de su panel padre. Esto soluciona el problema por el cual el botón no aparecía al desplegarse el panel de acciones. */
 #include "btn_1.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
@@ -8826,6 +8825,7 @@ void action_system_reset_all(void);
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
 #define BUTTON_PADDING 10
+static const char *TAG = "BTN_1";
 
 // --- Variable estática para el manejador del botón ---
 static lv_obj_t *s_btn_1_handle = NULL;
@@ -8838,6 +8838,7 @@ static lv_obj_t *s_btn_1_handle = NULL;
 static void btn_1_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_PRESSED) {
+        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de comer.");
         execute_diymon_action(ACTION_ID_COMER);
     }
 }
@@ -8857,16 +8858,22 @@ void btn_1_create(lv_obj_t *parent) {
 
     // --- Icono del botón ---
     lv_obj_t *img = lv_img_create(s_btn_1_handle);
-    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_EAT));
+    const lv_img_dsc_t* icon_src = ui_assets_get_icon(ASSET_ICON_EAT);
+    if (icon_src) {
+        lv_img_set_src(img, icon_src);
+    } else {
+        ESP_LOGE(TAG, "Fallo al cargar el icono 'ASSET_ICON_EAT'.");
+    }
     lv_obj_center(img);
 
-    // --- Posición inicial (para animación de entrada) ---
-    // El índice de este botón es 0 en su panel.
-    lv_obj_set_pos(s_btn_1_handle, (BUTTON_SIZE + BUTTON_PADDING) * 0, -BUTTON_SIZE);
-    lv_obj_add_flag(s_btn_1_handle, LV_OBJ_FLAG_HIDDEN);
+    // --- Posición DENTRO de su panel padre ---
+    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
+    lv_obj_align(s_btn_1_handle, LV_ALIGN_LEFT_MID, (BUTTON_SIZE + BUTTON_PADDING) * 0, 0);
 
     // --- Conexión del evento ---
     lv_obj_add_event_cb(s_btn_1_handle, btn_1_event_cb, LV_EVENT_PRESSED, NULL);
+    
+    ESP_LOGI(TAG, "Botón 'Comer' (BTN_1) creado y posicionado dentro de su panel.");
 }
 
 /**
