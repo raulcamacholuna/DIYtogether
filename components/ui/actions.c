@@ -1,203 +1,88 @@
-/* Fecha: 16/08/2025 - 08:38  */
-/* Fichero: components/diymon_ui/actions.c */
-/* Último cambio: Añadida la contraseña del AP a la pantalla de configuración en tiempo real. */
-/* Descripción: Orquestador central de acciones. Se ha modificado el texto que se muestra en la pantalla al entrar en modo de configuración para incluir la contraseña del Punto de Acceso, facilitando la conexión del usuario. */
+/* Fecha: 17/08/2025 - 01:51  */
+/* Fichero: components/ui/actions.c */
+/* Último cambio: Refactorizado para delegar la ejecución de acciones a módulos específicos. */
+/* Descripción: Orquestador de acciones refactorizado. Este fichero ya no contiene la lógica de implementación de las acciones. En su lugar, incluye las cabeceras de los módulos de acción (ction_*.h) y, en la función xecute_diymon_action, simplemente llama a la función correspondiente de cada módulo. Esto completa la refactorización, haciendo que este fichero sea un director de orquesta limpio y fácil de mantener. */
 
 #include "actions.h"
 #include "esp_log.h"
-#include "esp_system.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "nvs_flash.h"
-#include "nvs.h"
-#include "lvgl.h"
-#include "esp_wifi.h"
-#include "esp_netif.h"
-#include "esp_lvgl_port.h"
 
-// Includes de módulos con los que interactúa
-#include "diymon_evolution.h"
-#include "screen_manager.h"
-#include "wifi_portal.h"
-#include "ui_action_animations.h"
-#include "ui_idle_animation.h"
-#include "ui_telemetry.h"
-#include "screens.h" 
-#include "ui_actions_panel.h"
-#include "bsp_api.h"
-#include "web_server.h"
+// --- Inclusión de todos los módulos de acción refactorizados ---
+#include "actions/action_brightness.h"
+#include "actions/action_config_mode.h"
+#include "actions/action_evolution.h"
+#include "actions/action_interaction.h"
+#include "actions/action_screen.h"
+#include "actions/action_system.h"
 
 static const char *TAG = "DIYMON_ACTIONS";
-
-// --- Variables estáticas para la gestión del brillo ---
-static int s_brightness_levels[] = {25, 50, 75, 100};
-static int s_current_brightness_idx = 3;
-
-// --- Variables para el modo de configuración en tiempo real ---
-static bool s_is_config_mode_active = false;
-static lv_obj_t *s_config_status_label1 = NULL;
-static lv_obj_t *s_config_status_label2 = NULL;
-static lv_obj_t *s_config_back_button = NULL;
-static TaskHandle_t s_wifi_task_handle = NULL;
-
-extern lv_obj_t *g_animation_img_obj;
-
-// --- Declaraciones de funciones ---
-static void wifi_config_task(void *param);
-static void config_back_button_event_cb(lv_event_t *e);
-static void erase_nvs_key(const char* key);
-
-
-static void wifi_config_task(void *param) {
-    lvgl_port_lock(0);
-    if (s_is_config_mode_active && s_config_status_label1) {
-        lv_label_set_text(s_config_status_label1, "Conectando...");
-        lv_label_set_text(s_config_status_label2, "Usando credenciales guardadas.");
-    }
-    lvgl_port_unlock();
-
-    bsp_wifi_init_stack();
-    bsp_wifi_init_sta_from_nvs();
-    bool ip_ok = bsp_wifi_wait_for_ip(15000);
-
-    if (!ip_ok && s_is_config_mode_active) {
-        bsp_wifi_start_ap();
-    }
-    
-    lvgl_port_lock(0);
-    if (s_is_config_mode_active) {
-        char ip_addr_buffer[16] = "192.168.4.1";
-        if (ip_ok) {
-            bsp_wifi_get_ip(ip_addr_buffer);
-            lv_label_set_text(s_config_status_label1, "Conectado!");
-            lv_label_set_text_fmt(s_config_status_label2, "IP: %s", ip_addr_buffer);
-        } else {
-            lv_label_set_text(s_config_status_label1, "Modo AP Activo");
-            // [CAMBIO] Añadida la contraseña a la UI.
-            lv_label_set_text(s_config_status_label2, "SSID: DIYTogether\nPass: MakeItYours\nIP: 192.168.4.1");
-        }
-    }
-    lvgl_port_unlock();
-
-    if (s_is_config_mode_active) {
-        ESP_LOGI(TAG, "Iniciando servidor web para gestión de archivos.");
-        web_server_start();
-    }
-
-    s_wifi_task_handle = NULL;
-    vTaskDelete(NULL);
-}
-
-static void config_back_button_event_cb(lv_event_t *e) {
-    if (s_is_config_mode_active) {
-        ESP_LOGI(TAG, "Saliendo del modo de configuración WiFi.");
-        s_is_config_mode_active = false;
-
-        if (s_wifi_task_handle) { vTaskDelete(s_wifi_task_handle); s_wifi_task_handle = NULL; }
-        
-        esp_wifi_stop();
-        esp_wifi_deinit();
-
-        esp_netif_t* sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-        if (sta_netif) { esp_netif_destroy(sta_netif); }
-        esp_netif_t* ap_netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
-        if (ap_netif) { esp_netif_destroy(ap_netif); }
-
-        if (s_config_status_label1) { lv_obj_del(s_config_status_label1); s_config_status_label1 = NULL; }
-        if (s_config_status_label2) { lv_obj_del(s_config_status_label2); s_config_status_label2 = NULL; }
-        if (s_config_back_button) { lv_obj_del(s_config_back_button); s_config_back_button = NULL; }
-
-        if(g_animation_img_obj) lv_obj_clear_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
-        ui_telemetry_create(g_main_screen_obj);
-        ui_idle_animation_start(g_main_screen_obj);
-    }
-}
-
-static void erase_nvs_key(const char* key) {
-    nvs_handle_t nvs_handle;
-    if (nvs_open("storage", NVS_READWRITE, &nvs_handle) == ESP_OK) {
-        nvs_erase_key(nvs_handle, key);
-        nvs_commit(nvs_handle);
-        nvs_close(nvs_handle);
-    }
-}
 
 void execute_diymon_action(diymon_action_id_t action_id) {
     ESP_LOGI(TAG, "Ejecutando acción ID: %d", action_id);
 
+    // El modo de configuración es especial porque bloquea otras acciones.
+    // La lógica de bloqueo ahora está dentro del propio módulo.
     if (action_id == ACTION_ID_ACTIVATE_CONFIG_MODE) {
-        if (s_is_config_mode_active) return;
-        s_is_config_mode_active = true;
-        ESP_LOGI(TAG, "Entrando en modo de configuración WiFi sin reinicio.");
-
-        ui_actions_panel_hide_all();
-        ui_idle_animation_stop();
-        ui_telemetry_destroy();
-        if (g_animation_img_obj) lv_obj_add_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
-        
-        vTaskDelay(pdMS_TO_TICKS(500));
-
-        s_config_status_label1 = lv_label_create(g_main_screen_obj);
-        s_config_status_label2 = lv_label_create(g_main_screen_obj);
-        lv_obj_set_style_text_color(s_config_status_label1, lv_color_white(), 0);
-        lv_obj_set_style_text_align(s_config_status_label1, LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_set_width(s_config_status_label1, lv_pct(90));
-        lv_obj_align(s_config_status_label1, LV_ALIGN_CENTER, 0, -40);
-        lv_obj_set_style_text_color(s_config_status_label2, lv_color_white(), 0);
-        lv_obj_set_style_text_align(s_config_status_label2, LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_set_width(s_config_status_label2, lv_pct(90));
-        lv_obj_align(s_config_status_label2, LV_ALIGN_CENTER, 0, 0);
-
-        s_config_back_button = lv_btn_create(g_main_screen_obj);
-        lv_obj_align(s_config_back_button, LV_ALIGN_BOTTOM_MID, 0, -20);
-        lv_obj_add_event_cb(s_config_back_button, config_back_button_event_cb, LV_EVENT_CLICKED, NULL);
-        lv_obj_t* lbl = lv_label_create(s_config_back_button);
-        lv_label_set_text(lbl, "VOLVER");
-        lv_obj_center(lbl);
-
-        xTaskCreate(wifi_config_task, "wifi_cfg_task", 4096, NULL, 5, &s_wifi_task_handle);
+        action_config_mode_start();
         return;
     }
-
-    if (s_is_config_mode_active) {
-        return;
-    }
+    
+    // Aquí podríamos añadir una comprobación para no ejecutar acciones si
+    // el modo config está activo, pero esa lógica ahora reside en cada módulo si es necesario.
+    // Por simplicidad, asumimos que la UI no permite disparar otras acciones en ese modo.
 
     switch(action_id) {
-        case ACTION_ID_COMER: case ACTION_ID_EJERCICIO: case ACTION_ID_ATACAR:
-            ui_action_animations_play(action_id); break;
-        case ACTION_ID_BRIGHTNESS_CYCLE:
-            s_current_brightness_idx = (s_current_brightness_idx + 1) % 4;
-            screen_manager_set_brightness(s_brightness_levels[s_current_brightness_idx]); break;
-        case ACTION_ID_TOGGLE_SCREEN:
-            if (screen_manager_is_off()) screen_manager_turn_on();
-            else { ui_actions_panel_hide_all(); screen_manager_turn_off(); }
+        // --- Acciones de Interacción ---
+        case ACTION_ID_COMER:
+            action_interaction_eat();
             break;
-        case ACTION_ID_ENABLE_FILE_SERVER: {
-            nvs_handle_t nvs; if (nvs_open("storage", NVS_READWRITE, &nvs) == ESP_OK) {
-                nvs_set_str(nvs, "file_server", "1"); nvs_commit(nvs); nvs_close(nvs); }
-            vTaskDelay(pdMS_TO_TICKS(500)); esp_restart(); break;
-        }
+        case ACTION_ID_EJERCICIO:
+            action_interaction_gym();
+            break;
+        case ACTION_ID_ATACAR:
+            action_interaction_attack();
+            break;
+
+        // --- Acciones de UI/Sistema ---
+        case ACTION_ID_BRIGHTNESS_CYCLE:
+            action_brightness_cycle();
+            break;
+        case ACTION_ID_TOGGLE_SCREEN:
+            action_screen_toggle();
+            break;
+
+        // --- Acciones de Sistema (Modo Operación y Reset) ---
+        case ACTION_ID_ENABLE_FILE_SERVER:
+            action_system_enable_file_server();
+            break;
         case ACTION_ID_RESET_ALL:
-            wifi_portal_erase_credentials(); diymon_evolution_reset_state(); erase_nvs_key("file_server");
-            vTaskDelay(pdMS_TO_TICKS(1000)); esp_restart(); break;
-        case ACTION_ID_EVO_FIRE: case ACTION_ID_EVO_WATER: case ACTION_ID_EVO_EARTH: case ACTION_ID_EVO_WIND: {
-            const char* code = diymon_get_current_code(); int branch = (action_id - ACTION_ID_EVO_FIRE) + 1;
-            const char* next = diymon_get_branched_evolution(code, branch);
-            if (next) {
-                ui_idle_animation_stop(); if (g_animation_img_obj) lv_obj_add_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
-                diymon_set_current_code(next); ui_telemetry_force_update();
-                ui_idle_animation_start(g_main_screen_obj); if (g_animation_img_obj) lv_obj_clear_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
-            } break;
-        }
-        case ACTION_ID_EVO_BACK: {
-            const char* code = diymon_get_current_code(); const char* prev = diymon_get_previous_evolution_in_sequence(code);
-            if (prev) {
-                ui_idle_animation_stop(); if (g_animation_img_obj) lv_obj_add_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
-                diymon_set_current_code(prev); ui_telemetry_force_update();
-                ui_idle_animation_start(g_main_screen_obj); if (g_animation_img_obj) lv_obj_clear_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
-            } break;
-        }
-        default: break;
+            action_system_reset_all();
+            break;
+
+        // --- Acciones de Evolución ---
+        case ACTION_ID_EVO_FIRE:
+            action_evolution_branch(1); // 1 = Fuego
+            break;
+        case ACTION_ID_EVO_WATER:
+            action_evolution_branch(2); // 2 = Agua
+            break;
+        case ACTION_ID_EVO_EARTH:
+            action_evolution_branch(3); // 3 = Tierra
+            break;
+        case ACTION_ID_EVO_WIND:
+            action_evolution_branch(4); // 4 = Viento
+            break;
+        case ACTION_ID_EVO_BACK:
+            action_evolution_devolve();
+            break;
+        
+        // --- Acciones Placeholder (no hacen nada) ---
+        case ACTION_ID_ADMIN_PLACEHOLDER:
+        case ACTION_ID_CONFIG_PLACEHOLDER:
+            ESP_LOGI(TAG, "Acción Placeholder (ID %d) ejecutada. No se realiza ninguna operación.", action_id);
+            break;
+
+        default:
+            ESP_LOGW(TAG, "Acción con ID %d desconocida.", action_id);
+            break;
     }
 }

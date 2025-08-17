@@ -1,7 +1,7 @@
-# Fecha: 17/08/2025 - 01:17 
+# Fecha: 17/08/2025 - 01:57 
 # Fichero: components/ui/CMakeLists.txt
-# Último cambio: Añadido el subdirectorio 'buttons' a las fuentes y a las rutas de inclusión para soportar la refactorización de los botones.
-# Descripción: Fichero de compilación del componente de la UI. Se ha actualizado para incluir todos los ficheros .c del nuevo subdirectorio 'buttons' en la compilación y para añadir 'buttons' a las rutas de inclusión, permitiendo que el resto del componente pueda acceder a las nuevas cabeceras de los botones modulares.
+# Último cambio: Corregida la sintaxis de CMake para la expansión de variables de la lista de fuentes.
+# Descripción: Se ha corregido la forma en que se pasa la variable de fuentes a idf_component_register. La sintaxis anterior causaba un error de expansión de variable, haciendo que CMake buscara un fichero inexistente '$'. La sintaxis corregida asegura la correcta expansión de la lista de ficheros fuente, resolviendo el error de compilación.
 
 file(GLOB component_sources
     "*.c"
@@ -15,15 +15,16 @@ file(GLOB component_sources
 
 idf_component_register(
     SRCS ${component_sources}
-    INCLUDE_DIRS 
+    INCLUDE_DIRS
         "."
         "buttons"
+        "actions"
     PRIV_INCLUDE_DIRS "."
-    REQUIRES 
+    REQUIRES
         lvgl
         bsp
         core
         screen_manager
         wifi_portal
-        web_server 
+        web_server
 )
