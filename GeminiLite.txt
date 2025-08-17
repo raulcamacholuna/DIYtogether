@@ -66,6 +66,11 @@ build_flags = -D LVGL_VERSION_MAJOR=9
 --- END OF FILE: .\platformio.ini ---
 
 --- START OF FILE: .\README.md ---
+/* Fecha: 17/08/2025 - 02:52  */
+/* Fichero: .\README.md */
+/* Último cambio: Añadida nota aclaratoria en la sección de compilación para reflejar la robustez tras la refactorización de la UI. */
+/* Descripción: Documentación principal del proyecto, guía de inicio y visión general. */
+
 # DIYTogether - Tu Mascota Virtual DIY
 
 ![Ilustración de DIYTogether en acción]([Link a git3.png])
@@ -129,8 +134,10 @@ DIYTogether es un proyecto de mascota virtual open-source basada en hardware ESP
 ### 2. Compilación y Subida del Firmware
 Este proyecto está configurado para ser compilado y subido fácilmente con PlatformIO.
 
+*(Nota: La estructura de componentes ha sido refactorizada para mejorar la modularidad, pero el proceso de compilación con PlatformIO no ha cambiado y sigue siendo el método recomendado.)*
+
 1.  **Clona el repositorio**:
-    `ash
+    ` ash
     git clone [URL de tu repositorio]
     cd DIYtogether
     `
@@ -4675,10 +4682,10 @@ esp_err_t bsp_init_minimal_headless(void) {
 --- END OF FILE: .\components\bsp\WS1.9TS\bsp.c ---
 
 --- START OF FILE: .\components\bsp\CMakeLists.txt ---
-# Fecha: 16/08/2025 - 09:32 
+# Fecha: 17/08/2025 - 02:55 
 # Fichero: components/bsp/CMakeLists.txt
-# Último cambio: Renombrado el componente de 'diymon_bsp' a 'bsp' y corregido un error de copiado.
-# Descripción: Fichero de compilación del Board Support Package (BSP). Se ha corregido la dependencia de 'diymon_ui' a 'ui' para que coincida con el nuevo nombre del componente y se han eliminado referencias a componentes que ya no existen, resolviendo así el error de compilación "Failed to resolve component".
+# Último cambio: Eliminada la dependencia explícita de 'esp_driver_i2c' para resolver un conflicto de compilación.
+# Descripción: Se ha eliminado la dependencia 'esp_driver_i2c' de la lista REQUIRES. Requerir sub-componentes de 'driver' individualmente es una práctica no estándar que puede corromper el árbol de dependencias del build system. El componente 'driver' ya se incluye y proporciona acceso a todas las APIs de controladores necesarias (I2C, SPI, etc.), solucionando el fallo de compilación en el componente 'esp_twai'.
 
 set(BOARD_SUBDIR "WS1.9TS")
 
@@ -4697,7 +4704,6 @@ idf_component_register(
         fatfs
         esp_adc
         esp_wifi
-        esp_driver_i2c
         nvs_flash
         lvgl
         esp_lvgl_port
@@ -8272,10 +8278,10 @@ void action_brightness_cycle(void);
 --- END OF FILE: .\components\ui\actions\action_brightness.h ---
 
 --- START OF FILE: .\components\ui\actions\action_config_mode.c ---
-/* Fecha: 17/08/2025 - 01:50  */
+/* Fecha: 17/08/2025 - 02:33  */
 /* Fichero: components/ui/actions/action_config_mode.c */
-/* Último cambio: Implementación de la lógica del modo de configuración, movida desde 'actions.c'. */
-/* Descripción: Módulo que gestiona el estado y la UI del modo de configuración WiFi. Contiene todas las variables de estado, la tarea de red y los callbacks de UI relacionados, encapsulando esta compleja funcionalidad. */
+/* Último cambio: Actualizadas las llamadas al gestor de telemetría para reflejar la refactorización a ui/core/. */
+/* Descripción: Módulo que gestiona el modo de configuración WiFi. Se han actualizado las llamadas a las funciones de telemetría (de ui_telemetry_* a telemetry_manager_*) para mantener la consistencia con la nueva estructura del núcleo de la UI. */
 
 #include "actions/action_config_mode.h"
 #include "esp_log.h"
@@ -8286,7 +8292,7 @@ void action_brightness_cycle(void);
 #include "esp_lvgl_port.h"
 #include "bsp_api.h"
 #include "web_server.h"
-#include "ui_telemetry.h"
+#include "telemetry_manager.h"
 #include "screens.h"
 #include "ui_idle_animation.h"
 #include "ui_actions_panel.h"
@@ -8362,7 +8368,7 @@ void action_config_mode_start(void) {
 
     ui_actions_panel_hide_all();
     ui_idle_animation_stop();
-    ui_telemetry_destroy();
+    telemetry_manager_destroy();
     if (g_animation_img_obj) lv_obj_add_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
     
     vTaskDelay(pdMS_TO_TICKS(500));
@@ -8408,7 +8414,7 @@ void action_config_mode_stop(void) {
         if (s_config_back_button) { lv_obj_del(s_config_back_button); s_config_back_button = NULL; }
 
         if(g_animation_img_obj) lv_obj_clear_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
-        ui_telemetry_create(g_main_screen_obj);
+        telemetry_manager_create(g_main_screen_obj);
         ui_idle_animation_start(g_main_screen_obj);
     }
 }
@@ -8451,15 +8457,15 @@ void action_config_mode_stop(void);
 --- END OF FILE: .\components\ui\actions\action_config_mode.h ---
 
 --- START OF FILE: .\components\ui\actions\action_evolution.c ---
-/* Fecha: 17/08/2025 - 02:20  */
+/* Fecha: 17/08/2025 - 02:34  */
 /* Fichero: components/ui/actions/action_evolution.c */
-/* Último cambio: Añadido el include 'ui_telemetry.h' para resolver un error de compilación por declaración implícita. */
-/* Descripción: Módulo que maneja los cambios de estado del Diymon. Se ha corregido un error de compilación añadiendo la cabecera necesaria para que la función 'ui_telemetry_force_update' sea visible, permitiendo que la UI se actualice correctamente tras una evolución. */
+/* Último cambio: Actualizadas las llamadas al gestor de telemetría para reflejar la refactorización a ui/core/. */
+/* Descripción: Módulo que maneja los cambios de estado del Diymon. Se ha actualizado para llamar a telemetry_manager_update_values en lugar de la antigua función, adaptándose a la nueva estructura del núcleo de la UI. */
 
 #include "actions/action_evolution.h"
 #include "diymon_evolution.h"
 #include "ui_idle_animation.h"
-#include "ui_telemetry.h" // [CORRECCIÓN] Include faltante
+#include "telemetry_manager.h" // Actualizado desde ui_telemetry.h
 #include "ui_action_animations.h" // Para g_animation_img_obj
 #include "screens.h"              // Para g_main_screen_obj
 #include "esp_log.h"
@@ -8478,7 +8484,7 @@ static void update_ui_after_evolution_change(void) {
     }
 
     // Fuerza la actualización inmediata de la telemetría para que muestre el nuevo código EVO.
-    ui_telemetry_update_values(100); // Se asume 100% de batería, ya que no se recalcula aquí. La tarea principal lo corregirá.
+    telemetry_manager_update_values(100); // Se asume 100% de batería, ya que no se recalcula aquí. La tarea principal lo corregirá.
     
     // Inicia la nueva animación de reposo, que cargará los assets del nuevo código de evolución.
     ui_idle_animation_start(g_main_screen_obj);
@@ -10330,6 +10336,834 @@ lv_obj_t* evo_5_get_handle(void);
 
 --- END OF FILE: .\components\ui\buttons\evo_5.h ---
 
+--- START OF FILE: .\components\ui\core\state_manager.c ---
+/* Fecha: 17/08/2025 - 02:30  */
+/* Fichero: components/ui/core/state_manager.c */
+/* Último cambio: Movido a ui/core/ y renombrado de ui_state_manager.c como parte de la refactorización. */
+/* Descripción: Implementación del gestor de estado de la UI. Contiene la lógica para manejar la inactividad, el atenuado y apagado de la pantalla, y el patrón de despertar. */
+
+#include "state_manager.h"
+#include "screen_manager.h"
+#include "nvs_flash.h"
+#include "nvs.h"
+#include "esp_log.h"
+
+static const char *TAG = "UI_STATE_MANAGER";
+
+// --- Tipos y variables de estado internas ---
+typedef enum {
+    WAKE_STATE_OFF,
+    WAKE_STATE_PRIMED,
+} wake_up_state_t;
+
+static bool s_is_dimmed = false;
+static int s_user_brightness = 100;
+static bool s_user_brightness_known = false;
+static wake_up_state_t s_wake_state = WAKE_STATE_OFF;
+static uint8_t s_wake_click_count = 0;
+static lv_timer_t *s_double_click_timer = NULL;
+static lv_timer_t *s_wake_prime_timer = NULL;
+
+// --- Funciones de ayuda y callbacks ---
+
+static void read_user_brightness_from_nvs(void) {
+    if (s_user_brightness_known) return;
+    nvs_handle_t nvs_handle;
+    if (nvs_open("storage", NVS_READONLY, &nvs_handle) == ESP_OK) {
+        nvs_get_i32(nvs_handle, "brightness", (int32_t*)&s_user_brightness);
+        nvs_close(nvs_handle);
+        s_user_brightness_known = true;
+    }
+}
+
+static void double_click_timer_cb(lv_timer_t * timer) {
+    s_wake_click_count = 0;
+    s_double_click_timer = NULL;
+}
+
+static void wake_prime_timer_cb(lv_timer_t * timer) {
+    s_wake_state = WAKE_STATE_OFF;
+    s_wake_click_count = 0;
+    s_wake_prime_timer = NULL;
+}
+
+static void screen_touch_event_cb(lv_event_t * e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    lv_disp_t * disp = lv_display_get_default();
+    if (!disp) return;
+    
+    lv_display_trigger_activity(disp);
+
+    if (code == LV_EVENT_PRESSED && s_is_dimmed && !screen_manager_is_off()) {
+        read_user_brightness_from_nvs();
+        screen_manager_set_brightness(s_user_brightness);
+        s_is_dimmed = false;
+        return;
+    }
+
+    if (code == LV_EVENT_CLICKED && screen_manager_is_off()) {
+        if (s_wake_state == WAKE_STATE_OFF) {
+            s_wake_click_count++;
+            if (s_wake_click_count == 1) {
+                s_double_click_timer = lv_timer_create(double_click_timer_cb, 500, NULL);
+                lv_timer_set_repeat_count(s_double_click_timer, 1);
+            } else if (s_wake_click_count == 2) {
+                if (s_double_click_timer) lv_timer_del(s_double_click_timer);
+                s_double_click_timer = NULL;
+                s_wake_state = WAKE_STATE_PRIMED;
+                s_wake_click_count = 0;
+                s_wake_prime_timer = lv_timer_create(wake_prime_timer_cb, 3000, NULL);
+                lv_timer_set_repeat_count(s_wake_prime_timer, 1);
+            }
+        } else if (s_wake_state == WAKE_STATE_PRIMED) {
+            s_wake_click_count++;
+            if (s_wake_click_count == 1) {
+                s_double_click_timer = lv_timer_create(double_click_timer_cb, 500, NULL);
+                lv_timer_set_repeat_count(s_double_click_timer, 1);
+            } else if (s_wake_click_count >= 2) {
+                if (s_double_click_timer) lv_timer_del(s_double_click_timer);
+                if (s_wake_prime_timer) lv_timer_del(s_wake_prime_timer);
+                s_double_click_timer = NULL;
+                s_wake_prime_timer = NULL;
+                screen_manager_turn_on();
+                s_is_dimmed = false;
+                s_wake_state = WAKE_STATE_OFF;
+                s_wake_click_count = 0;
+            }
+        }
+    }
+}
+
+static void inactivity_timer_cb(lv_timer_t * timer) {
+    lv_disp_t * disp = lv_display_get_default();
+    if (!disp) return;
+    
+    uint32_t inactivity_ms = lv_display_get_inactive_time(disp);
+    bool is_off = screen_manager_is_off();
+
+    if (inactivity_ms < 30000 && s_is_dimmed) {
+        s_is_dimmed = false;
+    }
+
+    if (!is_off && inactivity_ms > 60000) {
+        screen_manager_turn_off();
+        s_is_dimmed = false;
+    } else if (!is_off && !s_is_dimmed && inactivity_ms > 30000) {
+        read_user_brightness_from_nvs();
+        screen_manager_set_brightness(10);
+        s_is_dimmed = true;
+    }
+}
+
+// --- Función de inicialización pública ---
+void state_manager_init(void) {
+    lv_timer_create(inactivity_timer_cb, 5000, NULL);
+    lv_obj_t * scr = lv_screen_active();
+    if (scr) {
+        lv_obj_add_event_cb(scr, screen_touch_event_cb, LV_EVENT_ALL, NULL);
+    }
+    ESP_LOGI(TAG, "Gestor de estado de UI inicializado. Manejadores de inactividad activos.");
+}
+
+--- END OF FILE: .\components\ui\core\state_manager.c ---
+
+--- START OF FILE: .\components\ui\core\state_manager.h ---
+/* Fecha: 17/08/2025 - 02:29  */
+/* Fichero: components/ui/core/state_manager.h */
+/* Último cambio: Movido a ui/core/ y renombrado de ui_state_manager.h como parte de la refactorización. */
+/* Descripción: Interfaz pública del gestor de estado de la UI. Responsable de manejar la inactividad, atenuado/apagado de pantalla y lógica de despertar. */
+
+#ifndef STATE_MANAGER_H
+#define STATE_MANAGER_H
+
+#include "lvgl.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Inicializa el gestor de estado de la UI.
+ * 
+ * Configura los temporizadores y callbacks necesarios para gestionar la
+ * inactividad, el atenuado/apagado de la pantalla y la lógica de despertar.
+ * Debe ser llamado una vez después de que la UI principal haya sido creada.
+ */
+void state_manager_init(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // STATE_MANAGER_H
+
+--- END OF FILE: .\components\ui\core\state_manager.h ---
+
+--- START OF FILE: .\components\ui\core\telemetry_manager.c ---
+/* Fecha: 17/08/2025 - 02:31  */
+/* Fichero: components/ui/core/telemetry_manager.c */
+/* Último cambio: Movido a ui/core/ y renombrado de ui_telemetry.c, actualizando nombres de funciones para consistencia. */
+/* Descripción: Implementación del módulo de telemetría de la UI. Ahora es un receptor pasivo de datos, actualizando los labels cuando la función 'telemetry_manager_update_values' es llamada por una tarea externa. */
+
+#include "telemetry_manager.h"
+#include "esp_log.h"
+#include "diymon_evolution.h"
+#include "esp_lvgl_port.h" // Necesario para el bloqueo thread-safe
+
+static const char *TAG = "TELEMETRY_MANAGER";
+
+/* Variables estáticas para los objetos de la UI */
+static lv_obj_t *s_battery_label = NULL;
+static lv_obj_t *s_evo_label = NULL;
+
+/**
+ * @brief Crea y configura los elementos de la UI para la telemetría.
+ */
+void telemetry_manager_create(lv_obj_t *parent) {
+    if (!parent) {
+        ESP_LOGE(TAG, "El objeto padre es nulo. No se puede crear la telemetría.");
+        return;
+    }
+
+    // Contenedor para la telemetría en la esquina inferior derecha
+    lv_obj_t * telemetry_cont = lv_obj_create(parent);
+    lv_obj_remove_style_all(telemetry_cont);
+    lv_obj_set_size(telemetry_cont, 120, 50);
+    lv_obj_align(telemetry_cont, LV_ALIGN_BOTTOM_RIGHT, -5, -5);
+    lv_obj_set_flex_flow(telemetry_cont, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(telemetry_cont, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    // Etiqueta para el nivel de batería
+    s_battery_label = lv_label_create(telemetry_cont);
+    lv_obj_set_style_text_color(s_battery_label, lv_color_white(), 0);
+    lv_label_set_text(s_battery_label, "Bateria...");
+
+    // Etiqueta para el código de evolución
+    s_evo_label = lv_label_create(telemetry_cont);
+    lv_obj_set_style_text_color(s_evo_label, lv_color_white(), 0);
+    lv_label_set_text(s_evo_label, "EVO: ...");
+    
+    // Forzar una actualización inicial con valores por defecto
+    telemetry_manager_update_values(100);
+    ESP_LOGI(TAG, "Módulo de telemetría creado.");
+}
+
+/**
+ * @brief Destruye los recursos asociados al módulo de telemetría.
+ */
+void telemetry_manager_destroy(void) {
+    // Ya no hay temporizador que borrar. LVGL se encarga de los objetos hijos.
+    s_battery_label = NULL;
+    s_evo_label = NULL;
+    ESP_LOGI(TAG, "Módulo de telemetría destruido.");
+}
+
+/**
+ * @brief Actualiza los valores mostrados en los labels de telemetría.
+ */
+void telemetry_manager_update_values(uint8_t battery_percentage) {
+    // Bloquear el mutex de LVGL ya que esta función será llamada desde otra tarea
+    if (lvgl_port_lock(0)) {
+        if (s_battery_label) {
+            lv_label_set_text_fmt(s_battery_label, "%s %d%%", LV_SYMBOL_BATTERY_FULL, battery_percentage);
+        }
+        if (s_evo_label) {
+            const char* evo_code = diymon_get_current_code();
+            lv_label_set_text_fmt(s_evo_label, "EVO: %s", evo_code ? evo_code : "N/A");
+        }
+        lvgl_port_unlock();
+    }
+}
+
+--- END OF FILE: .\components\ui\core\telemetry_manager.c ---
+
+--- START OF FILE: .\components\ui\core\telemetry_manager.h ---
+/* Fecha: 17/08/2025 - 02:31  */
+/* Fichero: components/ui/core/telemetry_manager.h */
+/* Último cambio: Movido a ui/core/ y renombrado de ui_telemetry.h como parte de la refactorización. */
+/* Descripción: Interfaz del módulo de telemetría de la UI. Expone funciones para crear, destruir y actualizar los elementos visuales de telemetría (batería, EVO). */
+
+#ifndef TELEMETRY_MANAGER_H
+#define TELEMETRY_MANAGER_H
+
+#include <lvgl.h>
+#include <stdint.h> // for uint8_t
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Crea y configura los elementos de la UI para la telemetría.
+ * 
+ * @param parent El objeto padre sobre el cual se crearán los labels.
+ */
+void telemetry_manager_create(lv_obj_t *parent);
+
+/**
+ * @brief Destruye los recursos asociados al módulo de telemetría.
+ */
+void telemetry_manager_destroy(void);
+
+/**
+ * @brief Actualiza los valores mostrados en los labels de telemetría.
+ *        Esta función es segura para ser llamada desde otras tareas (thread-safe).
+ * 
+ * @param battery_percentage El nivel de batería actual en porcentaje (0-100).
+ */
+void telemetry_manager_update_values(uint8_t battery_percentage);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // TELEMETRY_MANAGER_H
+
+--- END OF FILE: .\components\ui\core\telemetry_manager.h ---
+
+--- START OF FILE: .\components\ui\core\telemetry_task.c ---
+/* Fecha: 17/08/2025 - 02:32  */
+/* Fichero: components/ui/core/telemetry_task.c */
+/* Último cambio: Movido a ui/core/ y actualizada la llamada al gestor de telemetría para reflejar el cambio de nombre. */
+/* Descripción: Implementa una tarea de FreeRTOS dedicada a leer sensores y empujar los datos a la UI. Se ha actualizado para llamar a `telemetry_manager_update_values` en lugar de `ui_telemetry_update_values`. */
+
+#include "telemetry_task.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_log.h"
+#include "bsp_api.h"
+#include "screen_manager.h"
+#include "telemetry_manager.h" // Actualizado desde ui_telemetry.h
+#include <math.h> // Para sqrtf
+
+static const char *TAG = "TELEMETRY_TASK";
+
+// --- Constantes de configuración de la tarea ---
+#define TELEMETRY_TASK_STACK_SIZE   4096
+#define TELEMETRY_TASK_PRIORITY     5
+#define TELEMETRY_TASK_DELAY_MS     200
+#define SHAKE_THRESHOLD_G           1.5f // Umbral de agitación en G's
+#define UI_UPDATE_INTERVAL_MS       5000 // Actualizar la UI cada 5 segundos
+
+/**
+ * @brief Tarea principal que se ejecuta en segundo plano.
+ */
+static void telemetry_task_main(void *pvParameters) {
+    ESP_LOGI(TAG, "Tarea de telemetría iniciada.");
+
+    uint32_t ui_update_counter = 0;
+    const uint32_t ui_update_ticks = UI_UPDATE_INTERVAL_MS / TELEMETRY_TASK_DELAY_MS;
+
+    while (1) {
+        vTaskDelay(pdMS_TO_TICKS(TELEMETRY_TASK_DELAY_MS));
+
+        // --- Lectura de Sensores ---
+        float acc[3], gyro[3];
+        bsp_imu_read(acc, gyro);
+
+        float voltage;
+        uint16_t adc_val;
+        bsp_battery_get_voltage(&voltage, &adc_val);
+        // Lógica simple para convertir voltaje a porcentaje (ajustar según la curva de la batería)
+        uint8_t battery_percentage = (uint8_t)fmax(0.0, fmin(100.0, (voltage - 3.2) / (4.2 - 3.2) * 100.0));
+
+
+        // --- Lógica de Shake-to-Wake ---
+        float acceleration_magnitude = sqrtf(acc[0] * acc[0] + acc[1] * acc[1] + acc[2] * acc[2]) / 9.81f;
+        if (acceleration_magnitude > SHAKE_THRESHOLD_G) {
+            if (screen_manager_is_off()) {
+                ESP_LOGI(TAG, "¡Agitación detectada! (Magnitud: %.2f G). Despertando pantalla.", acceleration_magnitude);
+                screen_manager_turn_on();
+            }
+        }
+        
+        // --- Actualización de la UI (periódica) ---
+        ui_update_counter++;
+        if (ui_update_counter >= ui_update_ticks) {
+            ui_update_counter = 0;
+            // Empujar los nuevos valores a la UI para que los muestre
+            telemetry_manager_update_values(battery_percentage); // Actualizado desde ui_telemetry_update_values
+        }
+    }
+}
+
+/**
+ * @brief Inicia la tarea de telemetría.
+ */
+void telemetry_task_start(void) {
+    xTaskCreate(
+        telemetry_task_main,
+        "telemetry_task",
+        TELEMETRY_TASK_STACK_SIZE,
+        NULL,
+        TELEMETRY_TASK_PRIORITY,
+        NULL
+    );
+}
+
+--- END OF FILE: .\components\ui\core\telemetry_task.c ---
+
+--- START OF FILE: .\components\ui\core\telemetry_task.h ---
+/* Fecha: 17/08/2025 - 02:31  */
+/* Fichero: components/ui/core/telemetry_task.h */
+/* Último cambio: Movido a ui/core/ como parte de la refactorización. */
+/* Descripción: Interfaz pública para la tarea de telemetría. Esta tarea se ejecuta en segundo plano para leer sensores, actualizar la UI y gestionar la lógica de 'shake-to-wake'. */
+
+#ifndef TELEMETRY_TASK_H
+#define TELEMETRY_TASK_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Inicia la tarea de telemetría en segundo plano.
+ *
+ * Crea y lanza una tarea de FreeRTOS que se encargará de leer periódicamente
+ * los sensores del dispositivo (batería, IMU) y de actualizar la UI con
+ * esta información. También implementa la lógica de 'shake-to-wake'.
+ */
+void telemetry_task_start(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // TELEMETRY_TASK_H
+
+--- END OF FILE: .\components\ui\core\telemetry_task.h ---
+
+--- START OF FILE: .\components\ui\core\ui.c ---
+/* Fecha: 17/08/2025 - 02:29  */
+/* Fichero: components/ui/core/ui.c */
+/* Último cambio: Movido desde la raíz del componente 'ui' como parte de la refactorización. */
+/* Descripción: Orquestador principal de la UI. Inicializa las pantallas y los sistemas subyacentes. Su movimiento al subdirectorio 'core' centraliza la lógica fundamental de la interfaz. */
+
+#include "ui.h"
+#include "screens.h"
+#include "ui_action_animations.h"
+#include "esp_log.h"
+
+extern lv_obj_t *g_main_screen_obj; 
+
+static const char *TAG = "DIYMON_UI_MAIN";
+
+// La función 'ui_connect_actions' y su 'button_event_cb' han sido eliminados.
+// La conexión de eventos ahora está encapsulada dentro de cada módulo de botón.
+
+void ui_preinit(void) {
+    ESP_LOGI(TAG, "Pre-inicializando UI: reservando buffer de animación...");
+    ui_action_animations_preinit_buffer();
+}
+
+void ui_init(void) {
+    create_screens();
+    
+    if (g_main_screen_obj) {
+        // La llamada a ui_connect_actions() ha sido eliminada.
+        lv_obj_add_event_cb(g_main_screen_obj, (lv_event_cb_t)delete_screen_main, LV_EVENT_DELETE, NULL);
+    }
+    
+    lv_screen_load(g_main_screen_obj);
+    ESP_LOGI(TAG, "UI modularizada y lista.");
+}
+
+--- END OF FILE: .\components\ui\core\ui.c ---
+
+--- START OF FILE: .\components\ui\core\ui.h ---
+/* Fecha: 17/08/2025 - 02:29  */
+/* Fichero: components/ui/core/ui.h */
+/* Último cambio: Movido a ui/core/ como parte de la refactorización del núcleo de la UI. */
+/* Descripción: Interfaz PÚBLICA del componente de la UI. Define las funciones de alto nivel para controlar la UI desde el exterior. Se ha movido a este subdirectorio para encapsular la lógica principal. */
+
+#ifndef UI_H
+#define UI_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// --- DEFINICIONES COMPARTIDAS ---
+
+// Enum para identificar las pantallas. Se mantiene aquí porque es parte de la
+// interfaz pública para, potencialmente, cambiar de pantalla.
+enum ScreensEnum {
+    SCREEN_ID_MAIN = 1,
+};
+
+
+// --- FUNCIONES PÚBLICAS DE LA UI ---
+
+/**
+ * @brief Pre-inicializa la UI reservando los buffers de memoria más grandes.
+ *
+ * Esta función debe llamarse al principio de app_main para evitar la fragmentación
+ * de la memoria RAM, asegurando que la asignación de memoria más grande (el buffer
+ * de animación) tenga éxito.
+ */
+void ui_preinit(void);
+
+/**
+ * @brief Inicializa y configura toda la interfaz de usuario.
+ *
+ * Esta es la función principal que se debe llamar desde fuera del componente
+ * (por ejemplo, desde main.c) para poner en marcha toda la UI.
+ */
+void ui_init(void);
+
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // UI_H
+
+--- END OF FILE: .\components\ui\core\ui.h ---
+
+--- START OF FILE: .\components\ui\screens\config.c ---
+/* Fecha: 17/08/2025 - 02:49  */
+/* Fichero: components/ui/screens/config.c */
+/* Último cambio: Refactorizado y movido a 'screens/', renombrado de 'ui_config_screen.c'. */
+/* Descripción: Implementación de la pantalla de configuración. Encapsula la lógica de esta vista específica como parte de la refactorización de la UI. */
+
+#include "config.h"
+#include "esp_log.h"
+#include "esp_system.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+static const char *TAG = "UI_CONFIG_SCREEN";
+
+// Declaración externa del descriptor de la imagen de fondo compilada en el firmware.
+// Se espera que este símbolo esté definido en otro fichero .c (ej: BG_config.c).
+extern const lv_img_dsc_t bg_config;
+
+/**
+ * @brief Callback que se ejecuta al presionar el botón de reinicio.
+ */
+static void reset_button_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        ESP_LOGW(TAG, "Botón de reinicio presionado. Reiniciando el dispositivo...");
+        vTaskDelay(pdMS_TO_TICKS(500)); // Pequeña pausa para que el log se envíe
+        esp_restart();
+    }
+}
+
+/**
+ * @brief Crea y muestra la pantalla de configuración estática.
+ */
+void config_screen_show(void) {
+    // Crear una pantalla nueva y limpia
+    lv_obj_t *scr = lv_obj_create(NULL);
+    lv_obj_remove_style_all(scr); // Empezamos sin estilos por defecto
+    lv_obj_set_size(scr, 170, 320);
+
+    // Crear un objeto de imagen para el fondo de pantalla
+    lv_obj_t *bg_img = lv_image_create(scr);
+    lv_image_set_src(bg_img, &bg_config);
+    lv_obj_set_pos(bg_img, 0, 0);
+    lv_obj_add_flag(bg_img, LV_OBJ_FLAG_IGNORE_LAYOUT); // Asegura que no afecte a otros elementos
+
+    // Botón de Reinicio
+    lv_obj_t *btn_reset = lv_btn_create(scr);
+    lv_obj_add_event_cb(btn_reset, reset_button_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_align(btn_reset, LV_ALIGN_BOTTOM_MID, 0, -20); // Centrado abajo con padding
+
+    lv_obj_t *lbl_btn = lv_label_create(btn_reset);
+    lv_label_set_text(lbl_btn, "Reiniciar");
+    lv_obj_center(lbl_btn);
+
+    // Cargar la nueva pantalla
+    lv_screen_load(scr);
+    ESP_LOGI(TAG, "Pantalla de configuración estática con fondo I8 mostrada.");
+}
+
+--- END OF FILE: .\components\ui\screens\config.c ---
+
+--- START OF FILE: .\components\ui\screens\config.h ---
+/* Fecha: 17/08/2025 - 02:48  */
+/* Fichero: components/ui/screens/config.h */
+/* Último cambio: Refactorizado y movido a 'screens/', renombrado de 'ui_config_screen.h'. */
+/* Descripción: Define la interfaz pública para la pantalla de configuración. Encapsula la lógica de esta vista específica como parte de la refactorización de la UI. */
+
+#ifndef CONFIG_H
+#define CONFIG_H
+
+#include "lvgl.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Crea y muestra la pantalla de configuración estática con una imagen de fondo y un botón de reinicio.
+ */
+void config_screen_show(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // CONFIG_H
+
+--- END OF FILE: .\components\ui\screens\config.h ---
+
+--- START OF FILE: .\components\ui\screens\screens.c ---
+/* Fecha: 17/08/2025 - 02:50  */
+/* Fichero: components/ui/screens/screens.c */
+/* Último cambio: Movido a 'screens/' y actualizado para usar el nuevo 'telemetry_manager'. */
+/* Descripción: Orquesta la creación de la pantalla principal y maneja sus eventos de alto nivel (gestos, clics). Se ha actualizado para usar el `telemetry_manager` del core de la UI. */
+
+#include "screens.h"
+#include "ui_idle_animation.h"
+#include "ui_actions_panel.h"
+#include "ui_action_animations.h"
+#include "core/telemetry_manager.h" // Actualizado desde ui_telemetry.h
+#include "diymon_ui_helpers.h"
+#include "esp_log.h"
+#include "bsp_api.h"
+#include "screen_manager.h"
+#include "ui_asset_loader.h"
+
+static const char *TAG = "SCREENS";
+
+static lv_timer_t *s_resume_idle_timer = NULL;
+
+lv_obj_t *g_idle_animation_obj = NULL;
+lv_obj_t *g_main_screen_obj = NULL;
+
+static lv_coord_t touch_start_x = -1;
+static lv_coord_t touch_start_y = -1;
+
+static void main_screen_event_cb(lv_event_t *e);
+
+static void resume_idle_timer_cb(lv_timer_t *timer) {
+    ESP_LOGD(TAG, "Temporizador de reanudación de idle disparado.");
+    ui_idle_animation_resume();
+    s_resume_idle_timer = NULL;
+}
+
+void create_screen_main(void) {
+    g_main_screen_obj = lv_obj_create(NULL);
+    lv_obj_set_size(g_main_screen_obj, 170, 320);
+    lv_obj_add_flag(g_main_screen_obj, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(g_main_screen_obj, main_screen_event_cb, LV_EVENT_ALL, NULL);
+    
+    lv_obj_set_scroll_dir(g_main_screen_obj, LV_DIR_ALL);
+    lv_obj_set_scrollbar_mode(g_main_screen_obj, LV_SCROLLBAR_MODE_OFF);
+
+    ui_helpers_load_background(g_main_screen_obj);
+
+    ui_action_animations_create(g_main_screen_obj);
+    g_idle_animation_obj = ui_idle_animation_start(g_main_screen_obj);
+    ui_actions_panel_create(g_main_screen_obj);
+    telemetry_manager_create(g_main_screen_obj); // Actualizado desde ui_telemetry_create
+
+    ESP_LOGI(TAG, "Pantalla principal creada delegando en módulos.");
+}
+
+static void main_screen_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    lv_indev_t *indev = lv_indev_get_act();
+
+    switch(code) {
+        case LV_EVENT_PRESSED: {
+            if (s_resume_idle_timer) {
+                lv_timer_del(s_resume_idle_timer);
+                s_resume_idle_timer = NULL;
+            }
+
+            lv_point_t p;
+            lv_indev_get_point(indev, &p);
+            touch_start_x = p.x;
+            touch_start_y = p.y;
+            if (!screen_manager_is_off()) {
+                ui_idle_animation_pause();
+            }
+            break;
+        }
+        case LV_EVENT_RELEASED: {
+            touch_start_x = -1;
+            touch_start_y = -1;
+            
+            if (!screen_manager_is_off() && s_resume_idle_timer == NULL) {
+                s_resume_idle_timer = lv_timer_create(resume_idle_timer_cb, 500, NULL);
+                lv_timer_set_repeat_count(s_resume_idle_timer, 1);
+            }
+            break;
+        }
+        case LV_EVENT_GESTURE: {
+            if (!screen_manager_is_off()) { 
+                lv_dir_t dir = lv_indev_get_gesture_dir(indev);
+                ui_actions_panel_handle_gesture(dir, touch_start_x, touch_start_y);
+            }
+            break;
+        }
+        case LV_EVENT_CLICKED: {
+            if (!screen_manager_is_off()) {
+                ESP_LOGD(TAG, "Click en la pantalla, ocultando paneles.");
+                ui_actions_panel_hide_all();
+            }
+            break;
+        }
+        default:
+            break;
+    }
+}
+
+void delete_screen_main(void) {
+    if (g_main_screen_obj) {
+        lv_obj_del(g_main_screen_obj);
+        g_main_screen_obj = NULL;
+        g_idle_animation_obj = NULL;
+    }
+    ui_idle_animation_stop();
+    ui_action_animations_destroy();
+    telemetry_manager_destroy(); // Actualizado desde ui_telemetry_destroy
+    ui_assets_deinit();
+}
+
+void create_screens(void) {
+    create_screen_main();
+}
+
+--- END OF FILE: .\components\ui\screens\screens.c ---
+
+--- START OF FILE: .\components\ui\screens\screens.h ---
+/* Fecha: 17/08/2025 - 02:49  */
+/* Fichero: components/ui/screens/screens.h */
+/* Último cambio: Movido a 'screens/' y refactorizado como el gestor de pantallas. */
+/* Descripción: Interfaz pública del módulo de pantallas. Orquesta la creación y destrucción de las diferentes pantallas de la aplicación, empezando por la principal. */
+
+#ifndef SCREENS_H
+#define SCREENS_H
+
+#include <lvgl.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// --- DECLARACIONES DE OBJETOS GLOBALES ---
+// Se expone para que otros módulos (core, telemetry, etc.) puedan añadir widgets.
+extern lv_obj_t *g_main_screen_obj;
+
+
+// --- DECLARACIONES DE FUNCIONES ---
+/**
+ * @brief Crea todas las pantallas de la aplicación.
+ *        Actualmente, solo invoca la creación de la pantalla principal.
+ */
+void create_screens(void);
+
+/**
+ * @brief Destruye la pantalla principal y libera sus recursos.
+ */
+void delete_screen_main(void);
+
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // SCREENS_H
+
+--- END OF FILE: .\components\ui\screens\screens.h ---
+
+--- START OF FILE: .\components\ui\screens\welcome.c ---
+/* Fecha: 17/08/2025 - 02:48  */
+/* Fichero: components/ui/screens/welcome.c */
+/* Último cambio: Refactorizado y movido a 'screens/', renombrado de 'welcome_screen.c'. */
+/* Descripción: Implementación de la pantalla de bienvenida. Encapsula la lógica de esta vista específica como parte de la refactorización de la UI. */
+
+#include "welcome.h"
+#include "esp_log.h"
+
+static const char *TAG = "WELCOME_SCREEN";
+
+// Puntero estático para almacenar el callback de inicio.
+static void (*g_on_start_callback)(void) = NULL;
+
+/**
+ * @brief Callback del evento del botón "INICIAR".
+ *        Llama a la función de callback registrada si existe.
+ */
+static void start_button_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        ESP_LOGI(TAG, "Botón 'INICIAR' presionado.");
+        if (g_on_start_callback) {
+            g_on_start_callback();
+        }
+    }
+}
+
+/**
+ * @brief Implementación de la creación de la pantalla de bienvenida.
+ */
+void welcome_screen_show(void (*on_start_cb)(void)) {
+    g_on_start_callback = on_start_cb;
+
+    // Se crea un nuevo screen para asegurar que no hay elementos previos.
+    lv_obj_t *scr = lv_obj_create(NULL);
+    lv_obj_set_style_bg_color(scr, lv_color_hex(0x000000), LV_PART_MAIN);
+    lv_obj_set_layout(scr, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(scr, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_row(scr, 20, LV_PART_MAIN);
+
+    const char *texts[] = {"SSID: DIYTogether", "PASS: MakeItYours", "192.168.4.1"};
+    for (int i = 0; i < 3; i++) {
+        lv_obj_t *label = lv_label_create(scr);
+        lv_label_set_text(label, texts[i]);
+        lv_obj_set_style_text_color(label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+    }
+
+    lv_obj_t *btn = lv_btn_create(scr);
+    lv_obj_add_event_cb(btn, start_button_event_cb, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *label_btn = lv_label_create(btn);
+    lv_label_set_text(label_btn, "INICIAR");
+    lv_obj_center(label_btn);
+
+    // Se carga la nueva pantalla para reemplazar la activa.
+    lv_screen_load(scr);
+    ESP_LOGI(TAG, "Pantalla de bienvenida mostrada.");
+}
+
+--- END OF FILE: .\components\ui\screens\welcome.c ---
+
+--- START OF FILE: .\components\ui\screens\welcome.h ---
+/* Fecha: 17/08/2025 - 02:47  */
+/* Fichero: components/ui/screens/welcome.h */
+/* Último cambio: Refactorizado y movido a 'screens/', renombrado de 'welcome_screen.h'. */
+/* Descripción: Define la interfaz pública para la pantalla de bienvenida. Encapsula la lógica de esta vista específica como parte de la refactorización de la UI. */
+
+#ifndef WELCOME_H
+#define WELCOME_H
+
+#include "lvgl.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Muestra la pantalla de bienvenida.
+ *
+ * @param on_start_cb Puntero a una función que se llamará cuando se pulse el botón "INICIAR".
+ */
+void welcome_screen_show(void (*on_start_cb)(void));
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // WELCOME_H
+
+--- END OF FILE: .\components\ui\screens\welcome.h ---
+
 --- START OF FILE: .\components\ui\actions.c ---
 /* Fecha: 17/08/2025 - 01:51  */
 /* Fichero: components/ui/actions.c */
@@ -10687,17 +11521,17 @@ extern const lv_img_dsc_t bg_0;
 --- END OF FILE: .\components\ui\BG.h ---
 
 --- START OF FILE: .\components\ui\CMakeLists.txt ---
-# Fecha: 17/08/2025 - 01:57 
+# Fecha: 17/08/2025 - 02:53 
 # Fichero: components/ui/CMakeLists.txt
-# Último cambio: Corregida la sintaxis de CMake para la expansión de variables de la lista de fuentes.
-# Descripción: Se ha corregido la forma en que se pasa la variable de fuentes a idf_component_register. La sintaxis anterior causaba un error de expansión de variable, haciendo que CMake buscara un fichero inexistente '$'. La sintaxis corregida asegura la correcta expansión de la lista de ficheros fuente, resolviendo el error de compilación.
+# Último cambio: Corregido el formato de los comentarios para que sea compatible con CMake.
+# Descripción: Se ha corregido un error de compilación cambiando los comentarios de estilo C (/* */) a estilo CMake (#). Este error impedía a CMake analizar el fichero.
 
 file(GLOB component_sources
     "*.c"
+    "core/*.c"
     "screens/*.c"
     "actions/*.c"
     "styles/*.c"
-    "ui_telemetry.c"
     "assets/*.c"
     "buttons/*.c"
 )
@@ -10708,6 +11542,8 @@ idf_component_register(
         "."
         "buttons"
         "actions"
+        "core"
+        "screens"
     PRIV_INCLUDE_DIRS "."
     REQUIRES
         lvgl
@@ -13911,10 +14747,10 @@ endmenu
 --- END OF FILE: .\main\Kconfig.projbuild ---
 
 --- START OF FILE: .\main\main.c ---
-/* Fecha: 17/08/2025 - 02:16  */
+/* Fecha: 17/08/2025 - 02:51  */
 /* Fichero: main/main.c */
-/* Último cambio: Integrada la nueva tarea de telemetría en el arranque de la aplicación principal. */
-/* Descripción: Orquestador principal de la aplicación. Se ha añadido la llamada a 	elemetry_task_start() en la secuencia de arranque del modo de aplicación principal. Esto lanza la tarea en segundo plano que gestionará la lectura de sensores y la lógica de 'shake-to-wake', completando el desacoplamiento de la lógica de sensores de la UI. */
+/* Último cambio: Actualizadas las inclusiones y llamadas a funciones para reflejar la refactorización de la UI a subdirectorios (core/, screens/). */
+/* Descripción: Orquestador principal. Se han corregido las rutas de inclusión y los nombres de funciones para los módulos de pantallas y gestión de estado (e.g., 'ui_config_screen.h' -> 'screens/config.h'), resolviendo los errores de compilación 'undefined reference' tras la reorganización de la UI. */
 
 #include <stdio.h>
 #include <string.h>
@@ -13932,15 +14768,15 @@ endmenu
 #include "bsp_api.h"
 #include "hardware_manager.h"
 #include "diymon_evolution.h"
-#include "ui.h"
+#include "core/ui.h"
 #include "wifi_portal.h"
 #include "web_server.h"
 #include "screen_manager.h"
-#include "ui_config_screen.h"
+#include "screens/config.h"
 #include "ui_asset_loader.h" 
 #include "actions.h"
-#include "ui_state_manager.h"
-#include "telemetry_task.h" // <-- Nuevo include
+#include "core/state_manager.h"
+#include "core/telemetry_task.h"
 
 #include "esp_err.h"
 #include "esp_check.h"
@@ -14011,7 +14847,7 @@ static void run_main_application_mode(void) {
 
     if (lvgl_port_lock(0)) {
         ui_init();
-        ui_state_manager_init(); 
+        state_manager_init(); 
         lvgl_port_unlock();
     }
     ESP_LOGI(TAG, "Interfaz de Usuario principal inicializada.");
@@ -14021,15 +14857,14 @@ static void run_main_application_mode(void) {
         vTaskDelay(pdMS_TO_TICKS(500));
         execute_diymon_action(ACTION_ID_ACTIVATE_CONFIG_MODE);
     } else {
-        // Iniciar la tarea de telemetría solo si todo ha ido bien
         telemetry_task_start();
         ESP_LOGI(TAG, "¡Firmware DIYMON en marcha!");
     }
 }
 
 static void run_headless_wifi_portal_mode(void) { bsp_init_minimal_headless(); bsp_wifi_init_stack(); wifi_portal_start(); }
-static void run_file_server_mode(void) { bsp_init_service_mode(); init_lvgl_for_service_screen(); if (lvgl_port_lock(0)) { ui_config_screen_show(); ui_state_manager_init(); lvgl_port_unlock(); } display_waiting_for_network_on_screen(); bsp_wifi_init_stack(); bsp_wifi_init_sta_from_nvs(); bool ip_ok = bsp_wifi_wait_for_ip(15000); char ip_addr_buffer[16] = "N/A"; if (ip_ok) { bsp_wifi_get_ip(ip_addr_buffer); } else { bsp_wifi_start_ap(); } display_network_status_on_screen(ip_ok, ip_addr_buffer); web_server_start(); }
-static void run_wifi_portal_mode(void) { bsp_init_service_mode(); init_lvgl_for_service_screen(); if (lvgl_port_lock(0)) { ui_config_screen_show(); ui_state_manager_init(); lvgl_port_unlock(); } display_waiting_for_network_on_screen(); vTaskDelay(pdMS_TO_TICKS(1500)); display_network_status_on_screen(false, NULL); bsp_wifi_init_stack(); wifi_portal_start(); }
+static void run_file_server_mode(void) { bsp_init_service_mode(); init_lvgl_for_service_screen(); if (lvgl_port_lock(0)) { config_screen_show(); state_manager_init(); lvgl_port_unlock(); } display_waiting_for_network_on_screen(); bsp_wifi_init_stack(); bsp_wifi_init_sta_from_nvs(); bool ip_ok = bsp_wifi_wait_for_ip(15000); char ip_addr_buffer[16] = "N/A"; if (ip_ok) { bsp_wifi_get_ip(ip_addr_buffer); } else { bsp_wifi_start_ap(); } display_network_status_on_screen(ip_ok, ip_addr_buffer); web_server_start(); }
+static void run_wifi_portal_mode(void) { bsp_init_service_mode(); init_lvgl_for_service_screen(); if (lvgl_port_lock(0)) { config_screen_show(); state_manager_init(); lvgl_port_unlock(); } display_waiting_for_network_on_screen(); vTaskDelay(pdMS_TO_TICKS(1500)); display_network_status_on_screen(false, NULL); bsp_wifi_init_stack(); wifi_portal_start(); }
 static bool check_file_server_mode_flag(void) { nvs_handle_t nvs; esp_err_t err = nvs_open("storage", NVS_READONLY, &nvs); if (err != ESP_OK) return false; char flag[8] = {0}; size_t len = sizeof(flag); err = nvs_get_str(nvs, "file_server", flag, &len); nvs_close(nvs); return (err == ESP_OK && strcmp(flag, "1") == 0); }
 static void erase_file_server_mode_flag(void) { nvs_handle_t nvs; if (nvs_open("storage", NVS_READWRITE, &nvs) == ESP_OK) { nvs_erase_key(nvs, "file_server"); nvs_commit(nvs); nvs_close(nvs); } }
 static void init_lvgl_for_service_screen(void) { const lvgl_port_cfg_t c = ESP_LVGL_PORT_INIT_CONFIG(); lvgl_port_init(&c); const lvgl_port_display_cfg_t d = { .io_handle=bsp_get_panel_io_handle(), .panel_handle=bsp_get_display_handle(), .buffer_size=bsp_get_display_buffer_size(), .double_buffer=1, .hres=bsp_get_display_hres(), .vres=bsp_get_display_vres(), .flags={.swap_bytes=true}}; lv_disp_t* disp=lvgl_port_add_disp(&d); const lvgl_port_touch_cfg_t t = {.disp=disp, .handle=bsp_get_touch_handle()}; lvgl_port_add_touch(&t); }

@@ -1,3 +1,8 @@
+/* Fecha: 17/08/2025 - 02:52  */
+/* Fichero: .\README.md */
+/* Último cambio: Añadida nota aclaratoria en la sección de compilación para reflejar la robustez tras la refactorización de la UI. */
+/* Descripción: Documentación principal del proyecto, guía de inicio y visión general. */
+
 # DIYTogether - Tu Mascota Virtual DIY
 
 ![Ilustración de DIYTogether en acción]([Link a git3.png])
@@ -61,8 +66,10 @@ DIYTogether es un proyecto de mascota virtual open-source basada en hardware ESP
 ### 2. Compilación y Subida del Firmware
 Este proyecto está configurado para ser compilado y subido fácilmente con PlatformIO.
 
+*(Nota: La estructura de componentes ha sido refactorizada para mejorar la modularidad, pero el proceso de compilación con PlatformIO no ha cambiado y sigue siendo el método recomendado.)*
+
 1.  **Clona el repositorio**:
-    `ash
+    ` ash
     git clone [URL de tu repositorio]
     cd DIYtogether
     `

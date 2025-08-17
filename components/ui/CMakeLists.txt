@@ -1,7 +1,7 @@
-# Fecha: 17/08/2025 - 02:27 
+# Fecha: 17/08/2025 - 02:53 
 # Fichero: components/ui/CMakeLists.txt
-# Último cambio: Añadido el subdirectorio 'core' a la lista de fuentes y directorios de inclusión para reflejar la nueva estructura del componente.
-# Descripción: Fichero de compilación para el componente UI. Se ha actualizado para incluir los ficheros fuente y las cabeceras del nuevo subdirectorio 'core', que contiene la lógica principal de la UI (inicialización, gestión de estado y telemetría).
+# Último cambio: Corregido el formato de los comentarios para que sea compatible con CMake.
+# Descripción: Se ha corregido un error de compilación cambiando los comentarios de estilo C (/* */) a estilo CMake (#). Este error impedía a CMake analizar el fichero.
 
 file(GLOB component_sources
     "*.c"
@@ -20,6 +20,7 @@ idf_component_register(
         "buttons"
         "actions"
         "core"
+        "screens"
     PRIV_INCLUDE_DIRS "."
     REQUIRES
         lvgl

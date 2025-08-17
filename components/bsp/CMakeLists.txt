@@ -1,7 +1,7 @@
-# Fecha: 16/08/2025 - 09:32 
+# Fecha: 17/08/2025 - 02:55 
 # Fichero: components/bsp/CMakeLists.txt
-# Último cambio: Renombrado el componente de 'diymon_bsp' a 'bsp' y corregido un error de copiado.
-# Descripción: Fichero de compilación del Board Support Package (BSP). Se ha corregido la dependencia de 'diymon_ui' a 'ui' para que coincida con el nuevo nombre del componente y se han eliminado referencias a componentes que ya no existen, resolviendo así el error de compilación "Failed to resolve component".
+# Último cambio: Eliminada la dependencia explícita de 'esp_driver_i2c' para resolver un conflicto de compilación.
+# Descripción: Se ha eliminado la dependencia 'esp_driver_i2c' de la lista REQUIRES. Requerir sub-componentes de 'driver' individualmente es una práctica no estándar que puede corromper el árbol de dependencias del build system. El componente 'driver' ya se incluye y proporciona acceso a todas las APIs de controladores necesarias (I2C, SPI, etc.), solucionando el fallo de compilación en el componente 'esp_twai'.
 
 set(BOARD_SUBDIR "WS1.9TS")
 
@@ -20,7 +20,6 @@ idf_component_register(
         fatfs
         esp_adc
         esp_wifi
-        esp_driver_i2c
         nvs_flash
         lvgl
         esp_lvgl_port

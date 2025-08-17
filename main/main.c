@@ -1,7 +1,7 @@
-/* Fecha: 17/08/2025 - 02:16  */
+/* Fecha: 17/08/2025 - 02:51  */
 /* Fichero: main/main.c */
-/* Último cambio: Integrada la nueva tarea de telemetría en el arranque de la aplicación principal. */
-/* Descripción: Orquestador principal de la aplicación. Se ha añadido la llamada a 	elemetry_task_start() en la secuencia de arranque del modo de aplicación principal. Esto lanza la tarea en segundo plano que gestionará la lectura de sensores y la lógica de 'shake-to-wake', completando el desacoplamiento de la lógica de sensores de la UI. */
+/* Último cambio: Actualizadas las inclusiones y llamadas a funciones para reflejar la refactorización de la UI a subdirectorios (core/, screens/). */
+/* Descripción: Orquestador principal. Se han corregido las rutas de inclusión y los nombres de funciones para los módulos de pantallas y gestión de estado (e.g., 'ui_config_screen.h' -> 'screens/config.h'), resolviendo los errores de compilación 'undefined reference' tras la reorganización de la UI. */
 
 #include <stdio.h>
 #include <string.h>
@@ -19,15 +19,15 @@
 #include "bsp_api.h"
 #include "hardware_manager.h"
 #include "diymon_evolution.h"
-#include "ui.h"
+#include "core/ui.h"
 #include "wifi_portal.h"
 #include "web_server.h"
 #include "screen_manager.h"
-#include "ui_config_screen.h"
+#include "screens/config.h"
 #include "ui_asset_loader.h" 
 #include "actions.h"
-#include "ui_state_manager.h"
-#include "telemetry_task.h" // <-- Nuevo include
+#include "core/state_manager.h"
+#include "core/telemetry_task.h"
 
 #include "esp_err.h"
 #include "esp_check.h"
@@ -98,7 +98,7 @@ static void run_main_application_mode(void) {
 
     if (lvgl_port_lock(0)) {
         ui_init();
-        ui_state_manager_init(); 
+        state_manager_init(); 
         lvgl_port_unlock();
     }
     ESP_LOGI(TAG, "Interfaz de Usuario principal inicializada.");
@@ -108,15 +108,14 @@ static void run_main_application_mode(void) {
         vTaskDelay(pdMS_TO_TICKS(500));
         execute_diymon_action(ACTION_ID_ACTIVATE_CONFIG_MODE);
     } else {
-        // Iniciar la tarea de telemetría solo si todo ha ido bien
         telemetry_task_start();
         ESP_LOGI(TAG, "¡Firmware DIYMON en marcha!");
     }
 }
 
 static void run_headless_wifi_portal_mode(void) { bsp_init_minimal_headless(); bsp_wifi_init_stack(); wifi_portal_start(); }
-static void run_file_server_mode(void) { bsp_init_service_mode(); init_lvgl_for_service_screen(); if (lvgl_port_lock(0)) { ui_config_screen_show(); ui_state_manager_init(); lvgl_port_unlock(); } display_waiting_for_network_on_screen(); bsp_wifi_init_stack(); bsp_wifi_init_sta_from_nvs(); bool ip_ok = bsp_wifi_wait_for_ip(15000); char ip_addr_buffer[16] = "N/A"; if (ip_ok) { bsp_wifi_get_ip(ip_addr_buffer); } else { bsp_wifi_start_ap(); } display_network_status_on_screen(ip_ok, ip_addr_buffer); web_server_start(); }
-static void run_wifi_portal_mode(void) { bsp_init_service_mode(); init_lvgl_for_service_screen(); if (lvgl_port_lock(0)) { ui_config_screen_show(); ui_state_manager_init(); lvgl_port_unlock(); } display_waiting_for_network_on_screen(); vTaskDelay(pdMS_TO_TICKS(1500)); display_network_status_on_screen(false, NULL); bsp_wifi_init_stack(); wifi_portal_start(); }
+static void run_file_server_mode(void) { bsp_init_service_mode(); init_lvgl_for_service_screen(); if (lvgl_port_lock(0)) { config_screen_show(); state_manager_init(); lvgl_port_unlock(); } display_waiting_for_network_on_screen(); bsp_wifi_init_stack(); bsp_wifi_init_sta_from_nvs(); bool ip_ok = bsp_wifi_wait_for_ip(15000); char ip_addr_buffer[16] = "N/A"; if (ip_ok) { bsp_wifi_get_ip(ip_addr_buffer); } else { bsp_wifi_start_ap(); } display_network_status_on_screen(ip_ok, ip_addr_buffer); web_server_start(); }
+static void run_wifi_portal_mode(void) { bsp_init_service_mode(); init_lvgl_for_service_screen(); if (lvgl_port_lock(0)) { config_screen_show(); state_manager_init(); lvgl_port_unlock(); } display_waiting_for_network_on_screen(); vTaskDelay(pdMS_TO_TICKS(1500)); display_network_status_on_screen(false, NULL); bsp_wifi_init_stack(); wifi_portal_start(); }
 static bool check_file_server_mode_flag(void) { nvs_handle_t nvs; esp_err_t err = nvs_open("storage", NVS_READONLY, &nvs); if (err != ESP_OK) return false; char flag[8] = {0}; size_t len = sizeof(flag); err = nvs_get_str(nvs, "file_server", flag, &len); nvs_close(nvs); return (err == ESP_OK && strcmp(flag, "1") == 0); }
 static void erase_file_server_mode_flag(void) { nvs_handle_t nvs; if (nvs_open("storage", NVS_READWRITE, &nvs) == ESP_OK) { nvs_erase_key(nvs, "file_server"); nvs_commit(nvs); nvs_close(nvs); } }
 static void init_lvgl_for_service_screen(void) { const lvgl_port_cfg_t c = ESP_LVGL_PORT_INIT_CONFIG(); lvgl_port_init(&c); const lvgl_port_display_cfg_t d = { .io_handle=bsp_get_panel_io_handle(), .panel_handle=bsp_get_display_handle(), .buffer_size=bsp_get_display_buffer_size(), .double_buffer=1, .hres=bsp_get_display_hres(), .vres=bsp_get_display_vres(), .flags={.swap_bytes=true}}; lv_disp_t* disp=lvgl_port_add_disp(&d); const lvgl_port_touch_cfg_t t = {.disp=disp, .handle=bsp_get_touch_handle()}; lvgl_port_add_touch(&t); }
