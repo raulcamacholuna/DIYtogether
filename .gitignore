@@ -28,4 +28,4 @@ __pycache__/
 # Archivos basura de macOS y Windows.
 .DS_Store
 Thumbs.db
-
+Gemini*

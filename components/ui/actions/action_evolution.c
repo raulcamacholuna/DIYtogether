@@ -1,12 +1,12 @@
-/* Fecha: 17/08/2025 - 01:49  */
+/* Fecha: 17/08/2025 - 02:34  */
 /* Fichero: components/ui/actions/action_evolution.c */
-/* Último cambio: Implementación de la lógica de evolución y de involución. */
-/* Descripción: Módulo que maneja los cambios de estado del Diymon. Llama al 'core' para obtener la lógica de evolución y actualiza la UI (animación de reposo, telemetría) para reflejar el cambio. */
+/* Último cambio: Actualizadas las llamadas al gestor de telemetría para reflejar la refactorización a ui/core/. */
+/* Descripción: Módulo que maneja los cambios de estado del Diymon. Se ha actualizado para llamar a telemetry_manager_update_values en lugar de la antigua función, adaptándose a la nueva estructura del núcleo de la UI. */
 
 #include "actions/action_evolution.h"
 #include "diymon_evolution.h"
 #include "ui_idle_animation.h"
-#include "ui_telemetry.h"
+#include "telemetry_manager.h" // Actualizado desde ui_telemetry.h
 #include "ui_action_animations.h" // Para g_animation_img_obj
 #include "screens.h"              // Para g_main_screen_obj
 #include "esp_log.h"
@@ -25,8 +25,8 @@ static void update_ui_after_evolution_change(void) {
     }
 
     // Fuerza la actualización inmediata de la telemetría para que muestre el nuevo código EVO.
-    ui_telemetry_force_update();
-
+    telemetry_manager_update_values(100); // Se asume 100% de batería, ya que no se recalcula aquí. La tarea principal lo corregirá.
+    
     // Inicia la nueva animación de reposo, que cargará los assets del nuevo código de evolución.
     ui_idle_animation_start(g_main_screen_obj);
     

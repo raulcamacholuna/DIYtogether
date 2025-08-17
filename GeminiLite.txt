@@ -8451,15 +8451,15 @@ void action_config_mode_stop(void);
 --- END OF FILE: .\components\ui\actions\action_config_mode.h ---
 
 --- START OF FILE: .\components\ui\actions\action_evolution.c ---
-/* Fecha: 17/08/2025 - 01:49  */
+/* Fecha: 17/08/2025 - 02:20  */
 /* Fichero: components/ui/actions/action_evolution.c */
-/* Último cambio: Implementación de la lógica de evolución y de involución. */
-/* Descripción: Módulo que maneja los cambios de estado del Diymon. Llama al 'core' para obtener la lógica de evolución y actualiza la UI (animación de reposo, telemetría) para reflejar el cambio. */
+/* Último cambio: Añadido el include 'ui_telemetry.h' para resolver un error de compilación por declaración implícita. */
+/* Descripción: Módulo que maneja los cambios de estado del Diymon. Se ha corregido un error de compilación añadiendo la cabecera necesaria para que la función 'ui_telemetry_force_update' sea visible, permitiendo que la UI se actualice correctamente tras una evolución. */
 
 #include "actions/action_evolution.h"
 #include "diymon_evolution.h"
 #include "ui_idle_animation.h"
-#include "ui_telemetry.h"
+#include "ui_telemetry.h" // [CORRECCIÓN] Include faltante
 #include "ui_action_animations.h" // Para g_animation_img_obj
 #include "screens.h"              // Para g_main_screen_obj
 #include "esp_log.h"
@@ -8478,8 +8478,8 @@ static void update_ui_after_evolution_change(void) {
     }
 
     // Fuerza la actualización inmediata de la telemetría para que muestre el nuevo código EVO.
-    ui_telemetry_force_update();
-
+    ui_telemetry_update_values(100); // Se asume 100% de batería, ya que no se recalcula aquí. La tarea principal lo corregirá.
+    
     // Inicia la nueva animación de reposo, que cargará los assets del nuevo código de evolución.
     ui_idle_animation_start(g_main_screen_obj);
     
@@ -11046,6 +11046,118 @@ extern "C" {
 #endif /*EEZ_LVGL_UI_STYLES_H*/
 --- END OF FILE: .\components\ui\styles.h ---
 
+--- START OF FILE: .\components\ui\telemetry_task.c ---
+/* Fecha: 17/08/2025 - 02:13  */
+/* Fichero: components/ui/telemetry_task.c */
+/* Último cambio: Creación de la tarea de telemetría para desacoplar la lectura de sensores de la UI. */
+/* Descripción: Implementa una tarea de FreeRTOS dedicada a leer sensores en segundo plano. Esta tarea gestiona la lectura periódica de la batería y el IMU, implementa la lógica de 'shake-to-wake' para despertar la pantalla, y empuja los datos actualizados a la UI. Esto mejora la reactividad y modularidad del sistema. */
+
+#include "telemetry_task.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_log.h"
+#include "bsp_api.h"
+#include "screen_manager.h"
+#include "ui_telemetry.h"
+#include <math.h> // Para sqrtf
+
+static const char *TAG = "TELEMETRY_TASK";
+
+// --- Constantes de configuración de la tarea ---
+#define TELEMETRY_TASK_STACK_SIZE   4096
+#define TELEMETRY_TASK_PRIORITY     5
+#define TELEMETRY_TASK_DELAY_MS     200
+#define SHAKE_THRESHOLD_G           1.5f // Umbral de agitación en G's
+#define UI_UPDATE_INTERVAL_MS       5000 // Actualizar la UI cada 5 segundos
+
+/**
+ * @brief Tarea principal que se ejecuta en segundo plano.
+ */
+static void telemetry_task_main(void *pvParameters) {
+    ESP_LOGI(TAG, "Tarea de telemetría iniciada.");
+
+    uint32_t ui_update_counter = 0;
+    const uint32_t ui_update_ticks = UI_UPDATE_INTERVAL_MS / TELEMETRY_TASK_DELAY_MS;
+
+    while (1) {
+        vTaskDelay(pdMS_TO_TICKS(TELEMETRY_TASK_DELAY_MS));
+
+        // --- Lectura de Sensores ---
+        float acc[3], gyro[3];
+        bsp_imu_read(acc, gyro);
+
+        float voltage;
+        uint16_t adc_val;
+        bsp_battery_get_voltage(&voltage, &adc_val);
+        // Lógica simple para convertir voltaje a porcentaje (ajustar según la curva de la batería)
+        uint8_t battery_percentage = (uint8_t)fmax(0.0, fmin(100.0, (voltage - 3.2) / (4.2 - 3.2) * 100.0));
+
+
+        // --- Lógica de Shake-to-Wake ---
+        float acceleration_magnitude = sqrtf(acc[0] * acc[0] + acc[1] * acc[1] + acc[2] * acc[2]) / 9.81f;
+        if (acceleration_magnitude > SHAKE_THRESHOLD_G) {
+            if (screen_manager_is_off()) {
+                ESP_LOGI(TAG, "¡Agitación detectada! (Magnitud: %.2f G). Despertando pantalla.", acceleration_magnitude);
+                screen_manager_turn_on();
+            }
+        }
+        
+        // --- Actualización de la UI (periódica) ---
+        ui_update_counter++;
+        if (ui_update_counter >= ui_update_ticks) {
+            ui_update_counter = 0;
+            // Empujar los nuevos valores a la UI para que los muestre
+            ui_telemetry_update_values(battery_percentage);
+        }
+    }
+}
+
+/**
+ * @brief Inicia la tarea de telemetría.
+ */
+void telemetry_task_start(void) {
+    xTaskCreate(
+        telemetry_task_main,
+        "telemetry_task",
+        TELEMETRY_TASK_STACK_SIZE,
+        NULL,
+        TELEMETRY_TASK_PRIORITY,
+        NULL
+    );
+}
+
+--- END OF FILE: .\components\ui\telemetry_task.c ---
+
+--- START OF FILE: .\components\ui\telemetry_task.h ---
+/* Fecha: 17/08/2025 - 02:13  */
+/* Fichero: components/ui/telemetry_task.h */
+/* Último cambio: Creación del fichero para la tarea de telemetría y sensores. */
+/* Descripción: Interfaz pública para la tarea de telemetría. Esta tarea se ejecutará en segundo plano para leer sensores como la batería y el IMU, actualizar la UI y gestionar la lógica de 'shake-to-wake'. Expone una única función para iniciar la tarea. */
+
+#ifndef TELEMETRY_TASK_H
+#define TELEMETRY_TASK_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Inicia la tarea de telemetría en segundo plano.
+ *
+ * Crea y lanza una tarea de FreeRTOS que se encargará de leer periódicamente
+ * los sensores del dispositivo (batería, IMU) y de actualizar la UI con
+ * esta información. También implementa la lógica de 'shake-to-wake'.
+ */
+void telemetry_task_start(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // TELEMETRY_TASK_H
+
+--- END OF FILE: .\components\ui\telemetry_task.h ---
+
 --- START OF FILE: .\components\ui\ui_action_animations.c ---
 /*
 # Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_action_animations.c
@@ -11941,6 +12053,33 @@ void ui_idle_animation_resume(void);
 
 --- END OF FILE: .\components\ui\ui_idle_animation.h ---
 
+--- START OF FILE: .\components\ui\ui_layout.h ---
+/* Fecha: 17/08/2025 - 02:08  */
+/* Fichero: components/ui/ui_layout.h */
+/* Último cambio: Centralizadas todas las constantes de diseño (tamaño de botones, tiempos de animación, etc.) en un único fichero para facilitar el mantenimiento y la coherencia visual. */
+/* Descripción: Este fichero contiene todas las constantes mágicas que definen la apariencia y el comportamiento de la UI. Centraliza valores como el tamaño de los botones, los paddings y los tiempos de animación para aplicar el principio DRY (Don't Repeat Yourself) y facilitar cambios de diseño globales. */
+
+#ifndef UI_LAYOUT_H
+#define UI_LAYOUT_H
+
+// --- Constantes de Diseño de Botones ---
+#define BUTTON_SIZE 50
+#define BUTTON_PADDING 10
+
+// --- Constantes de Animación y Comportamiento de Paneles ---
+#define ANIM_TIME_MS 300
+#define PANEL_AUTO_HIDE_DELAY 10000 
+#define EDGE_SWIPE_THRESHOLD 50
+
+// --- Constantes Estructurales de Paneles ---
+#define NUM_TOP_BUTTONS 3
+#define NUM_SIDE_BUTTONS 5
+
+
+#endif // UI_LAYOUT_H
+
+--- END OF FILE: .\components\ui\ui_layout.h ---
+
 --- START OF FILE: .\components\ui\ui_priv.h ---
 /*
  * Fichero: ui_priv.h
@@ -12001,39 +12140,190 @@ extern objects_t objects;
 #endif // UI_PRIV_H
 --- END OF FILE: .\components\ui\ui_priv.h ---
 
---- START OF FILE: .\components\ui\ui_telemetry.c ---
-/* Fecha: 16/08/2025 - 07:06  */
-/* Fichero: components/diymon_ui/ui_telemetry.c */
-/* Último cambio: Movida la telemetría a la esquina inferior derecha para evitar solapamiento con botones. */
-/* Descripción: Implementa la lógica para mostrar la telemetría (batería, código EVO) en la pantalla principal. Crea un temporizador para actualizaciones periódicas y proporciona una función para forzar una actualización. */
+--- START OF FILE: .\components\ui\ui_state_manager.c ---
+/* Fecha: 17/08/2025 - 02:11  */
+/* Fichero: components/ui/ui_state_manager.c */
+/* Último cambio: Movida toda la lógica de gestión de estado de la pantalla (inactividad, atenuado, despertar) desde main.c a este nuevo módulo dedicado. */
+/* Descripción: Implementación del gestor de estado de la UI. Este fichero ahora contiene todas las variables y funciones que manejan el comportamiento de la pantalla en respuesta a la inactividad del usuario. Centraliza la lógica de atenuado, apagado automático y el patrón de toques para despertar, limpiando significativamente la lógica de main.c. */
 
-#include "ui_telemetry.h"
+#include "ui_state_manager.h"
+#include "screen_manager.h"
+#include "nvs_flash.h"
+#include "nvs.h"
 #include "esp_log.h"
-//#include "diymon_vitals.h" // Temporalmente deshabilitado para corregir la compilación
-#include "diymon_evolution.h"
 
-static const char *TAG = "UI_TELEMETRY";
+static const char *TAG = "UI_STATE_MANAGER";
 
-/* Variables estáticas para los objetos de la UI y el temporizador */
-static lv_obj_t *s_battery_label = NULL;
-static lv_obj_t *s_evo_label = NULL;
-static lv_timer_t *s_telemetry_timer = NULL;
+// --- Tipos y variables de estado internas ---
+typedef enum {
+    WAKE_STATE_OFF,
+    WAKE_STATE_PRIMED,
+} wake_up_state_t;
 
-/**
- * @brief Callback del temporizador para actualizar periódicamente los datos de telemetría.
- */
-static void telemetry_update_timer_cb(lv_timer_t *timer) {
-    if (s_battery_label) {
-        //uint8_t battery_level = diymon_vitals_get_battery_percentage(); // TODO: Re-integrar diymon_vitals
-        uint8_t battery_level = 100; // Valor estático para permitir la compilación
-        lv_label_set_text_fmt(s_battery_label, "%s %d%%", LV_SYMBOL_BATTERY_FULL, battery_level);
-    }
-    if (s_evo_label) {
-        const char* evo_code = diymon_get_current_code();
-        lv_label_set_text_fmt(s_evo_label, "EVO: %s", evo_code ? evo_code : "N/A");
+static bool s_is_dimmed = false;
+static int s_user_brightness = 100;
+static bool s_user_brightness_known = false;
+static wake_up_state_t s_wake_state = WAKE_STATE_OFF;
+static uint8_t s_wake_click_count = 0;
+static lv_timer_t *s_double_click_timer = NULL;
+static lv_timer_t *s_wake_prime_timer = NULL;
+
+// --- Funciones de ayuda y callbacks ---
+
+static void read_user_brightness_from_nvs(void) {
+    if (s_user_brightness_known) return;
+    nvs_handle_t nvs_handle;
+    if (nvs_open("storage", NVS_READONLY, &nvs_handle) == ESP_OK) {
+        nvs_get_i32(nvs_handle, "brightness", (int32_t*)&s_user_brightness);
+        nvs_close(nvs_handle);
+        s_user_brightness_known = true;
     }
 }
 
+static void double_click_timer_cb(lv_timer_t * timer) {
+    s_wake_click_count = 0;
+    s_double_click_timer = NULL;
+}
+
+static void wake_prime_timer_cb(lv_timer_t * timer) {
+    s_wake_state = WAKE_STATE_OFF;
+    s_wake_click_count = 0;
+    s_wake_prime_timer = NULL;
+}
+
+static void screen_touch_event_cb(lv_event_t * e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    lv_disp_t * disp = lv_display_get_default();
+    if (!disp) return;
+    
+    lv_display_trigger_activity(disp);
+
+    if (code == LV_EVENT_PRESSED && s_is_dimmed && !screen_manager_is_off()) {
+        read_user_brightness_from_nvs();
+        screen_manager_set_brightness(s_user_brightness);
+        s_is_dimmed = false;
+        return;
+    }
+
+    if (code == LV_EVENT_CLICKED && screen_manager_is_off()) {
+        if (s_wake_state == WAKE_STATE_OFF) {
+            s_wake_click_count++;
+            if (s_wake_click_count == 1) {
+                s_double_click_timer = lv_timer_create(double_click_timer_cb, 500, NULL);
+                lv_timer_set_repeat_count(s_double_click_timer, 1);
+            } else if (s_wake_click_count == 2) {
+                if (s_double_click_timer) lv_timer_del(s_double_click_timer);
+                s_double_click_timer = NULL;
+                s_wake_state = WAKE_STATE_PRIMED;
+                s_wake_click_count = 0;
+                s_wake_prime_timer = lv_timer_create(wake_prime_timer_cb, 3000, NULL);
+                lv_timer_set_repeat_count(s_wake_prime_timer, 1);
+            }
+        } else if (s_wake_state == WAKE_STATE_PRIMED) {
+            s_wake_click_count++;
+            if (s_wake_click_count == 1) {
+                s_double_click_timer = lv_timer_create(double_click_timer_cb, 500, NULL);
+                lv_timer_set_repeat_count(s_double_click_timer, 1);
+            } else if (s_wake_click_count >= 2) {
+                if (s_double_click_timer) lv_timer_del(s_double_click_timer);
+                if (s_wake_prime_timer) lv_timer_del(s_wake_prime_timer);
+                s_double_click_timer = NULL;
+                s_wake_prime_timer = NULL;
+                screen_manager_turn_on();
+                s_is_dimmed = false;
+                s_wake_state = WAKE_STATE_OFF;
+                s_wake_click_count = 0;
+            }
+        }
+    }
+}
+
+static void inactivity_timer_cb(lv_timer_t * timer) {
+    lv_disp_t * disp = lv_display_get_default();
+    if (!disp) return;
+    
+    uint32_t inactivity_ms = lv_display_get_inactive_time(disp);
+    bool is_off = screen_manager_is_off();
+
+    if (inactivity_ms < 30000 && s_is_dimmed) {
+        s_is_dimmed = false;
+    }
+
+    if (!is_off && inactivity_ms > 60000) {
+        screen_manager_turn_off();
+        s_is_dimmed = false;
+    } else if (!is_off && !s_is_dimmed && inactivity_ms > 30000) {
+        read_user_brightness_from_nvs();
+        screen_manager_set_brightness(10);
+        s_is_dimmed = true;
+    }
+}
+
+// --- Función de inicialización pública ---
+void ui_state_manager_init(void) {
+    lv_timer_create(inactivity_timer_cb, 5000, NULL);
+    lv_obj_t * scr = lv_screen_active();
+    if (scr) {
+        lv_obj_add_event_cb(scr, screen_touch_event_cb, LV_EVENT_ALL, NULL);
+    }
+    ESP_LOGI(TAG, "Gestor de estado de UI inicializado. Manejadores de inactividad activos.");
+}
+
+--- END OF FILE: .\components\ui\ui_state_manager.c ---
+
+--- START OF FILE: .\components\ui\ui_state_manager.h ---
+/* Fecha: 17/08/2025 - 02:10  */
+/* Fichero: components/ui/ui_state_manager.h */
+/* Último cambio: Creación del gestor de estado de la UI para encapsular la lógica de inactividad. */
+/* Descripción: Interfaz pública del gestor de estado de la UI. Este módulo es responsable de manejar la inactividad del usuario, el atenuado y apagado automático de la pantalla, y la lógica de despertar. Expone una única función de inicialización para mantener su implementación interna encapsulada. */
+
+#ifndef UI_STATE_MANAGER_H
+#define UI_STATE_MANAGER_H
+
+#include "lvgl.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Inicializa el gestor de estado de la UI.
+ * 
+ * Configura los temporizadores y los callbacks de eventos necesarios para
+ * gestionar la inactividad, el atenuado/apagado de la pantalla y la lógica
+ * de despertar. Debe ser llamado una vez después de que la UI principal
+ * haya sido creada.
+ */
+void ui_state_manager_init(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // UI_STATE_MANAGER_H
+
+--- END OF FILE: .\components\ui\ui_state_manager.h ---
+
+--- START OF FILE: .\components\ui\ui_telemetry.c ---
+/* Fecha: 17/08/2025 - 02:15  */
+/* Fichero: components/ui/ui_telemetry.c */
+/* Último cambio: Refactorizado para ser un receptor pasivo de datos, eliminando su temporizador interno. */
+/* Descripción: Implementación del módulo de telemetría de la UI. Se ha eliminado el temporizador de LVGL y la lógica de sondeo de datos. Ahora, este módulo se limita a crear los labels y exponer una función ui_telemetry_update_values que es llamada por la telemetry_task externa para actualizar la pantalla. Esto completa el patrón de 'empujar' datos a la UI. */
+
+#include "ui_telemetry.h"
+#include "esp_log.h"
+#include "diymon_evolution.h"
+#include "esp_lvgl_port.h" // Necesario para el bloqueo thread-safe
+
+static const char *TAG = "UI_TELEMETRY";
+
+/* Variables estáticas para los objetos de la UI */
+static lv_obj_t *s_battery_label = NULL;
+static lv_obj_t *s_evo_label = NULL;
+
+/**
+ * @brief Crea y configura los elementos de la UI para la telemetría.
+ */
 void ui_telemetry_create(lv_obj_t *parent) {
     if (!parent) {
         ESP_LOGE(TAG, "El objeto padre es nulo. No se puede crear la telemetría.");
@@ -12044,7 +12334,7 @@ void ui_telemetry_create(lv_obj_t *parent) {
     lv_obj_t * telemetry_cont = lv_obj_create(parent);
     lv_obj_remove_style_all(telemetry_cont);
     lv_obj_set_size(telemetry_cont, 120, 50);
-    lv_obj_align(telemetry_cont, LV_ALIGN_BOTTOM_RIGHT, -5, -5); // Movido abajo
+    lv_obj_align(telemetry_cont, LV_ALIGN_BOTTOM_RIGHT, -5, -5);
     lv_obj_set_flex_flow(telemetry_cont, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(telemetry_cont, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
@@ -12057,50 +12347,52 @@ void ui_telemetry_create(lv_obj_t *parent) {
     s_evo_label = lv_label_create(telemetry_cont);
     lv_obj_set_style_text_color(s_evo_label, lv_color_white(), 0);
     lv_label_set_text(s_evo_label, "EVO: ...");
-
-    // Crear y configurar el temporizador para la actualización periódica
-    if (!s_telemetry_timer) {
-        s_telemetry_timer = lv_timer_create(telemetry_update_timer_cb, 10000, NULL); // 10 segundos
-        ESP_LOGI(TAG, "Temporizador de telemetría creado.");
-    }
     
-    // Forzar una actualización inicial
-    telemetry_update_timer_cb(NULL);
+    // Forzar una actualización inicial con valores por defecto
+    ui_telemetry_update_values(100);
+    ESP_LOGI(TAG, "Módulo de telemetría creado.");
 }
 
+/**
+ * @brief Destruye los recursos asociados al módulo de telemetría.
+ */
 void ui_telemetry_destroy(void) {
-    if (s_telemetry_timer) {
-        lv_timer_del(s_telemetry_timer);
-        s_telemetry_timer = NULL;
-        ESP_LOGI(TAG, "Temporizador de telemetría destruido.");
-    }
-    // LVGL se encarga de los hijos cuando se destruye el padre (la pantalla)
+    // Ya no hay temporizador que borrar. LVGL se encarga de los objetos hijos.
     s_battery_label = NULL;
     s_evo_label = NULL;
+    ESP_LOGI(TAG, "Módulo de telemetría destruido.");
 }
 
-void ui_telemetry_force_update(void) {
-    if (s_telemetry_timer) {
-        ESP_LOGI(TAG, "Forzando actualización de telemetría.");
-        // Llamamos directamente al callback para refrescar la UI al instante.
-        telemetry_update_timer_cb(s_telemetry_timer);
-    } else {
-        ESP_LOGW(TAG, "No se puede forzar la actualización: el temporizador no existe.");
+/**
+ * @brief Actualiza los valores mostrados en los labels de telemetría.
+ */
+void ui_telemetry_update_values(uint8_t battery_percentage) {
+    // Bloquear el mutex de LVGL ya que esta función será llamada desde otra tarea
+    if (lvgl_port_lock(0)) {
+        if (s_battery_label) {
+            lv_label_set_text_fmt(s_battery_label, "%s %d%%", LV_SYMBOL_BATTERY_FULL, battery_percentage);
+        }
+        if (s_evo_label) {
+            const char* evo_code = diymon_get_current_code();
+            lv_label_set_text_fmt(s_evo_label, "EVO: %s", evo_code ? evo_code : "N/A");
+        }
+        lvgl_port_unlock();
     }
 }
 
 --- END OF FILE: .\components\ui\ui_telemetry.c ---
 
 --- START OF FILE: .\components\ui\ui_telemetry.h ---
-/* Fecha: 16/08/2025 - 06:53  */
-/* Fichero: components/diymon_ui/ui_telemetry.h */
-/* Último cambio: Añadida declaración de ui_telemetry_force_update() para actualización bajo demanda. */
-/* Descripción: Define la interfaz para el módulo de telemetría de la UI, encargado de mostrar datos como el nivel de batería y el código de evolución. */
+/* Fecha: 17/08/2025 - 02:14  */
+/* Fichero: components/ui/ui_telemetry.h */
+/* Último cambio: Refactorizado para recibir datos de la telemetry_task en lugar de usar un temporizador propio. */
+/* Descripción: Interfaz del módulo de telemetría de la UI. Se ha eliminado la lógica de temporizador interna y ahora expone una función ui_telemetry_update_values para que una tarea externa (telemetry_task) pueda empujar los datos del sensor para su visualización. */
 
 #ifndef UI_TELEMETRY_H
 #define UI_TELEMETRY_H
 
 #include <lvgl.h>
+#include <stdint.h> // for uint8_t
 
 #ifdef __cplusplus
 extern "C" {
@@ -12119,10 +12411,12 @@ void ui_telemetry_create(lv_obj_t *parent);
 void ui_telemetry_destroy(void);
 
 /**
- * @brief Fuerza una actualización inmediata de los labels de telemetría.
- *        Útil después de una acción que cambia el estado del Diymon, como una evolución.
+ * @brief Actualiza los valores mostrados en los labels de telemetría.
+ *        Esta función es segura para ser llamada desde otras tareas (thread-safe).
+ * 
+ * @param battery_percentage El nivel de batería actual en porcentaje (0-100).
  */
-void ui_telemetry_force_update(void);
+void ui_telemetry_update_values(uint8_t battery_percentage);
 
 #ifdef __cplusplus
 }
@@ -13617,10 +13911,10 @@ endmenu
 --- END OF FILE: .\main\Kconfig.projbuild ---
 
 --- START OF FILE: .\main\main.c ---
-/* Fecha: 16/08/2025 - 08:24  */
+/* Fecha: 17/08/2025 - 02:16  */
 /* Fichero: main/main.c */
-/* Último cambio: Añadido el include de 'actions.h' para resolver el error de compilación. */
-/* Descripción: Se ha añadido `#include "actions.h"` para que las funciones y enums definidos en ese fichero (como `execute_diymon_action` y `ACTION_ID_ACTIVATE_CONFIG_MODE`) sean visibles en `main.c`, corrigiendo el error de compilación por declaración implícita. */
+/* Último cambio: Integrada la nueva tarea de telemetría en el arranque de la aplicación principal. */
+/* Descripción: Orquestador principal de la aplicación. Se ha añadido la llamada a 	elemetry_task_start() en la secuencia de arranque del modo de aplicación principal. Esto lanza la tarea en segundo plano que gestionará la lectura de sensores y la lógica de 'shake-to-wake', completando el desacoplamiento de la lógica de sensores de la UI. */
 
 #include <stdio.h>
 #include <string.h>
@@ -13644,7 +13938,9 @@ endmenu
 #include "screen_manager.h"
 #include "ui_config_screen.h"
 #include "ui_asset_loader.h" 
-#include "actions.h" // [CORRECCIÓN] Include faltante
+#include "actions.h"
+#include "ui_state_manager.h"
+#include "telemetry_task.h" // <-- Nuevo include
 
 #include "esp_err.h"
 #include "esp_check.h"
@@ -13663,72 +13959,10 @@ static void erase_file_server_mode_flag(void);
 static void init_lvgl_for_service_screen(void);
 static void display_network_status_on_screen(bool is_connected, const char* ip_addr);
 static void display_waiting_for_network_on_screen(void);
-static void setup_inactivity_handling(void);
 static bool verify_sdcard_contents(void);
 
-// --- Lógica de Gestión de Inactividad y Despertar ---
-typedef enum { WAKE_STATE_OFF, WAKE_STATE_PRIMED, } wake_up_state_t;
-static bool s_is_dimmed = false;
-static int s_user_brightness = 100;
-static bool s_user_brightness_known = false;
-static wake_up_state_t s_wake_state = WAKE_STATE_OFF;
-static uint8_t s_wake_click_count = 0;
-static lv_timer_t *s_double_click_timer = NULL;
-static lv_timer_t *s_wake_prime_timer = NULL;
 static lv_obj_t *s_status_line1 = NULL;
 static lv_obj_t *s_status_line2 = NULL;
-
-static void read_user_brightness_from_nvs(void) {
-    if (s_user_brightness_known) return;
-    nvs_handle_t nvs_handle;
-    if (nvs_open("storage", NVS_READONLY, &nvs_handle) == ESP_OK) {
-        nvs_get_i32(nvs_handle, "brightness", (int32_t*)&s_user_brightness);
-        nvs_close(nvs_handle);
-        s_user_brightness_known = true;
-    }
-}
-
-static void double_click_timer_cb(lv_timer_t * timer) { s_wake_click_count = 0; s_double_click_timer = NULL; }
-static void wake_prime_timer_cb(lv_timer_t * timer) { s_wake_state = WAKE_STATE_OFF; s_wake_click_count = 0; s_wake_prime_timer = NULL; }
-
-static void screen_touch_event_cb(lv_event_t * e) {
-    lv_event_code_t code = lv_event_get_code(e);
-    lv_disp_t * disp = lv_display_get_default();
-    if (!disp) return;
-    lv_display_trigger_activity(disp);
-    if (code == LV_EVENT_PRESSED && s_is_dimmed && !screen_manager_is_off()) {
-        read_user_brightness_from_nvs(); screen_manager_set_brightness(s_user_brightness); s_is_dimmed = false; return;
-    }
-    if (code == LV_EVENT_CLICKED && screen_manager_is_off()) {
-        if (s_wake_state == WAKE_STATE_OFF) {
-            s_wake_click_count++;
-            if (s_wake_click_count == 1) { s_double_click_timer = lv_timer_create(double_click_timer_cb, 500, NULL); lv_timer_set_repeat_count(s_double_click_timer, 1); }
-            else if (s_wake_click_count == 2) { if (s_double_click_timer) lv_timer_del(s_double_click_timer); s_double_click_timer = NULL; s_wake_state = WAKE_STATE_PRIMED; s_wake_click_count = 0; s_wake_prime_timer = lv_timer_create(wake_prime_timer_cb, 3000, NULL); lv_timer_set_repeat_count(s_wake_prime_timer, 1); }
-        } else if (s_wake_state == WAKE_STATE_PRIMED) {
-            s_wake_click_count++;
-            if (s_wake_click_count == 1) { s_double_click_timer = lv_timer_create(double_click_timer_cb, 500, NULL); lv_timer_set_repeat_count(s_double_click_timer, 1); }
-            else if (s_wake_click_count >= 2) { if (s_double_click_timer) lv_timer_del(s_double_click_timer); if (s_wake_prime_timer) lv_timer_del(s_wake_prime_timer); s_double_click_timer = NULL; s_wake_prime_timer = NULL; screen_manager_turn_on(); s_is_dimmed = false; s_wake_state = WAKE_STATE_OFF; s_wake_click_count = 0; }
-        }
-    }
-}
-
-static void inactivity_timer_cb(lv_timer_t * timer) {
-    lv_disp_t * disp = lv_display_get_default();
-    if (!disp) return;
-    uint32_t inactivity_ms = lv_display_get_inactive_time(disp);
-    bool is_off = screen_manager_is_off();
-    if (inactivity_ms < 30000 && s_is_dimmed) s_is_dimmed = false;
-    if (!is_off && inactivity_ms > 60000) { screen_manager_turn_off(); s_is_dimmed = false; }
-    else if (!is_off && !s_is_dimmed && inactivity_ms > 30000) { read_user_brightness_from_nvs(); screen_manager_set_brightness(10); s_is_dimmed = true; }
-}
-
-static void setup_inactivity_handling(void) {
-    lv_timer_create(inactivity_timer_cb, 5000, NULL);
-    lv_obj_t * scr = lv_screen_active();
-    if (scr) {
-        lv_obj_add_event_cb(scr, screen_touch_event_cb, LV_EVENT_ALL, NULL);
-    }
-}
 
 void app_main(void) {
     nvs_flash_init();
@@ -13777,7 +14011,7 @@ static void run_main_application_mode(void) {
 
     if (lvgl_port_lock(0)) {
         ui_init();
-        setup_inactivity_handling();
+        ui_state_manager_init(); 
         lvgl_port_unlock();
     }
     ESP_LOGI(TAG, "Interfaz de Usuario principal inicializada.");
@@ -13787,13 +14021,15 @@ static void run_main_application_mode(void) {
         vTaskDelay(pdMS_TO_TICKS(500));
         execute_diymon_action(ACTION_ID_ACTIVATE_CONFIG_MODE);
     } else {
+        // Iniciar la tarea de telemetría solo si todo ha ido bien
+        telemetry_task_start();
         ESP_LOGI(TAG, "¡Firmware DIYMON en marcha!");
     }
 }
 
 static void run_headless_wifi_portal_mode(void) { bsp_init_minimal_headless(); bsp_wifi_init_stack(); wifi_portal_start(); }
-static void run_file_server_mode(void) { bsp_init_service_mode(); init_lvgl_for_service_screen(); if (lvgl_port_lock(0)) { ui_config_screen_show(); setup_inactivity_handling(); lvgl_port_unlock(); } display_waiting_for_network_on_screen(); bsp_wifi_init_stack(); bsp_wifi_init_sta_from_nvs(); bool ip_ok = bsp_wifi_wait_for_ip(15000); char ip_addr_buffer[16] = "N/A"; if (ip_ok) { bsp_wifi_get_ip(ip_addr_buffer); } else { bsp_wifi_start_ap(); } display_network_status_on_screen(ip_ok, ip_addr_buffer); web_server_start(); }
-static void run_wifi_portal_mode(void) { bsp_init_service_mode(); init_lvgl_for_service_screen(); if (lvgl_port_lock(0)) { ui_config_screen_show(); setup_inactivity_handling(); lvgl_port_unlock(); } display_waiting_for_network_on_screen(); vTaskDelay(pdMS_TO_TICKS(1500)); display_network_status_on_screen(false, NULL); bsp_wifi_init_stack(); wifi_portal_start(); }
+static void run_file_server_mode(void) { bsp_init_service_mode(); init_lvgl_for_service_screen(); if (lvgl_port_lock(0)) { ui_config_screen_show(); ui_state_manager_init(); lvgl_port_unlock(); } display_waiting_for_network_on_screen(); bsp_wifi_init_stack(); bsp_wifi_init_sta_from_nvs(); bool ip_ok = bsp_wifi_wait_for_ip(15000); char ip_addr_buffer[16] = "N/A"; if (ip_ok) { bsp_wifi_get_ip(ip_addr_buffer); } else { bsp_wifi_start_ap(); } display_network_status_on_screen(ip_ok, ip_addr_buffer); web_server_start(); }
+static void run_wifi_portal_mode(void) { bsp_init_service_mode(); init_lvgl_for_service_screen(); if (lvgl_port_lock(0)) { ui_config_screen_show(); ui_state_manager_init(); lvgl_port_unlock(); } display_waiting_for_network_on_screen(); vTaskDelay(pdMS_TO_TICKS(1500)); display_network_status_on_screen(false, NULL); bsp_wifi_init_stack(); wifi_portal_start(); }
 static bool check_file_server_mode_flag(void) { nvs_handle_t nvs; esp_err_t err = nvs_open("storage", NVS_READONLY, &nvs); if (err != ESP_OK) return false; char flag[8] = {0}; size_t len = sizeof(flag); err = nvs_get_str(nvs, "file_server", flag, &len); nvs_close(nvs); return (err == ESP_OK && strcmp(flag, "1") == 0); }
 static void erase_file_server_mode_flag(void) { nvs_handle_t nvs; if (nvs_open("storage", NVS_READWRITE, &nvs) == ESP_OK) { nvs_erase_key(nvs, "file_server"); nvs_commit(nvs); nvs_close(nvs); } }
 static void init_lvgl_for_service_screen(void) { const lvgl_port_cfg_t c = ESP_LVGL_PORT_INIT_CONFIG(); lvgl_port_init(&c); const lvgl_port_display_cfg_t d = { .io_handle=bsp_get_panel_io_handle(), .panel_handle=bsp_get_display_handle(), .buffer_size=bsp_get_display_buffer_size(), .double_buffer=1, .hres=bsp_get_display_hres(), .vres=bsp_get_display_vres(), .flags={.swap_bytes=true}}; lv_disp_t* disp=lvgl_port_add_disp(&d); const lvgl_port_touch_cfg_t t = {.disp=disp, .handle=bsp_get_touch_handle()}; lvgl_port_add_touch(&t); }

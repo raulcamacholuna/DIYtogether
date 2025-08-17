@@ -1,7 +1,7 @@
-/* Fecha: 17/08/2025 - 01:50  */
+/* Fecha: 17/08/2025 - 02:33  */
 /* Fichero: components/ui/actions/action_config_mode.c */
-/* Último cambio: Implementación de la lógica del modo de configuración, movida desde 'actions.c'. */
-/* Descripción: Módulo que gestiona el estado y la UI del modo de configuración WiFi. Contiene todas las variables de estado, la tarea de red y los callbacks de UI relacionados, encapsulando esta compleja funcionalidad. */
+/* Último cambio: Actualizadas las llamadas al gestor de telemetría para reflejar la refactorización a ui/core/. */
+/* Descripción: Módulo que gestiona el modo de configuración WiFi. Se han actualizado las llamadas a las funciones de telemetría (de ui_telemetry_* a telemetry_manager_*) para mantener la consistencia con la nueva estructura del núcleo de la UI. */
 
 #include "actions/action_config_mode.h"
 #include "esp_log.h"
@@ -12,7 +12,7 @@
 #include "esp_lvgl_port.h"
 #include "bsp_api.h"
 #include "web_server.h"
-#include "ui_telemetry.h"
+#include "telemetry_manager.h"
 #include "screens.h"
 #include "ui_idle_animation.h"
 #include "ui_actions_panel.h"
@@ -88,7 +88,7 @@ void action_config_mode_start(void) {
 
     ui_actions_panel_hide_all();
     ui_idle_animation_stop();
-    ui_telemetry_destroy();
+    telemetry_manager_destroy();
     if (g_animation_img_obj) lv_obj_add_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
     
     vTaskDelay(pdMS_TO_TICKS(500));
@@ -134,7 +134,7 @@ void action_config_mode_stop(void) {
         if (s_config_back_button) { lv_obj_del(s_config_back_button); s_config_back_button = NULL; }
 
         if(g_animation_img_obj) lv_obj_clear_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
-        ui_telemetry_create(g_main_screen_obj);
+        telemetry_manager_create(g_main_screen_obj);
         ui_idle_animation_start(g_main_screen_obj);
     }
 }

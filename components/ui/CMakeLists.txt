@@ -1,14 +1,14 @@
-# Fecha: 17/08/2025 - 01:57 
+# Fecha: 17/08/2025 - 02:27 
 # Fichero: components/ui/CMakeLists.txt
-# Último cambio: Corregida la sintaxis de CMake para la expansión de variables de la lista de fuentes.
-# Descripción: Se ha corregido la forma en que se pasa la variable de fuentes a idf_component_register. La sintaxis anterior causaba un error de expansión de variable, haciendo que CMake buscara un fichero inexistente '$'. La sintaxis corregida asegura la correcta expansión de la lista de ficheros fuente, resolviendo el error de compilación.
+# Último cambio: Añadido el subdirectorio 'core' a la lista de fuentes y directorios de inclusión para reflejar la nueva estructura del componente.
+# Descripción: Fichero de compilación para el componente UI. Se ha actualizado para incluir los ficheros fuente y las cabeceras del nuevo subdirectorio 'core', que contiene la lógica principal de la UI (inicialización, gestión de estado y telemetría).
 
 file(GLOB component_sources
     "*.c"
+    "core/*.c"
     "screens/*.c"
     "actions/*.c"
     "styles/*.c"
-    "ui_telemetry.c"
     "assets/*.c"
     "buttons/*.c"
 )
@@ -19,6 +19,7 @@ idf_component_register(
         "."
         "buttons"
         "actions"
+        "core"
     PRIV_INCLUDE_DIRS "."
     REQUIRES
         lvgl
