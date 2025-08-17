@@ -1,7 +1,7 @@
-# Fecha: 16/08/2025 - 09:24 
+# Fecha: 17/08/2025 - 01:17 
 # Fichero: components/ui/CMakeLists.txt
-# Último cambio: Corregidas las dependencias de componentes para que coincidan con los nuevos nombres de directorio.
-# Descripción: Se ha actualizado la lista `REQUIRES` para usar los nombres de componente cortos ('bsp', 'core') en lugar de los antiguos ('diymon_bsp', 'diymon_core'). Esto resuelve el error de compilación de CMake "Failed to resolve component 'diymon_bsp'".
+# Último cambio: Añadido el subdirectorio 'buttons' a las fuentes y a las rutas de inclusión para soportar la refactorización de los botones.
+# Descripción: Fichero de compilación del componente de la UI. Se ha actualizado para incluir todos los ficheros .c del nuevo subdirectorio 'buttons' en la compilación y para añadir 'buttons' a las rutas de inclusión, permitiendo que el resto del componente pueda acceder a las nuevas cabeceras de los botones modulares.
 
 file(GLOB component_sources
     "*.c"

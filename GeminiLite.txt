@@ -8199,104 +8199,79 @@ esp_err_t service_screen_show(const char* image_path);
 #endif // SERVICE_SCREEN_H
 --- END OF FILE: .\components\service_screen\service_screen.h ---
 
---- START OF FILE: .\components\ui\buttons\buttons_player.c ---
-/* Fecha: 16/08/2025 - 09:09  */
-/* Fichero: components/ui/buttons/buttons_player.c */
-/* Último cambio: Creación del fichero de implementación para los botones del jugador. */
-/* Descripción: Este fichero contiene la lógica para crear, posicionar y conectar los eventos de los botones de acción del jugador (Comer, Ejercicio, Atacar). Está diseñado para ser utilizado por el gestor de paneles de la UI. */
-
-#include "buttons_player.h"
-#include "actions.h"
+--- START OF FILE: .\components\ui\buttons\btn_1.c ---
+/* Fecha: 17/08/2025 - 01:18 
+# Fichero: components/ui/buttons/btn_1.c
+# Último cambio: Implementación del módulo para el botón 'Comer' (BTN_1) como parte de la refactorización.
+# Descripción: Este fichero encapsula toda la lógica para el botón 'Comer': su creación, la asignación del icono, el posicionamiento inicial y la conexión de su evento de clic a la acción ACTION_ID_COMER. Esto elimina la dependencia de ui_actions_panel.c y ui.c para este botón específico.
+*/
+#include "btn_1.h"
 #include "ui_asset_loader.h"
-#include "esp_log.h"
+#include "actions.h"
 
-// --- Constantes de diseño ---
+// --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
 #define BUTTON_PADDING 10
 
-// --- Variables estáticas para los objetos de los botones ---
-// 'static' asegura que estas variables solo son visibles dentro de este fichero.
-static lv_obj_t *s_eat_btn = NULL;
-static lv_obj_t *s_gym_btn = NULL;
-static lv_obj_t *s_atk_btn = NULL;
+// --- Variable estática para el manejador del botón ---
+static lv_obj_t *s_btn_1_handle = NULL;
 
 /**
- * @brief Callback genérico para todos los botones de este módulo.
- *        Ejecuta la acción correspondiente al botón presionado.
+ * @brief Callback de evento específico para el botón 'Comer'.
+ *        Ejecuta la acción de comer cuando se presiona el botón.
  * @param e Puntero al evento de LVGL.
  */
-static void button_event_cb(lv_event_t *e) {
+static void btn_1_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_PRESSED || code == LV_EVENT_CLICKED) {
-        // Obtenemos el ID de la acción que guardamos al conectar el evento.
-        diymon_action_id_t action_id = (diymon_action_id_t)(intptr_t)lv_event_get_user_data(e);
-        execute_diymon_action(action_id);
+    if (code == LV_EVENT_PRESSED) {
+        execute_diymon_action(ACTION_ID_COMER);
     }
 }
 
 /**
- * @brief Función de ayuda para crear un botón de acción estandarizado.
- * @param parent El objeto padre.
- * @param asset_id El icono a mostrar en el botón.
- * @param index La posición del botón en el panel (0, 1, 2...).
- * @return Un puntero al objeto de botón creado.
+ * @brief Crea el objeto del botón 'Comer'.
  */
-static lv_obj_t* create_player_action_button(lv_obj_t *parent, ui_asset_id_t asset_id, int index) {
-    lv_obj_t *btn = lv_btn_create(parent);
-    lv_obj_remove_style_all(btn);
-    lv_obj_set_size(btn, BUTTON_SIZE, BUTTON_SIZE);
-    
-    lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, LV_STATE_ANY);
-    lv_obj_set_style_border_width(btn, 0, LV_STATE_ANY);
-    lv_obj_set_style_shadow_width(btn, 0, LV_STATE_ANY);
+void btn_1_create(lv_obj_t *parent) {
+    s_btn_1_handle = lv_btn_create(parent);
+    lv_obj_remove_style_all(s_btn_1_handle);
+    lv_obj_set_size(s_btn_1_handle, BUTTON_SIZE, BUTTON_SIZE);
 
-    lv_obj_t *img = lv_img_create(btn);
-    lv_img_set_src(img, ui_assets_get_icon(asset_id));
+    // --- Estilos del botón ---
+    lv_obj_set_style_bg_opa(s_btn_1_handle, LV_OPA_TRANSP, LV_STATE_ANY);
+    lv_obj_set_style_border_width(s_btn_1_handle, 0, LV_STATE_ANY);
+    lv_obj_set_style_shadow_width(s_btn_1_handle, 0, LV_STATE_ANY);
+
+    // --- Icono del botón ---
+    lv_obj_t *img = lv_img_create(s_btn_1_handle);
+    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_EAT));
     lv_obj_center(img);
-        
-    // Posición inicial fuera de la pantalla para la animación de entrada.
-    lv_obj_set_pos(btn, (BUTTON_SIZE + BUTTON_PADDING) * index, -BUTTON_SIZE);
-    lv_obj_add_flag(btn, LV_OBJ_FLAG_HIDDEN);
-    
-    return btn;
+
+    // --- Posición inicial (para animación de entrada) ---
+    // El índice de este botón es 0 en su panel.
+    lv_obj_set_pos(s_btn_1_handle, (BUTTON_SIZE + BUTTON_PADDING) * 0, -BUTTON_SIZE);
+    lv_obj_add_flag(s_btn_1_handle, LV_OBJ_FLAG_HIDDEN);
+
+    // --- Conexión del evento ---
+    lv_obj_add_event_cb(s_btn_1_handle, btn_1_event_cb, LV_EVENT_PRESSED, NULL);
 }
 
-// --- Implementación de Funciones Públicas ---
-
-void ui_buttons_player_create(lv_obj_t *parent) {
-    s_eat_btn = create_player_action_button(parent, ASSET_ICON_EAT, 0);
-    s_gym_btn = create_player_action_button(parent, ASSET_ICON_GYM, 1);
-    s_atk_btn = create_player_action_button(parent, ASSET_ICON_ATK, 2);
+/**
+ * @brief Obtiene el manejador del botón 'Comer'.
+ */
+lv_obj_t* btn_1_get_handle(void) {
+    return s_btn_1_handle;
 }
 
-void ui_buttons_player_connect_events(void) {
-    if (s_eat_btn) lv_obj_add_event_cb(s_eat_btn, button_event_cb, LV_EVENT_PRESSED, (void*)ACTION_ID_COMER);
-    if (s_gym_btn) lv_obj_add_event_cb(s_gym_btn, button_event_cb, LV_EVENT_PRESSED, (void*)ACTION_ID_EJERCICIO);
-    if (s_atk_btn) lv_obj_add_event_cb(s_atk_btn, button_event_cb, LV_EVENT_PRESSED, (void*)ACTION_ID_ATACAR);
-}
+--- END OF FILE: .\components\ui\buttons\btn_1.c ---
 
-lv_obj_t* ui_buttons_player_get_eat_btn(void) {
-    return s_eat_btn;
-}
-
-lv_obj_t* ui_buttons_player_get_gym_btn(void) {
-    return s_gym_btn;
-}
-
-lv_obj_t* ui_buttons_player_get_atk_btn(void) {
-    return s_atk_btn;
-}
-
---- END OF FILE: .\components\ui\buttons\buttons_player.c ---
-
---- START OF FILE: .\components\ui\buttons\buttons_player.h ---
-/* Fecha: 16/08/2025 - 09:06  */
-/* Fichero: components/ui/buttons/buttons_player.h */
-/* Último cambio: Creación del fichero de cabecera para el sub-componente de botones del jugador. */
-/* Descripción: Define la interfaz pública para crear y gestionar los botones de 'Comer', 'Ejercicio' y 'Atacar'. Este módulo encapsula la creación de los objetos LVGL y expone funciones para conectar sus eventos. */
-
-#ifndef BUTTONS_PLAYER_H
-#define BUTTONS_PLAYER_H
+--- START OF FILE: .\components\ui\buttons\btn_1.h ---
+/* Fecha: 17/08/2025 - 01:17 
+# Fichero: components/ui/buttons/btn_1.h
+# Último cambio: Creación del fichero de cabecera para el botón 'Comer' (BTN_1).
+# Descripción: Define la interfaz pública para el módulo del botón 'Comer'. Expone funciones para crear el objeto LVGL del botón y para obtener su manejador, encapsulando su lógica.
+*/
+#ifndef BTN_1_H
+#define BTN_1_H
 
 #include "lvgl.h"
 
@@ -8305,43 +8280,1471 @@ extern "C" {
 #endif
 
 /**
- * @brief Crea los botones de acción del jugador (Comer, Ejercicio, Atacar).
+ * @brief Crea el objeto LVGL para el botón 'Comer'.
  * 
- * @param parent El objeto LVGL padre sobre el cual se crearán los botones.
+ * @param parent El objeto LVGL padre sobre el cual se creará el botón.
  */
-void ui_buttons_player_create(lv_obj_t *parent);
-
-/**
- * @brief Conecta los eventos de clic de los botones del jugador a sus acciones correspondientes.
- */
-void ui_buttons_player_connect_events(void);
+void btn_1_create(lv_obj_t *parent);
 
 /**
  * @brief Obtiene el manejador del botón 'Comer'.
+ * 
  * @return Un puntero al objeto lv_obj_t del botón.
  */
-lv_obj_t* ui_buttons_player_get_eat_btn(void);
+lv_obj_t* btn_1_get_handle(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // BTN_1_H
+
+--- END OF FILE: .\components\ui\buttons\btn_1.h ---
+
+--- START OF FILE: .\components\ui\buttons\btn_2.c ---
+/* Fecha: 17/08/2025 - 01:19 
+# Fichero: components/ui/buttons/btn_2.c
+# Último cambio: Implementación del módulo para el botón 'Ejercicio' (BTN_2).
+# Descripción: Encapsula la lógica del botón 'Ejercicio', incluyendo creación, estilo, icono (ASSET_ICON_GYM) y conexión de evento a la acción ACTION_ID_EJERCICIO. Continúa la refactorización modular.
+*/
+#include "btn_2.h"
+#include "ui_asset_loader.h"
+#include "actions.h"
+
+// --- Definiciones de diseño locales ---
+#define BUTTON_SIZE 50
+#define BUTTON_PADDING 10
+
+// --- Variable estática para el manejador del botón ---
+static lv_obj_t *s_btn_2_handle = NULL;
+
+/**
+ * @brief Callback de evento específico para el botón 'Ejercicio'.
+ *        Ejecuta la acción de ejercicio cuando se presiona el botón.
+ * @param e Puntero al evento de LVGL.
+ */
+static void btn_2_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_PRESSED) {
+        execute_diymon_action(ACTION_ID_EJERCICIO);
+    }
+}
+
+/**
+ * @brief Crea el objeto del botón 'Ejercicio'.
+ */
+void btn_2_create(lv_obj_t *parent) {
+    s_btn_2_handle = lv_btn_create(parent);
+    lv_obj_remove_style_all(s_btn_2_handle);
+    lv_obj_set_size(s_btn_2_handle, BUTTON_SIZE, BUTTON_SIZE);
+
+    // --- Estilos del botón ---
+    lv_obj_set_style_bg_opa(s_btn_2_handle, LV_OPA_TRANSP, LV_STATE_ANY);
+    lv_obj_set_style_border_width(s_btn_2_handle, 0, LV_STATE_ANY);
+    lv_obj_set_style_shadow_width(s_btn_2_handle, 0, LV_STATE_ANY);
+
+    // --- Icono del botón ---
+    lv_obj_t *img = lv_img_create(s_btn_2_handle);
+    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_GYM));
+    lv_obj_center(img);
+
+    // --- Posición inicial (para animación de entrada) ---
+    // El índice de este botón es 1 en su panel.
+    lv_obj_set_pos(s_btn_2_handle, (BUTTON_SIZE + BUTTON_PADDING) * 1, -BUTTON_SIZE);
+    lv_obj_add_flag(s_btn_2_handle, LV_OBJ_FLAG_HIDDEN);
+
+    // --- Conexión del evento ---
+    lv_obj_add_event_cb(s_btn_2_handle, btn_2_event_cb, LV_EVENT_PRESSED, NULL);
+}
 
 /**
  * @brief Obtiene el manejador del botón 'Ejercicio'.
+ */
+lv_obj_t* btn_2_get_handle(void) {
+    return s_btn_2_handle;
+}
+
+--- END OF FILE: .\components\ui\buttons\btn_2.c ---
+
+--- START OF FILE: .\components\ui\buttons\btn_2.h ---
+/* Fecha: 17/08/2025 - 01:18 
+# Fichero: components/ui/buttons/btn_2.h
+# Último cambio: Creación del fichero de cabecera para el botón 'Ejercicio' (BTN_2).
+# Descripción: Define la interfaz pública para el módulo del botón 'Ejercicio'. Expone funciones para crear el objeto LVGL del botón y para obtener su manejador.
+*/
+#ifndef BTN_2_H
+#define BTN_2_H
+
+#include "lvgl.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Crea el objeto LVGL para el botón 'Ejercicio'.
+ * 
+ * @param parent El objeto LVGL padre sobre el cual se creará el botón.
+ */
+void btn_2_create(lv_obj_t *parent);
+
+/**
+ * @brief Obtiene el manejador del botón 'Ejercicio'.
+ * 
  * @return Un puntero al objeto lv_obj_t del botón.
  */
-lv_obj_t* ui_buttons_player_get_gym_btn(void);
+lv_obj_t* btn_2_get_handle(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // BTN_2_H
+
+--- END OF FILE: .\components\ui\buttons\btn_2.h ---
+
+--- START OF FILE: .\components\ui\buttons\btn_3.c ---
+/* Fecha: 17/08/2025 - 01:20 
+# Fichero: components/ui/buttons/btn_3.c
+# Último cambio: Implementación del módulo para el botón 'Atacar' (BTN_3).
+# Descripción: Encapsula la lógica del botón 'Atacar', incluyendo creación, estilo, icono (ASSET_ICON_ATK) y conexión de evento a la acción ACTION_ID_ATACAR.
+*/
+#include "btn_3.h"
+#include "ui_asset_loader.h"
+#include "actions.h"
+
+// --- Definiciones de diseño locales ---
+#define BUTTON_SIZE 50
+#define BUTTON_PADDING 10
+
+// --- Variable estática para el manejador del botón ---
+static lv_obj_t *s_btn_3_handle = NULL;
+
+/**
+ * @brief Callback de evento específico para el botón 'Atacar'.
+ *        Ejecuta la acción de atacar cuando se presiona el botón.
+ * @param e Puntero al evento de LVGL.
+ */
+static void btn_3_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_PRESSED) {
+        execute_diymon_action(ACTION_ID_ATACAR);
+    }
+}
+
+/**
+ * @brief Crea el objeto del botón 'Atacar'.
+ */
+void btn_3_create(lv_obj_t *parent) {
+    s_btn_3_handle = lv_btn_create(parent);
+    lv_obj_remove_style_all(s_btn_3_handle);
+    lv_obj_set_size(s_btn_3_handle, BUTTON_SIZE, BUTTON_SIZE);
+
+    // --- Estilos del botón ---
+    lv_obj_set_style_bg_opa(s_btn_3_handle, LV_OPA_TRANSP, LV_STATE_ANY);
+    lv_obj_set_style_border_width(s_btn_3_handle, 0, LV_STATE_ANY);
+    lv_obj_set_style_shadow_width(s_btn_3_handle, 0, LV_STATE_ANY);
+
+    // --- Icono del botón ---
+    lv_obj_t *img = lv_img_create(s_btn_3_handle);
+    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_ATK));
+    lv_obj_center(img);
+
+    // --- Posición inicial (para animación de entrada) ---
+    // El índice de este botón es 2 en su panel.
+    lv_obj_set_pos(s_btn_3_handle, (BUTTON_SIZE + BUTTON_PADDING) * 2, -BUTTON_SIZE);
+    lv_obj_add_flag(s_btn_3_handle, LV_OBJ_FLAG_HIDDEN);
+
+    // --- Conexión del evento ---
+    lv_obj_add_event_cb(s_btn_3_handle, btn_3_event_cb, LV_EVENT_PRESSED, NULL);
+}
 
 /**
  * @brief Obtiene el manejador del botón 'Atacar'.
+ */
+lv_obj_t* btn_3_get_handle(void) {
+    return s_btn_3_handle;
+}
+
+--- END OF FILE: .\components\ui\buttons\btn_3.c ---
+
+--- START OF FILE: .\components\ui\buttons\btn_3.h ---
+/* Fecha: 17/08/2025 - 01:19 
+# Fichero: components/ui/buttons/btn_3.h
+# Último cambio: Creación del fichero de cabecera para el botón 'Atacar' (BTN_3).
+# Descripción: Define la interfaz pública para el módulo del botón 'Atacar'. Expone funciones para crear el objeto LVGL del botón y para obtener su manejador.
+*/
+#ifndef BTN_3_H
+#define BTN_3_H
+
+#include "lvgl.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Crea el objeto LVGL para el botón 'Atacar'.
+ * 
+ * @param parent El objeto LVGL padre sobre el cual se creará el botón.
+ */
+void btn_3_create(lv_obj_t *parent);
+
+/**
+ * @brief Obtiene el manejador del botón 'Atacar'.
+ * 
  * @return Un puntero al objeto lv_obj_t del botón.
  */
-lv_obj_t* ui_buttons_player_get_atk_btn(void);
+lv_obj_t* btn_3_get_handle(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // BTN_3_H
+
+--- END OF FILE: .\components\ui\buttons\btn_3.h ---
+
+--- START OF FILE: .\components\ui\buttons\btn_4.c ---
+/* Fecha: 17/08/2025 - 01:20 
+# Fichero: components/ui/buttons/btn_4.c
+# Último cambio: Implementación del módulo para el botón 'Brillo' (BTN_4).
+# Descripción: Encapsula la lógica del botón 'Brillo', incluyendo creación, estilo, icono (ASSET_ICON_BRIGHTNESS) y conexión de evento a la acción ACTION_ID_BRIGHTNESS_CYCLE.
+*/
+#include "btn_4.h"
+#include "ui_asset_loader.h"
+#include "actions.h"
+
+// --- Definiciones de diseño locales ---
+#define BUTTON_SIZE 50
+#define BUTTON_PADDING 10
+
+// --- Variable estática para el manejador del botón ---
+static lv_obj_t *s_btn_4_handle = NULL;
+
+/**
+ * @brief Callback de evento específico para el botón 'Brillo'.
+ *        Ejecuta la acción de ciclar el brillo.
+ * @param e Puntero al evento de LVGL.
+ */
+static void btn_4_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        execute_diymon_action(ACTION_ID_BRIGHTNESS_CYCLE);
+    }
+}
+
+/**
+ * @brief Crea el objeto del botón 'Brillo'.
+ */
+void btn_4_create(lv_obj_t *parent) {
+    s_btn_4_handle = lv_btn_create(parent);
+    lv_obj_remove_style_all(s_btn_4_handle);
+    lv_obj_set_size(s_btn_4_handle, BUTTON_SIZE, BUTTON_SIZE);
+
+    // --- Estilos del botón ---
+    lv_obj_set_style_bg_opa(s_btn_4_handle, LV_OPA_TRANSP, LV_STATE_ANY);
+    lv_obj_set_style_border_width(s_btn_4_handle, 0, LV_STATE_ANY);
+    lv_obj_set_style_shadow_width(s_btn_4_handle, 0, LV_STATE_ANY);
+
+    // --- Icono del botón ---
+    lv_obj_t *img = lv_img_create(s_btn_4_handle);
+    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_BRIGHTNESS));
+    lv_obj_center(img);
+
+    // --- Posición inicial (para animación de entrada) ---
+    // El índice de este botón es 0 en su panel.
+    lv_obj_set_pos(s_btn_4_handle, (BUTTON_SIZE + BUTTON_PADDING) * 0, -BUTTON_SIZE);
+    lv_obj_add_flag(s_btn_4_handle, LV_OBJ_FLAG_HIDDEN);
+
+    // --- Conexión del evento ---
+    lv_obj_add_event_cb(s_btn_4_handle, btn_4_event_cb, LV_EVENT_CLICKED, NULL);
+}
+
+/**
+ * @brief Obtiene el manejador del botón 'Brillo'.
+ */
+lv_obj_t* btn_4_get_handle(void) {
+    return s_btn_4_handle;
+}
+
+--- END OF FILE: .\components\ui\buttons\btn_4.c ---
+
+--- START OF FILE: .\components\ui\buttons\btn_4.h ---
+/* Fecha: 17/08/2025 - 01:20 
+# Fichero: components/ui/buttons/btn_4.h
+# Último cambio: Creación del fichero de cabecera para el botón 'Brillo' (BTN_4).
+# Descripción: Define la interfaz pública para el módulo del botón 'Brillo'. Expone funciones para crear el objeto LVGL del botón y para obtener su manejador.
+*/
+#ifndef BTN_4_H
+#define BTN_4_H
+
+#include "lvgl.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Crea el objeto LVGL para el botón 'Brillo'.
+ * 
+ * @param parent El objeto LVGL padre sobre el cual se creará el botón.
+ */
+void btn_4_create(lv_obj_t *parent);
+
+/**
+ * @brief Obtiene el manejador del botón 'Brillo'.
+ * 
+ * @return Un puntero al objeto lv_obj_t del botón.
+ */
+lv_obj_t* btn_4_get_handle(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // BTN_4_H
+
+--- END OF FILE: .\components\ui\buttons\btn_4.h ---
+
+--- START OF FILE: .\components\ui\buttons\btn_5.c ---
+/* Fecha: 17/08/2025 - 01:21 
+# Fichero: components/ui/buttons/btn_5.c
+# Último cambio: Implementación del módulo para el botón 'Apagar Pantalla' (BTN_5).
+# Descripción: Encapsula la lógica del botón 'Apagar Pantalla', incluyendo creación, estilo, icono (ASSET_ICON_SCREEN_OFF) y conexión de evento a la acción ACTION_ID_TOGGLE_SCREEN.
+*/
+#include "btn_5.h"
+#include "ui_asset_loader.h"
+#include "actions.h"
+
+// --- Definiciones de diseño locales ---
+#define BUTTON_SIZE 50
+#define BUTTON_PADDING 10
+
+// --- Variable estática para el manejador del botón ---
+static lv_obj_t *s_btn_5_handle = NULL;
+
+/**
+ * @brief Callback de evento específico para el botón 'Apagar Pantalla'.
+ *        Ejecuta la acción de apagar/encender la pantalla.
+ * @param e Puntero al evento de LVGL.
+ */
+static void btn_5_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        execute_diymon_action(ACTION_ID_TOGGLE_SCREEN);
+    }
+}
+
+/**
+ * @brief Crea el objeto del botón 'Apagar Pantalla'.
+ */
+void btn_5_create(lv_obj_t *parent) {
+    s_btn_5_handle = lv_btn_create(parent);
+    lv_obj_remove_style_all(s_btn_5_handle);
+    lv_obj_set_size(s_btn_5_handle, BUTTON_SIZE, BUTTON_SIZE);
+
+    // --- Estilos del botón ---
+    lv_obj_set_style_bg_opa(s_btn_5_handle, LV_OPA_TRANSP, LV_STATE_ANY);
+    lv_obj_set_style_border_width(s_btn_5_handle, 0, LV_STATE_ANY);
+    lv_obj_set_style_shadow_width(s_btn_5_handle, 0, LV_STATE_ANY);
+
+    // --- Icono del botón ---
+    lv_obj_t *img = lv_img_create(s_btn_5_handle);
+    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_SCREEN_OFF));
+    lv_obj_center(img);
+
+    // --- Posición inicial (para animación de entrada) ---
+    // El índice de este botón es 1 en su panel.
+    lv_obj_set_pos(s_btn_5_handle, (BUTTON_SIZE + BUTTON_PADDING) * 1, -BUTTON_SIZE);
+    lv_obj_add_flag(s_btn_5_handle, LV_OBJ_FLAG_HIDDEN);
+
+    // --- Conexión del evento ---
+    lv_obj_add_event_cb(s_btn_5_handle, btn_5_event_cb, LV_EVENT_CLICKED, NULL);
+}
+
+/**
+ * @brief Obtiene el manejador del botón 'Apagar Pantalla'.
+ */
+lv_obj_t* btn_5_get_handle(void) {
+    return s_btn_5_handle;
+}
+
+--- END OF FILE: .\components\ui\buttons\btn_5.c ---
+
+--- START OF FILE: .\components\ui\buttons\btn_5.h ---
+/* Fecha: 17/08/2025 - 01:20 
+# Fichero: components/ui/buttons/btn_5.h
+# Último cambio: Creación del fichero de cabecera para el botón 'Apagar Pantalla' (BTN_5).
+# Descripción: Define la interfaz pública para el módulo del botón 'Apagar Pantalla'. Expone funciones para crear el objeto LVGL del botón y para obtener su manejador.
+*/
+#ifndef BTN_5_H
+#define BTN_5_H
+
+#include "lvgl.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Crea el objeto LVGL para el botón 'Apagar Pantalla'.
+ * 
+ * @param parent El objeto LVGL padre sobre el cual se creará el botón.
+ */
+void btn_5_create(lv_obj_t *parent);
+
+/**
+ * @brief Obtiene el manejador del botón 'Apagar Pantalla'.
+ * 
+ * @return Un puntero al objeto lv_obj_t del botón.
+ */
+lv_obj_t* btn_5_get_handle(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // BTN_5_H
+
+--- END OF FILE: .\components\ui\buttons\btn_5.h ---
+
+--- START OF FILE: .\components\ui\buttons\btn_6.c ---
+/* Fecha: 17/08/2025 - 01:21 
+# Fichero: components\ui\buttons\btn_6.c
+# Último cambio: Implementación del módulo para el botón 'Modo Config' (BTN_6).
+# Descripción: Encapsula la lógica del botón que activa el modo de configuración WiFi. Utiliza el icono 'ASSET_ICON_ADMIN_PLACEHOLDER' y conecta el evento de clic a la acción 'ACTION_ID_ACTIVATE_CONFIG_MODE', reflejando la refactorización previa.
+*/
+#include "btn_6.h"
+#include "ui_asset_loader.h"
+#include "actions.h"
+
+// --- Definiciones de diseño locales ---
+#define BUTTON_SIZE 50
+#define BUTTON_PADDING 10
+
+// --- Variable estática para el manejador del botón ---
+static lv_obj_t *s_btn_6_handle = NULL;
+
+/**
+ * @brief Callback de evento específico para el botón 'Modo Config'.
+ *        Ejecuta la acción de activar el modo de configuración.
+ * @param e Puntero al evento de LVGL.
+ */
+static void btn_6_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        execute_diymon_action(ACTION_ID_ACTIVATE_CONFIG_MODE);
+    }
+}
+
+/**
+ * @brief Crea el objeto del botón 'Modo Config'.
+ */
+void btn_6_create(lv_obj_t *parent) {
+    s_btn_6_handle = lv_btn_create(parent);
+    lv_obj_remove_style_all(s_btn_6_handle);
+    lv_obj_set_size(s_btn_6_handle, BUTTON_SIZE, BUTTON_SIZE);
+
+    // --- Estilos del botón ---
+    lv_obj_set_style_bg_opa(s_btn_6_handle, LV_OPA_TRANSP, LV_STATE_ANY);
+    lv_obj_set_style_border_width(s_btn_6_handle, 0, LV_STATE_ANY);
+    lv_obj_set_style_shadow_width(s_btn_6_handle, 0, LV_STATE_ANY);
+
+    // --- Icono del botón ---
+    lv_obj_t *img = lv_img_create(s_btn_6_handle);
+    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_ADMIN_PLACEHOLDER));
+    lv_obj_center(img);
+
+    // --- Posición inicial (para animación de entrada) ---
+    // El índice de este botón es 2 en su panel.
+    lv_obj_set_pos(s_btn_6_handle, (BUTTON_SIZE + BUTTON_PADDING) * 2, -BUTTON_SIZE);
+    lv_obj_add_flag(s_btn_6_handle, LV_OBJ_FLAG_HIDDEN);
+
+    // --- Conexión del evento ---
+    lv_obj_add_event_cb(s_btn_6_handle, btn_6_event_cb, LV_EVENT_CLICKED, NULL);
+}
+
+/**
+ * @brief Obtiene el manejador del botón 'Modo Config'.
+ */
+lv_obj_t* btn_6_get_handle(void) {
+    return s_btn_6_handle;
+}
+
+--- END OF FILE: .\components\ui\buttons\btn_6.c ---
+
+--- START OF FILE: .\components\ui\buttons\btn_6.h ---
+/* Fecha: 17/08/2025 - 01:21 
+# Fichero: components\ui\buttons\btn_6.h
+# Último cambio: Creación del fichero de cabecera para el botón 'Modo Config' (BTN_6).
+# Descripción: Define la interfaz pública para el módulo del botón que activa el modo de configuración. Expone funciones para crear el objeto LVGL del botón y para obtener su manejador.
+*/
+#ifndef BTN_6_H
+#define BTN_6_H
+
+#include "lvgl.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Crea el objeto LVGL para el botón 'Modo Config'.
+ * 
+ * @param parent El objeto LVGL padre sobre el cual se creará el botón.
+ */
+void btn_6_create(lv_obj_t *parent);
+
+/**
+ * @brief Obtiene el manejador del botón 'Modo Config'.
+ * 
+ * @return Un puntero al objeto lv_obj_t del botón.
+ */
+lv_obj_t* btn_6_get_handle(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // BTN_6_H
+
+--- END OF FILE: .\components\ui\buttons\btn_6.h ---
+
+--- START OF FILE: .\components\ui\buttons\btn_7.c ---
+/* Fecha: 17/08/2025 - 01:23 
+# Fichero: components\ui\buttons\btn_7.c
+# Último cambio: Implementación del módulo para el botón 'Reset Total' (BTN_7).
+# Descripción: Encapsula la lógica del botón 'Reset Total', incluyendo creación, estilo, icono (ASSET_ICON_RESET_ALL) y conexión de evento a la acción ACTION_ID_RESET_ALL.
+*/
+#include "btn_7.h"
+#include "ui_asset_loader.h"
+#include "actions.h"
+
+// --- Definiciones de diseño locales ---
+#define BUTTON_SIZE 50
+#define BUTTON_PADDING 10
+
+// --- Variable estática para el manejador del botón ---
+static lv_obj_t *s_btn_7_handle = NULL;
+
+/**
+ * @brief Callback de evento específico para el botón 'Reset Total'.
+ *        Ejecuta la acción de reseteo total.
+ * @param e Puntero al evento de LVGL.
+ */
+static void btn_7_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        execute_diymon_action(ACTION_ID_RESET_ALL);
+    }
+}
+
+/**
+ * @brief Crea el objeto del botón 'Reset Total'.
+ */
+void btn_7_create(lv_obj_t *parent) {
+    s_btn_7_handle = lv_btn_create(parent);
+    lv_obj_remove_style_all(s_btn_7_handle);
+    lv_obj_set_size(s_btn_7_handle, BUTTON_SIZE, BUTTON_SIZE);
+
+    // --- Estilos del botón ---
+    lv_obj_set_style_bg_opa(s_btn_7_handle, LV_OPA_TRANSP, LV_STATE_ANY);
+    lv_obj_set_style_border_width(s_btn_7_handle, 0, LV_STATE_ANY);
+    lv_obj_set_style_shadow_width(s_btn_7_handle, 0, LV_STATE_ANY);
+
+    // --- Icono del botón ---
+    lv_obj_t *img = lv_img_create(s_btn_7_handle);
+    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_RESET_ALL));
+    lv_obj_center(img);
+
+    // --- Posición inicial (para animación de entrada) ---
+    // El índice de este botón es 0 en su panel.
+    lv_obj_set_pos(s_btn_7_handle, (BUTTON_SIZE + BUTTON_PADDING) * 0, -BUTTON_SIZE);
+    lv_obj_add_flag(s_btn_7_handle, LV_OBJ_FLAG_HIDDEN);
+
+    // --- Conexión del evento ---
+    lv_obj_add_event_cb(s_btn_7_handle, btn_7_event_cb, LV_EVENT_CLICKED, NULL);
+}
+
+/**
+ * @brief Obtiene el manejador del botón 'Reset Total'.
+ */
+lv_obj_t* btn_7_get_handle(void) {
+    return s_btn_7_handle;
+}
+
+--- END OF FILE: .\components\ui\buttons\btn_7.c ---
+
+--- START OF FILE: .\components\ui\buttons\btn_7.h ---
+/* Fecha: 17/08/2025 - 01:22 
+# Fichero: components\ui\buttons\btn_7.h
+# Último cambio: Creación del fichero de cabecera para el botón 'Reset Total' (BTN_7).
+# Descripción: Define la interfaz pública para el módulo del botón de reseteo. Expone funciones para crear el objeto LVGL del botón y para obtener su manejador.
+*/
+#ifndef BTN_7_H
+#define BTN_7_H
+
+#include "lvgl.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Crea el objeto LVGL para el botón 'Reset Total'.
+ * 
+ * @param parent El objeto LVGL padre sobre el cual se creará el botón.
+ */
+void btn_7_create(lv_obj_t *parent);
+
+/**
+ * @brief Obtiene el manejador del botón 'Reset Total'.
+ * 
+ * @return Un puntero al objeto lv_obj_t del botón.
+ */
+lv_obj_t* btn_7_get_handle(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // BTN_7_H
+
+--- END OF FILE: .\components\ui\buttons\btn_7.h ---
+
+--- START OF FILE: .\components\ui\buttons\btn_8.c ---
+/* Fecha: 17/08/2025 - 01:24 
+# Fichero: components\ui\buttons\btn_8.c
+# Último cambio: Implementación del módulo para el botón 'Servidor de Ficheros' (BTN_8).
+# Descripción: Encapsula la lógica del botón 'Servidor de Ficheros', incluyendo creación, estilo, icono (ASSET_ICON_ENABLE_FILE_SERVER) y conexión de evento a la acción ACTION_ID_ENABLE_FILE_SERVER.
+*/
+#include "btn_8.h"
+#include "ui_asset_loader.h"
+#include "actions.h"
+
+// --- Definiciones de diseño locales ---
+#define BUTTON_SIZE 50
+#define BUTTON_PADDING 10
+
+// --- Variable estática para el manejador del botón ---
+static lv_obj_t *s_btn_8_handle = NULL;
+
+/**
+ * @brief Callback de evento específico para el botón 'Servidor de Ficheros'.
+ *        Ejecuta la acción de habilitar el servidor de ficheros.
+ * @param e Puntero al evento de LVGL.
+ */
+static void btn_8_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        execute_diymon_action(ACTION_ID_ENABLE_FILE_SERVER);
+    }
+}
+
+/**
+ * @brief Crea el objeto del botón 'Servidor de Ficheros'.
+ */
+void btn_8_create(lv_obj_t *parent) {
+    s_btn_8_handle = lv_btn_create(parent);
+    lv_obj_remove_style_all(s_btn_8_handle);
+    lv_obj_set_size(s_btn_8_handle, BUTTON_SIZE, BUTTON_SIZE);
+
+    // --- Estilos del botón ---
+    lv_obj_set_style_bg_opa(s_btn_8_handle, LV_OPA_TRANSP, LV_STATE_ANY);
+    lv_obj_set_style_border_width(s_btn_8_handle, 0, LV_STATE_ANY);
+    lv_obj_set_style_shadow_width(s_btn_8_handle, 0, LV_STATE_ANY);
+
+    // --- Icono del botón ---
+    lv_obj_t *img = lv_img_create(s_btn_8_handle);
+    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_ENABLE_FILE_SERVER));
+    lv_obj_center(img);
+
+    // --- Posición inicial (para animación de entrada) ---
+    // El índice de este botón es 1 en su panel.
+    lv_obj_set_pos(s_btn_8_handle, (BUTTON_SIZE + BUTTON_PADDING) * 1, -BUTTON_SIZE);
+    lv_obj_add_flag(s_btn_8_handle, LV_OBJ_FLAG_HIDDEN);
+
+    // --- Conexión del evento ---
+    lv_obj_add_event_cb(s_btn_8_handle, btn_8_event_cb, LV_EVENT_CLICKED, NULL);
+}
+
+/**
+ * @brief Obtiene el manejador del botón 'Servidor de Ficheros'.
+ */
+lv_obj_t* btn_8_get_handle(void) {
+    return s_btn_8_handle;
+}
+
+--- END OF FILE: .\components\ui\buttons\btn_8.c ---
+
+--- START OF FILE: .\components\ui\buttons\btn_8.h ---
+/* Fecha: 17/08/2025 - 01:24 
+# Fichero: components\ui\buttons\btn_8.h
+# Último cambio: Creación del fichero de cabecera para el botón 'Servidor de Ficheros' (BTN_8).
+# Descripción: Define la interfaz pública para el módulo del botón que activa el servidor de ficheros. Expone funciones para crear el objeto LVGL del botón y para obtener su manejador.
+*/
+#ifndef BTN_8_H
+#define BTN_8_H
+
+#include "lvgl.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Crea el objeto LVGL para el botón 'Servidor de Ficheros'.
+ * 
+ * @param parent El objeto LVGL padre sobre el cual se creará el botón.
+ */
+void btn_8_create(lv_obj_t *parent);
+
+/**
+ * @brief Obtiene el manejador del botón 'Servidor de Ficheros'.
+ * 
+ * @return Un puntero al objeto lv_obj_t del botón.
+ */
+lv_obj_t* btn_8_get_handle(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // BTN_8_H
+
+--- END OF FILE: .\components\ui\buttons\btn_8.h ---
+
+--- START OF FILE: .\components\ui\buttons\btn_9.c ---
+/* Fecha: 17/08/2025 - 01:25 
+# Fichero: components\ui\buttons\btn_9.c
+# Último cambio: Implementación del módulo para el botón 'Placeholder de Config' (BTN_9).
+# Descripción: Encapsula la lógica del botón placeholder del panel de configuración, incluyendo creación, estilo, icono (ASSET_ICON_CONFIG_PLACEHOLDER) y conexión de evento a la acción ACTION_ID_CONFIG_PLACEHOLDER.
+*/
+#include "btn_9.h"
+#include "ui_asset_loader.h"
+#include "actions.h"
+
+// --- Definiciones de diseño locales ---
+#define BUTTON_SIZE 50
+#define BUTTON_PADDING 10
+
+// --- Variable estática para el manejador del botón ---
+static lv_obj_t *s_btn_9_handle = NULL;
+
+/**
+ * @brief Callback de evento específico para el botón 'Placeholder de Config'.
+ *        Ejecuta la acción de placeholder.
+ * @param e Puntero al evento de LVGL.
+ */
+static void btn_9_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        execute_diymon_action(ACTION_ID_CONFIG_PLACEHOLDER);
+    }
+}
+
+/**
+ * @brief Crea el objeto del botón 'Placeholder de Config'.
+ */
+void btn_9_create(lv_obj_t *parent) {
+    s_btn_9_handle = lv_btn_create(parent);
+    lv_obj_remove_style_all(s_btn_9_handle);
+    lv_obj_set_size(s_btn_9_handle, BUTTON_SIZE, BUTTON_SIZE);
+
+    // --- Estilos del botón ---
+    lv_obj_set_style_bg_opa(s_btn_9_handle, LV_OPA_TRANSP, LV_STATE_ANY);
+    lv_obj_set_style_border_width(s_btn_9_handle, 0, LV_STATE_ANY);
+    lv_obj_set_style_shadow_width(s_btn_9_handle, 0, LV_STATE_ANY);
+
+    // --- Icono del botón ---
+    lv_obj_t *img = lv_img_create(s_btn_9_handle);
+    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_CONFIG_PLACEHOLDER));
+    lv_obj_center(img);
+
+    // --- Posición inicial (para animación de entrada) ---
+    // El índice de este botón es 2 en su panel.
+    lv_obj_set_pos(s_btn_9_handle, (BUTTON_SIZE + BUTTON_PADDING) * 2, -BUTTON_SIZE);
+    lv_obj_add_flag(s_btn_9_handle, LV_OBJ_FLAG_HIDDEN);
+
+    // --- Conexión del evento ---
+    lv_obj_add_event_cb(s_btn_9_handle, btn_9_event_cb, LV_EVENT_CLICKED, NULL);
+}
+
+/**
+ * @brief Obtiene el manejador del botón 'Placeholder de Config'.
+ */
+lv_obj_t* btn_9_get_handle(void) {
+    return s_btn_9_handle;
+}
+
+--- END OF FILE: .\components\ui\buttons\btn_9.c ---
+
+--- START OF FILE: .\components\ui\buttons\btn_9.h ---
+/* Fecha: 17/08/2025 - 01:24 
+# Fichero: components\ui\buttons\btn_9.h
+# Último cambio: Creación del fichero de cabecera para el botón 'Placeholder de Config' (BTN_9).
+# Descripción: Define la interfaz pública para el módulo del botón placeholder del panel de configuración. Expone funciones para crear el objeto LVGL del botón y para obtener su manejador.
+*/
+#ifndef BTN_9_H
+#define BTN_9_H
+
+#include "lvgl.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Crea el objeto LVGL para el botón 'Placeholder de Config'.
+ * 
+ * @param parent El objeto LVGL padre sobre el cual se creará el botón.
+ */
+void btn_9_create(lv_obj_t *parent);
+
+/**
+ * @brief Obtiene el manejador del botón 'Placeholder de Config'.
+ * 
+ * @return Un puntero al objeto lv_obj_t del botón.
+ */
+lv_obj_t* btn_9_get_handle(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // BTN_9_H
+
+--- END OF FILE: .\components\ui\buttons\btn_9.h ---
+
+--- START OF FILE: .\components\ui\buttons\buttons_manager.c ---
+/* Fecha: 17/08/2025 - 01:29 
+# Fichero: components\ui\buttons\buttons_manager.c
+# Último cambio: Implementación del orquestador de botones.
+# Descripción: Este fichero centraliza la creación de todos los botones de la UI. La función ui_buttons_init llama a las funciones de creación de cada módulo de botón individual, y los getters proporcionan acceso a sus manejadores para otros módulos.
+*/
+#include "buttons_manager.h"
+
+// Include all individual button modules
+#include "btn_1.h"
+#include "btn_2.h"
+#include "btn_3.h"
+#include "btn_4.h"
+#include "btn_5.h"
+#include "btn_6.h"
+#include "btn_7.h"
+#include "btn_8.h"
+#include "btn_9.h"
+#include "evo_1.h"
+#include "evo_2.h"
+#include "evo_3.h"
+#include "evo_4.h"
+#include "evo_5.h"
+
+/**
+ * @brief Inicializa y crea todos los botones de la UI llamando a los constructores de cada módulo.
+ */
+void ui_buttons_init(lv_obj_t *parent) {
+    // --- Panel de Jugador (3 botones) ---
+    btn_1_create(parent);
+    btn_2_create(parent);
+    btn_3_create(parent);
+
+    // --- Panel de Administración (3 botones) ---
+    btn_4_create(parent);
+    btn_5_create(parent);
+    btn_6_create(parent);
+    
+    // --- Panel de Configuración (3 botones) ---
+    btn_7_create(parent);
+    btn_8_create(parent);
+    btn_9_create(parent);
+
+    // --- Panel Lateral de Evolución (5 botones) ---
+    evo_1_create(parent);
+    evo_2_create(parent);
+    evo_3_create(parent);
+    evo_4_create(parent);
+    evo_5_create(parent);
+}
+
+// --- Implementación de Getters ---
+lv_obj_t* ui_buttons_get_btn_1(void) { return btn_1_get_handle(); }
+lv_obj_t* ui_buttons_get_btn_2(void) { return btn_2_get_handle(); }
+lv_obj_t* ui_buttons_get_btn_3(void) { return btn_3_get_handle(); }
+lv_obj_t* ui_buttons_get_btn_4(void) { return btn_4_get_handle(); }
+lv_obj_t* ui_buttons_get_btn_5(void) { return btn_5_get_handle(); }
+lv_obj_t* ui_buttons_get_btn_6(void) { return btn_6_get_handle(); }
+lv_obj_t* ui_buttons_get_btn_7(void) { return btn_7_get_handle(); }
+lv_obj_t* ui_buttons_get_btn_8(void) { return btn_8_get_handle(); }
+lv_obj_t* ui_buttons_get_btn_9(void) { return btn_9_get_handle(); }
+
+lv_obj_t* ui_buttons_get_evo_1(void) { return evo_1_get_handle(); }
+lv_obj_t* ui_buttons_get_evo_2(void) { return evo_2_get_handle(); }
+lv_obj_t* ui_buttons_get_evo_3(void) { return evo_3_get_handle(); }
+lv_obj_t* ui_buttons_get_evo_4(void) { return evo_4_get_handle(); }
+lv_obj_t* ui_buttons_get_evo_5(void) { return evo_5_get_handle(); }
+
+--- END OF FILE: .\components\ui\buttons\buttons_manager.c ---
+
+--- START OF FILE: .\components\ui\buttons\buttons_manager.h ---
+/* Fecha: 17/08/2025 - 01:28 
+# Fichero: components\ui\buttons\buttons_manager.h
+# Último cambio: Creación del fichero de cabecera para el orquestador de botones.
+# Descripción: Define la interfaz pública del gestor de botones. Expone una función de inicialización para crear todos los botones de la UI y getters individuales para que otros módulos, como el gestor de paneles, puedan acceder a sus manejadores.
+*/
+#ifndef BUTTONS_MANAGER_H
+#define BUTTONS_MANAGER_H
+
+#include "lvgl.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Inicializa y crea todos los botones de la interfaz de usuario.
+ * 
+ * @param parent El objeto LVGL padre sobre el cual se crearán todos los botones.
+ */
+void ui_buttons_init(lv_obj_t *parent);
+
+// --- Getters para los botones del panel superior ---
+lv_obj_t* ui_buttons_get_btn_1(void); // Comer
+lv_obj_t* ui_buttons_get_btn_2(void); // Ejercicio
+lv_obj_t* ui_buttons_get_btn_3(void); // Atacar
+lv_obj_t* ui_buttons_get_btn_4(void); // Brillo
+lv_obj_t* ui_buttons_get_btn_5(void); // Apagar Pantalla
+lv_obj_t* ui_buttons_get_btn_6(void); // Modo Config
+lv_obj_t* ui_buttons_get_btn_7(void); // Reset Total
+lv_obj_t* ui_buttons_get_btn_8(void); // Servidor Ficheros
+lv_obj_t* ui_buttons_get_btn_9(void); // Placeholder Config
+
+// --- Getters para los botones del panel lateral (Evolución) ---
+lv_obj_t* ui_buttons_get_evo_1(void); // Fuego
+lv_obj_t* ui_buttons_get_evo_2(void); // Agua
+lv_obj_t* ui_buttons_get_evo_3(void); // Tierra
+lv_obj_t* ui_buttons_get_evo_4(void); // Viento
+lv_obj_t* ui_buttons_get_evo_5(void); // Involucionar
 
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // BUTTONS_PLAYER_H
+#endif // BUTTONS_MANAGER_H
 
---- END OF FILE: .\components\ui\buttons\buttons_player.h ---
+--- END OF FILE: .\components\ui\buttons\buttons_manager.h ---
+
+--- START OF FILE: .\components\ui\buttons\evo_1.c ---
+/* Fecha: 17/08/2025 - 01:26 
+# Fichero: components\ui\buttons\evo_1.c
+# Último cambio: Implementación del módulo para el botón 'Evo Fuego' (EVO_1).
+# Descripción: Encapsula la lógica del botón 'Evo Fuego', incluyendo creación, posicionamiento en el panel lateral, icono (ASSET_ICON_EVO_FIRE) y conexión de evento a la acción ACTION_ID_EVO_FIRE.
+*/
+#include "evo_1.h"
+#include "ui_asset_loader.h"
+#include "actions.h"
+
+// --- Definiciones de diseño locales ---
+#define BUTTON_SIZE 50
+#define BUTTON_PADDING 10
+
+// --- Variable estática para el manejador del botón ---
+static lv_obj_t *s_evo_1_handle = NULL;
+
+/**
+ * @brief Callback de evento específico para el botón 'Evo Fuego'.
+ *        Ejecuta la acción de evolucionar a Fuego.
+ * @param e Puntero al evento de LVGL.
+ */
+static void evo_1_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        execute_diymon_action(ACTION_ID_EVO_FIRE);
+    }
+}
+
+/**
+ * @brief Crea el objeto del botón 'Evo Fuego'.
+ */
+void evo_1_create(lv_obj_t *parent) {
+    s_evo_1_handle = lv_btn_create(parent);
+    lv_obj_remove_style_all(s_evo_1_handle);
+    lv_obj_set_size(s_evo_1_handle, BUTTON_SIZE, BUTTON_SIZE);
+
+    // --- Estilos del botón ---
+    lv_obj_set_style_bg_opa(s_evo_1_handle, LV_OPA_TRANSP, LV_STATE_ANY);
+    lv_obj_set_style_border_width(s_evo_1_handle, 0, LV_STATE_ANY);
+    lv_obj_set_style_shadow_width(s_evo_1_handle, 0, LV_STATE_ANY);
+
+    // --- Icono del botón ---
+    lv_obj_t *img = lv_img_create(s_evo_1_handle);
+    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_EVO_FIRE));
+    lv_obj_center(img);
+
+    // --- Posición inicial (para animación de entrada) ---
+    // El índice de este botón es 0 en el panel lateral.
+    lv_obj_set_pos(s_evo_1_handle, -BUTTON_SIZE, BUTTON_PADDING + (BUTTON_SIZE + BUTTON_PADDING) * 0);
+    lv_obj_add_flag(s_evo_1_handle, LV_OBJ_FLAG_HIDDEN);
+
+    // --- Conexión del evento ---
+    lv_obj_add_event_cb(s_evo_1_handle, evo_1_event_cb, LV_EVENT_CLICKED, NULL);
+}
+
+/**
+ * @brief Obtiene el manejador del botón 'Evo Fuego'.
+ */
+lv_obj_t* evo_1_get_handle(void) {
+    return s_evo_1_handle;
+}
+
+--- END OF FILE: .\components\ui\buttons\evo_1.c ---
+
+--- START OF FILE: .\components\ui\buttons\evo_1.h ---
+/* Fecha: 17/08/2025 - 01:25 
+# Fichero: components\ui\buttons\evo_1.h
+# Último cambio: Creación del fichero de cabecera para el botón 'Evo Fuego' (EVO_1).
+# Descripción: Define la interfaz pública para el módulo del botón de evolución de Fuego. Expone funciones para crear el objeto LVGL del botón y para obtener su manejador.
+*/
+#ifndef EVO_1_H
+#define EVO_1_H
+
+#include "lvgl.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Crea el objeto LVGL para el botón 'Evo Fuego'.
+ * 
+ * @param parent El objeto LVGL padre sobre el cual se creará el botón.
+ */
+void evo_1_create(lv_obj_t *parent);
+
+/**
+ * @brief Obtiene el manejador del botón 'Evo Fuego'.
+ * 
+ * @return Un puntero al objeto lv_obj_t del botón.
+ */
+lv_obj_t* evo_1_get_handle(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // EVO_1_H
+
+--- END OF FILE: .\components\ui\buttons\evo_1.h ---
+
+--- START OF FILE: .\components\ui\buttons\evo_2.c ---
+/* Fecha: 17/08/2025 - 01:26 
+# Fichero: components\ui\buttons\evo_2.c
+# Último cambio: Implementación del módulo para el botón 'Evo Agua' (EVO_2).
+# Descripción: Encapsula la lógica del botón 'Evo Agua', incluyendo creación, posicionamiento en el panel lateral, icono (ASSET_ICON_EVO_WATER) y conexión de evento a la acción ACTION_ID_EVO_WATER.
+*/
+#include "evo_2.h"
+#include "ui_asset_loader.h"
+#include "actions.h"
+
+// --- Definiciones de diseño locales ---
+#define BUTTON_SIZE 50
+#define BUTTON_PADDING 10
+
+// --- Variable estática para el manejador del botón ---
+static lv_obj_t *s_evo_2_handle = NULL;
+
+/**
+ * @brief Callback de evento específico para el botón 'Evo Agua'.
+ *        Ejecuta la acción de evolucionar a Agua.
+ * @param e Puntero al evento de LVGL.
+ */
+static void evo_2_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        execute_diymon_action(ACTION_ID_EVO_WATER);
+    }
+}
+
+/**
+ * @brief Crea el objeto del botón 'Evo Agua'.
+ */
+void evo_2_create(lv_obj_t *parent) {
+    s_evo_2_handle = lv_btn_create(parent);
+    lv_obj_remove_style_all(s_evo_2_handle);
+    lv_obj_set_size(s_evo_2_handle, BUTTON_SIZE, BUTTON_SIZE);
+
+    // --- Estilos del botón ---
+    lv_obj_set_style_bg_opa(s_evo_2_handle, LV_OPA_TRANSP, LV_STATE_ANY);
+    lv_obj_set_style_border_width(s_evo_2_handle, 0, LV_STATE_ANY);
+    lv_obj_set_style_shadow_width(s_evo_2_handle, 0, LV_STATE_ANY);
+
+    // --- Icono del botón ---
+    lv_obj_t *img = lv_img_create(s_evo_2_handle);
+    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_EVO_WATER));
+    lv_obj_center(img);
+
+    // --- Posición inicial (para animación de entrada) ---
+    // El índice de este botón es 1 en el panel lateral.
+    lv_obj_set_pos(s_evo_2_handle, -BUTTON_SIZE, BUTTON_PADDING + (BUTTON_SIZE + BUTTON_PADDING) * 1);
+    lv_obj_add_flag(s_evo_2_handle, LV_OBJ_FLAG_HIDDEN);
+
+    // --- Conexión del evento ---
+    lv_obj_add_event_cb(s_evo_2_handle, evo_2_event_cb, LV_EVENT_CLICKED, NULL);
+}
+
+/**
+ * @brief Obtiene el manejador del botón 'Evo Agua'.
+ */
+lv_obj_t* evo_2_get_handle(void) {
+    return s_evo_2_handle;
+}
+
+--- END OF FILE: .\components\ui\buttons\evo_2.c ---
+
+--- START OF FILE: .\components\ui\buttons\evo_2.h ---
+/* Fecha: 17/08/2025 - 01:26 
+# Fichero: components\ui\buttons\evo_2.h
+# Último cambio: Creación del fichero de cabecera para el botón 'Evo Agua' (EVO_2).
+# Descripción: Define la interfaz pública para el módulo del botón de evolución de Agua. Expone funciones para crear el objeto LVGL del botón y para obtener su manejador.
+*/
+#ifndef EVO_2_H
+#define EVO_2_H
+
+#include "lvgl.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Crea el objeto LVGL para el botón 'Evo Agua'.
+ * 
+ * @param parent El objeto LVGL padre sobre el cual se creará el botón.
+ */
+void evo_2_create(lv_obj_t *parent);
+
+/**
+ * @brief Obtiene el manejador del botón 'Evo Agua'.
+ * 
+ * @return Un puntero al objeto lv_obj_t del botón.
+ */
+lv_obj_t* evo_2_get_handle(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // EVO_2_H
+
+--- END OF FILE: .\components\ui\buttons\evo_2.h ---
+
+--- START OF FILE: .\components\ui\buttons\evo_3.c ---
+/* Fecha: 17/08/2025 - 01:27 
+# Fichero: components\ui\buttons\evo_3.c
+# Último cambio: Implementación del módulo para el botón 'Evo Tierra' (EVO_3).
+# Descripción: Encapsula la lógica del botón 'Evo Tierra', incluyendo creación, posicionamiento en el panel lateral, icono (ASSET_ICON_EVO_EARTH) y conexión de evento a la acción ACTION_ID_EVO_EARTH.
+*/
+#include "evo_3.h"
+#include "ui_asset_loader.h"
+#include "actions.h"
+
+// --- Definiciones de diseño locales ---
+#define BUTTON_SIZE 50
+#define BUTTON_PADDING 10
+
+// --- Variable estática para el manejador del botón ---
+static lv_obj_t *s_evo_3_handle = NULL;
+
+/**
+ * @brief Callback de evento específico para el botón 'Evo Tierra'.
+ *        Ejecuta la acción de evolucionar a Tierra.
+ * @param e Puntero al evento de LVGL.
+ */
+static void evo_3_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        execute_diymon_action(ACTION_ID_EVO_EARTH);
+    }
+}
+
+/**
+ * @brief Crea el objeto del botón 'Evo Tierra'.
+ */
+void evo_3_create(lv_obj_t *parent) {
+    s_evo_3_handle = lv_btn_create(parent);
+    lv_obj_remove_style_all(s_evo_3_handle);
+    lv_obj_set_size(s_evo_3_handle, BUTTON_SIZE, BUTTON_SIZE);
+
+    // --- Estilos del botón ---
+    lv_obj_set_style_bg_opa(s_evo_3_handle, LV_OPA_TRANSP, LV_STATE_ANY);
+    lv_obj_set_style_border_width(s_evo_3_handle, 0, LV_STATE_ANY);
+    lv_obj_set_style_shadow_width(s_evo_3_handle, 0, LV_STATE_ANY);
+
+    // --- Icono del botón ---
+    lv_obj_t *img = lv_img_create(s_evo_3_handle);
+    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_EVO_EARTH));
+    lv_obj_center(img);
+
+    // --- Posición inicial (para animación de entrada) ---
+    // El índice de este botón es 2 en el panel lateral.
+    lv_obj_set_pos(s_evo_3_handle, -BUTTON_SIZE, BUTTON_PADDING + (BUTTON_SIZE + BUTTON_PADDING) * 2);
+    lv_obj_add_flag(s_evo_3_handle, LV_OBJ_FLAG_HIDDEN);
+
+    // --- Conexión del evento ---
+    lv_obj_add_event_cb(s_evo_3_handle, evo_3_event_cb, LV_EVENT_CLICKED, NULL);
+}
+
+/**
+ * @brief Obtiene el manejador del botón 'Evo Tierra'.
+ */
+lv_obj_t* evo_3_get_handle(void) {
+    return s_evo_3_handle;
+}
+
+--- END OF FILE: .\components\ui\buttons\evo_3.c ---
+
+--- START OF FILE: .\components\ui\buttons\evo_3.h ---
+/* Fecha: 17/08/2025 - 01:26 
+# Fichero: components\ui\buttons\evo_3.h
+# Último cambio: Creación del fichero de cabecera para el botón 'Evo Tierra' (EVO_3).
+# Descripción: Define la interfaz pública para el módulo del botón de evolución de Tierra. Expone funciones para crear el objeto LVGL del botón y para obtener su manejador.
+*/
+#ifndef EVO_3_H
+#define EVO_3_H
+
+#include "lvgl.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Crea el objeto LVGL para el botón 'Evo Tierra'.
+ * 
+ * @param parent El objeto LVGL padre sobre el cual se creará el botón.
+ */
+void evo_3_create(lv_obj_t *parent);
+
+/**
+ * @brief Obtiene el manejador del botón 'Evo Tierra'.
+ * 
+ * @return Un puntero al objeto lv_obj_t del botón.
+ */
+lv_obj_t* evo_3_get_handle(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // EVO_3_H
+
+--- END OF FILE: .\components\ui\buttons\evo_3.h ---
+
+--- START OF FILE: .\components\ui\buttons\evo_4.c ---
+/* Fecha: 17/08/2025 - 01:27 
+# Fichero: components\ui\buttons\evo_4.c
+# Último cambio: Implementación del módulo para el botón 'Evo Viento' (EVO_4).
+# Descripción: Encapsula la lógica del botón 'Evo Viento', incluyendo creación, posicionamiento en el panel lateral, icono (ASSET_ICON_EVO_WIND) y conexión de evento a la acción ACTION_ID_EVO_WIND.
+*/
+#include "evo_4.h"
+#include "ui_asset_loader.h"
+#include "actions.h"
+
+// --- Definiciones de diseño locales ---
+#define BUTTON_SIZE 50
+#define BUTTON_PADDING 10
+
+// --- Variable estática para el manejador del botón ---
+static lv_obj_t *s_evo_4_handle = NULL;
+
+/**
+ * @brief Callback de evento específico para el botón 'Evo Viento'.
+ *        Ejecuta la acción de evolucionar a Viento.
+ * @param e Puntero al evento de LVGL.
+ */
+static void evo_4_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        execute_diymon_action(ACTION_ID_EVO_WIND);
+    }
+}
+
+/**
+ * @brief Crea el objeto del botón 'Evo Viento'.
+ */
+void evo_4_create(lv_obj_t *parent) {
+    s_evo_4_handle = lv_btn_create(parent);
+    lv_obj_remove_style_all(s_evo_4_handle);
+    lv_obj_set_size(s_evo_4_handle, BUTTON_SIZE, BUTTON_SIZE);
+
+    // --- Estilos del botón ---
+    lv_obj_set_style_bg_opa(s_evo_4_handle, LV_OPA_TRANSP, LV_STATE_ANY);
+    lv_obj_set_style_border_width(s_evo_4_handle, 0, LV_STATE_ANY);
+    lv_obj_set_style_shadow_width(s_evo_4_handle, 0, LV_STATE_ANY);
+
+    // --- Icono del botón ---
+    lv_obj_t *img = lv_img_create(s_evo_4_handle);
+    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_EVO_WIND));
+    lv_obj_center(img);
+
+    // --- Posición inicial (para animación de entrada) ---
+    // El índice de este botón es 3 en el panel lateral.
+    lv_obj_set_pos(s_evo_4_handle, -BUTTON_SIZE, BUTTON_PADDING + (BUTTON_SIZE + BUTTON_PADDING) * 3);
+    lv_obj_add_flag(s_evo_4_handle, LV_OBJ_FLAG_HIDDEN);
+
+    // --- Conexión del evento ---
+    lv_obj_add_event_cb(s_evo_4_handle, evo_4_event_cb, LV_EVENT_CLICKED, NULL);
+}
+
+/**
+ * @brief Obtiene el manejador del botón 'Evo Viento'.
+ */
+lv_obj_t* evo_4_get_handle(void) {
+    return s_evo_4_handle;
+}
+
+--- END OF FILE: .\components\ui\buttons\evo_4.c ---
+
+--- START OF FILE: .\components\ui\buttons\evo_4.h ---
+/* Fecha: 17/08/2025 - 01:27 
+# Fichero: components\ui\buttons\evo_4.h
+# Último cambio: Creación del fichero de cabecera para el botón 'Evo Viento' (EVO_4).
+# Descripción: Define la interfaz pública para el módulo del botón de evolución de Viento. Expone funciones para crear el objeto LVGL del botón y para obtener su manejador.
+*/
+#ifndef EVO_4_H
+#define EVO_4_H
+
+#include "lvgl.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Crea el objeto LVGL para el botón 'Evo Viento'.
+ * 
+ * @param parent El objeto LVGL padre sobre el cual se creará el botón.
+ */
+void evo_4_create(lv_obj_t *parent);
+
+/**
+ * @brief Obtiene el manejador del botón 'Evo Viento'.
+ * 
+ * @return Un puntero al objeto lv_obj_t del botón.
+ */
+lv_obj_t* evo_4_get_handle(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // EVO_4_H
+
+--- END OF FILE: .\components\ui\buttons\evo_4.h ---
+
+--- START OF FILE: .\components\ui\buttons\evo_5.c ---
+/* Fecha: 17/08/2025 - 01:28 
+# Fichero: components\ui\buttons\evo_5.c
+# Último cambio: Implementación del módulo para el botón 'Involucionar' (EVO_5).
+# Descripción: Encapsula la lógica del botón 'Involucionar', incluyendo creación, posicionamiento en el panel lateral, icono (ASSET_ICON_EVO_BACK) y conexión de evento a la acción ACTION_ID_EVO_BACK.
+*/
+#include "evo_5.h"
+#include "ui_asset_loader.h"
+#include "actions.h"
+
+// --- Definiciones de diseño locales ---
+#define BUTTON_SIZE 50
+#define BUTTON_PADDING 10
+
+// --- Variable estática para el manejador del botón ---
+static lv_obj_t *s_evo_5_handle = NULL;
+
+/**
+ * @brief Callback de evento específico para el botón 'Involucionar'.
+ *        Ejecuta la acción de involucionar.
+ * @param e Puntero al evento de LVGL.
+ */
+static void evo_5_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        execute_diymon_action(ACTION_ID_EVO_BACK);
+    }
+}
+
+/**
+ * @brief Crea el objeto del botón 'Involucionar'.
+ */
+void evo_5_create(lv_obj_t *parent) {
+    s_evo_5_handle = lv_btn_create(parent);
+    lv_obj_remove_style_all(s_evo_5_handle);
+    lv_obj_set_size(s_evo_5_handle, BUTTON_SIZE, BUTTON_SIZE);
+
+    // --- Estilos del botón ---
+    lv_obj_set_style_bg_opa(s_evo_5_handle, LV_OPA_TRANSP, LV_STATE_ANY);
+    lv_obj_set_style_border_width(s_evo_5_handle, 0, LV_STATE_ANY);
+    lv_obj_set_style_shadow_width(s_evo_5_handle, 0, LV_STATE_ANY);
+
+    // --- Icono del botón ---
+    lv_obj_t *img = lv_img_create(s_evo_5_handle);
+    lv_img_set_src(img, ui_assets_get_icon(ASSET_ICON_EVO_BACK));
+    lv_obj_center(img);
+
+    // --- Posición inicial (para animación de entrada) ---
+    // El índice de este botón es 4 en el panel lateral.
+    lv_obj_set_pos(s_evo_5_handle, -BUTTON_SIZE, BUTTON_PADDING + (BUTTON_SIZE + BUTTON_PADDING) * 4);
+    lv_obj_add_flag(s_evo_5_handle, LV_OBJ_FLAG_HIDDEN);
+
+    // --- Conexión del evento ---
+    lv_obj_add_event_cb(s_evo_5_handle, evo_5_event_cb, LV_EVENT_CLICKED, NULL);
+}
+
+/**
+ * @brief Obtiene el manejador del botón 'Involucionar'.
+ */
+lv_obj_t* evo_5_get_handle(void) {
+    return s_evo_5_handle;
+}
+
+--- END OF FILE: .\components\ui\buttons\evo_5.c ---
+
+--- START OF FILE: .\components\ui\buttons\evo_5.h ---
+/* Fecha: 17/08/2025 - 01:28 
+# Fichero: components\ui\buttons\evo_5.h
+# Último cambio: Creación del fichero de cabecera para el botón 'Involucionar' (EVO_5).
+# Descripción: Define la interfaz pública para el módulo del botón de involución. Expone funciones para crear el objeto LVGL del botón y para obtener su manejador.
+*/
+#ifndef EVO_5_H
+#define EVO_5_H
+
+#include "lvgl.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Crea el objeto LVGL para el botón 'Involucionar'.
+ * 
+ * @param parent El objeto LVGL padre sobre el cual se creará el botón.
+ */
+void evo_5_create(lv_obj_t *parent);
+
+/**
+ * @brief Obtiene el manejador del botón 'Involucionar'.
+ * 
+ * @return Un puntero al objeto lv_obj_t del botón.
+ */
+lv_obj_t* evo_5_get_handle(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // EVO_5_H
+
+--- END OF FILE: .\components\ui\buttons\evo_5.h ---
 
 --- START OF FILE: .\components\ui\actions.c ---
 /* Fecha: 16/08/2025 - 08:38  */
@@ -8815,10 +10218,10 @@ extern const lv_img_dsc_t bg_0;
 --- END OF FILE: .\components\ui\BG.h ---
 
 --- START OF FILE: .\components\ui\CMakeLists.txt ---
-# Fecha: 16/08/2025 - 09:24 
+# Fecha: 17/08/2025 - 01:17 
 # Fichero: components/ui/CMakeLists.txt
-# Último cambio: Corregidas las dependencias de componentes para que coincidan con los nuevos nombres de directorio.
-# Descripción: Se ha actualizado la lista `REQUIRES` para usar los nombres de componente cortos ('bsp', 'core') en lugar de los antiguos ('diymon_bsp', 'diymon_core'). Esto resuelve el error de compilación de CMake "Failed to resolve component 'diymon_bsp'".
+# Último cambio: Añadido el subdirectorio 'buttons' a las fuentes y a las rutas de inclusión para soportar la refactorización de los botones.
+# Descripción: Fichero de compilación del componente de la UI. Se ha actualizado para incluir todos los ficheros .c del nuevo subdirectorio 'buttons' en la compilación y para añadir 'buttons' a las rutas de inclusión, permitiendo que el resto del componente pueda acceder a las nuevas cabeceras de los botones modulares.
 
 file(GLOB component_sources
     "*.c"
@@ -9363,14 +10766,13 @@ animation_t* ui_action_animations_get_player(void);
 --- END OF FILE: .\components\ui\ui_action_animations.h ---
 
 --- START OF FILE: .\components\ui\ui_actions_panel.c ---
-/* Fecha: 16/08/2025 - 07:21  */
-/* Fichero: components/diymon_ui/ui_actions_panel.c */
-/* Último cambio: Implementada ui_actions_panel_hide_all() para ocultar paneles mediante programación. */
-/* Descripción: Implementa la lógica de los paneles de acción deslizantes, incluyendo su creación, animación, manejo de gestos y una nueva función para forzar su ocultado, útil al apagar la pantalla. */
-
+/* Fecha: 17/08/2025 - 01:31 
+# Fichero: components/ui/ui_actions_panel.c
+# Último cambio: Refactorizado para usar el nuevo 'buttons_manager' y eliminar la lógica de creación de botones local.
+# Descripción: Este fichero ahora solo gestiona la LÓGICA de los paneles (animaciones, estado, gestos). La creación y gestión de los botones individuales se ha delegado al 'buttons_manager'. Las funciones de animación ahora obtienen los manejadores de los botones del manager en lugar de usar arrays estáticos locales, completando la refactorización.
+*/
 #include "ui_actions_panel.h"
-#include "ui_asset_loader.h"
-#include "actions.h"
+#include "buttons_manager.h" // <-- NUEVO include
 #include "ui_idle_animation.h"
 #include "esp_log.h"
 #include <stdio.h>
@@ -9390,14 +10792,11 @@ typedef enum {
     PANEL_STATE_HIDDEN,
     PANEL_STATE_PLAYER_VISIBLE,
     PANEL_STATE_ADMIN_VISIBLE,
-    PANEL_STATE_SIDE_VISIBLE,
     PANEL_STATE_CONFIG_VISIBLE,
+    PANEL_STATE_SIDE_VISIBLE,
 } panel_state_t;
 
-static lv_obj_t *s_player_btns[NUM_TOP_BUTTONS];
-static lv_obj_t *s_admin_btns[NUM_TOP_BUTTONS];
-static lv_obj_t *s_side_btns[NUM_SIDE_BUTTONS];
-static lv_obj_t *s_config_btns[NUM_TOP_BUTTONS];
+// --- Variables estáticas del módulo ---
 static lv_timer_t *s_hide_timer = NULL;
 static panel_state_t s_panel_state = PANEL_STATE_HIDDEN;
 static bool s_is_animating = false;
@@ -9408,113 +10807,22 @@ static void animate_panel_out_top(lv_obj_t **buttons);
 static void animate_panel_in_side(lv_obj_t **buttons);
 static void animate_panel_out_side(lv_obj_t **buttons);
 static void timer_auto_hide_callback(lv_timer_t *timer);
-static lv_obj_t* create_top_action_button(lv_obj_t *parent, ui_asset_id_t asset_id, int index);
-static lv_obj_t* create_side_action_button(lv_obj_t *parent, ui_asset_id_t asset_id, int index);
-static void button_event_cb(lv_event_t *e);
 static void anim_ready_hide_cb(lv_anim_t *a);
 static void animation_finish_cb(lv_anim_t *a);
 static void last_button_out_anim_ready_cb(lv_anim_t *a);
 
-static lv_obj_t* create_top_action_button(lv_obj_t *parent, ui_asset_id_t asset_id, int index) {
-    lv_obj_t *btn = lv_btn_create(parent);
-    lv_obj_remove_style_all(btn);
-    lv_obj_set_size(btn, BUTTON_SIZE, BUTTON_SIZE);
-    
-    lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, LV_STATE_ANY);
-    lv_obj_set_style_border_width(btn, 0, LV_STATE_ANY);
-    lv_obj_set_style_shadow_width(btn, 0, LV_STATE_ANY);
-
-    lv_obj_t *img = lv_img_create(btn);
-    lv_img_set_src(img, ui_assets_get_icon(asset_id));
-    lv_obj_center(img);
-        
-    lv_obj_set_pos(btn, (BUTTON_SIZE + BUTTON_PADDING) * index, -BUTTON_SIZE);
-    lv_obj_add_flag(btn, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_event_cb(btn, button_event_cb, LV_EVENT_PRESSED, NULL);
-    return btn;
-}
-
-static lv_obj_t* create_side_action_button(lv_obj_t *parent, ui_asset_id_t asset_id, int index) {
-    lv_obj_t *btn = lv_btn_create(parent);
-    lv_obj_remove_style_all(btn);
-    lv_obj_set_size(btn, BUTTON_SIZE, BUTTON_SIZE);
-
-    lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, LV_STATE_ANY);
-    lv_obj_set_style_border_width(btn, 0, LV_STATE_ANY);
-    lv_obj_set_style_shadow_width(btn, 0, LV_STATE_ANY);
-    
-    lv_obj_t *img = lv_img_create(btn);
-    lv_img_set_src(img, ui_assets_get_icon(asset_id));
-    lv_obj_center(img);
-    
-    lv_obj_set_pos(btn, -BUTTON_SIZE, BUTTON_PADDING + (BUTTON_SIZE + BUTTON_PADDING) * index);
-    lv_obj_add_flag(btn, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_event_cb(btn, button_event_cb, LV_EVENT_PRESSED, NULL);
-    return btn;
-}
+// --- Implementación de Funciones Públicas ---
 
 void ui_actions_panel_create(lv_obj_t *parent) {
-    s_player_btns[0] = create_top_action_button(parent, ASSET_ICON_EAT, 0);
-    s_player_btns[1] = create_top_action_button(parent, ASSET_ICON_GYM, 1);
-    s_player_btns[2] = create_top_action_button(parent, ASSET_ICON_ATK, 2);
-
-    s_admin_btns[0] = create_top_action_button(parent, ASSET_ICON_BRIGHTNESS, 0);
-    s_admin_btns[1] = create_top_action_button(parent, ASSET_ICON_SCREEN_OFF, 1);
-    s_admin_btns[2] = create_top_action_button(parent, ASSET_ICON_ADMIN_PLACEHOLDER, 2);
-
-    s_config_btns[0] = create_top_action_button(parent, ASSET_ICON_RESET_ALL, 0);
-    s_config_btns[1] = create_top_action_button(parent, ASSET_ICON_ENABLE_FILE_SERVER, 1);
-    s_config_btns[2] = create_top_action_button(parent, ASSET_ICON_CONFIG_PLACEHOLDER, 2);
-
-    s_side_btns[0] = create_side_action_button(parent, ASSET_ICON_EVO_FIRE, 0);
-    s_side_btns[1] = create_side_action_button(parent, ASSET_ICON_EVO_WATER, 1);
-    s_side_btns[2] = create_side_action_button(parent, ASSET_ICON_EVO_EARTH, 2);
-    s_side_btns[3] = create_side_action_button(parent, ASSET_ICON_EVO_WIND, 3);
-    s_side_btns[4] = create_side_action_button(parent, ASSET_ICON_EVO_BACK, 4);
-
-    ESP_LOGI(TAG, "Todos los paneles de acción creados.");
+    // La creación de botones se delega completamente al manager.
+    ui_buttons_init(parent);
+    ESP_LOGI(TAG, "Creación de botones delegada al buttons_manager.");
 }
 
-lv_obj_t* ui_actions_panel_get_eat_btn(void) { return s_player_btns[0]; }
-lv_obj_t* ui_actions_panel_get_gym_btn(void) { return s_player_btns[1]; }
-lv_obj_t* ui_actions_panel_get_atk_btn(void) { return s_player_btns[2]; }
-lv_obj_t* ui_actions_panel_get_brightness_btn(void) { return s_admin_btns[0]; }
-lv_obj_t* ui_actions_panel_get_toggle_screen_btn(void) { return s_admin_btns[1]; }
-lv_obj_t* ui_actions_panel_get_admin_placeholder_btn(void) { return s_admin_btns[2]; }
-lv_obj_t* ui_actions_panel_get_reset_all_btn(void) { return s_config_btns[0]; }
-lv_obj_t* ui_actions_panel_get_enable_file_server_btn(void) { return s_config_btns[1]; }
-lv_obj_t* ui_actions_panel_get_config_placeholder_btn(void) { return s_config_btns[2]; }
-lv_obj_t* ui_actions_panel_get_evo_fire_btn(void) { return s_side_btns[0]; }
-lv_obj_t* ui_actions_panel_get_evo_water_btn(void) { return s_side_btns[1]; }
-lv_obj_t* ui_actions_panel_get_evo_earth_btn(void) { return s_side_btns[2]; }
-lv_obj_t* ui_actions_panel_get_evo_wind_btn(void) { return s_side_btns[3]; }
-lv_obj_t* ui_actions_panel_get_evo_back_btn(void) { return s_side_btns[4]; }
-
-static void timer_auto_hide_callback(lv_timer_t *timer) {
-    if (s_panel_state == PANEL_STATE_PLAYER_VISIBLE) animate_panel_out_top(s_player_btns);
-    if (s_panel_state == PANEL_STATE_ADMIN_VISIBLE) animate_panel_out_top(s_admin_btns);
-    if (s_panel_state == PANEL_STATE_CONFIG_VISIBLE) animate_panel_out_top(s_config_btns);
-    if (s_panel_state == PANEL_STATE_SIDE_VISIBLE) animate_panel_out_side(s_side_btns);
-    
-    ESP_LOGD(TAG, "Auto-hide timer triggered. Resuming idle animation.");
-    ui_idle_animation_resume();
-
-    s_panel_state = PANEL_STATE_HIDDEN;
-    s_hide_timer = NULL;
-}
-
-static void anim_ready_hide_cb(lv_anim_t *a) {
-    lv_obj_add_flag((lv_obj_t *)a->var, LV_OBJ_FLAG_HIDDEN);
-}
-
-static void animation_finish_cb(lv_anim_t *a) {
-    s_is_animating = false;
-}
-
-static void last_button_out_anim_ready_cb(lv_anim_t *a) {
-    lv_obj_add_flag((lv_obj_t *)a->var, LV_OBJ_FLAG_HIDDEN);
-    s_is_animating = false;
-}
+// --- Lógica de Animación (sin cambios, ya que aceptan arrays) ---
+static void anim_ready_hide_cb(lv_anim_t *a) { lv_obj_add_flag((lv_obj_t *)a->var, LV_OBJ_FLAG_HIDDEN); }
+static void animation_finish_cb(lv_anim_t *a) { s_is_animating = false; }
+static void last_button_out_anim_ready_cb(lv_anim_t *a) { lv_obj_add_flag((lv_obj_t *)a->var, LV_OBJ_FLAG_HIDDEN); s_is_animating = false; }
 
 static void animate_panel_in_top(lv_obj_t **buttons) {
     if (s_hide_timer) lv_timer_del(s_hide_timer);
@@ -9606,55 +10914,74 @@ static void animate_panel_out_side(lv_obj_t **buttons) {
     }
 }
 
+
+// --- Lógica de Gestos y Temporizadores (Modificada para usar el manager) ---
+
+static void timer_auto_hide_callback(lv_timer_t *timer) {
+    ui_actions_panel_hide_all(); // Usar la función pública para centralizar
+    s_hide_timer = NULL;
+}
+
 void ui_actions_panel_handle_gesture(lv_dir_t dir, lv_coord_t start_x, lv_coord_t start_y) {
     if (s_is_animating) return;
 
+    if (s_hide_timer) {
+        lv_timer_reset(s_hide_timer);
+    } else {
+        s_hide_timer = lv_timer_create(timer_auto_hide_callback, PANEL_AUTO_HIDE_DELAY, NULL);
+        lv_timer_set_repeat_count(s_hide_timer, 1);
+    }
+
+    // Definición de los grupos de botones obtenidos del manager
+    lv_obj_t* player_buttons[] = { ui_buttons_get_btn_1(), ui_buttons_get_btn_2(), ui_buttons_get_btn_3() };
+    lv_obj_t* admin_buttons[] = { ui_buttons_get_btn_4(), ui_buttons_get_btn_5(), ui_buttons_get_btn_6() };
+    lv_obj_t* config_buttons[] = { ui_buttons_get_btn_7(), ui_buttons_get_btn_8(), ui_buttons_get_btn_9() };
+    lv_obj_t* side_buttons[] = { ui_buttons_get_evo_1(), ui_buttons_get_evo_2(), ui_buttons_get_evo_3(), ui_buttons_get_evo_4(), ui_buttons_get_evo_5() };
+
     switch(s_panel_state) {
         case PANEL_STATE_HIDDEN:
-            if ((dir == LV_DIR_BOTTOM && start_y < EDGE_SWIPE_THRESHOLD) || (dir == LV_DIR_RIGHT && start_x < EDGE_SWIPE_THRESHOLD)) {
-                 if (dir == LV_DIR_BOTTOM) {
-                    animate_panel_in_top(s_player_btns);
-                    s_panel_state = PANEL_STATE_PLAYER_VISIBLE;
-                } else if (dir == LV_DIR_RIGHT) {
-                    animate_panel_in_side(s_side_btns);
-                    s_panel_state = PANEL_STATE_SIDE_VISIBLE;
-                }
+            if (dir == LV_DIR_BOTTOM && start_y < EDGE_SWIPE_THRESHOLD) {
+                animate_panel_in_top(player_buttons);
+                s_panel_state = PANEL_STATE_PLAYER_VISIBLE;
+            } else if (dir == LV_DIR_RIGHT && start_x < EDGE_SWIPE_THRESHOLD) {
+                animate_panel_in_side(side_buttons);
+                s_panel_state = PANEL_STATE_SIDE_VISIBLE;
             } else {
                 ui_idle_animation_resume();
             }
             break;
         case PANEL_STATE_PLAYER_VISIBLE:
             if (dir == LV_DIR_BOTTOM) {
-                animate_panel_out_top(s_player_btns);
-                animate_panel_in_top(s_admin_btns);
+                animate_panel_out_top(player_buttons);
+                animate_panel_in_top(admin_buttons);
                 s_panel_state = PANEL_STATE_ADMIN_VISIBLE;
             } else if (dir == LV_DIR_TOP) {
-                animate_panel_out_top(s_player_btns);
+                animate_panel_out_top(player_buttons);
                 s_panel_state = PANEL_STATE_HIDDEN;
                 ui_idle_animation_resume();
             }
             break;
         case PANEL_STATE_ADMIN_VISIBLE:
             if (dir == LV_DIR_BOTTOM) {
-                animate_panel_out_top(s_admin_btns);
-                animate_panel_in_top(s_config_btns);
+                animate_panel_out_top(admin_buttons);
+                animate_panel_in_top(config_buttons);
                 s_panel_state = PANEL_STATE_CONFIG_VISIBLE;
             } else if (dir == LV_DIR_TOP) {
-                animate_panel_out_top(s_admin_btns);
+                animate_panel_out_top(admin_buttons);
                 s_panel_state = PANEL_STATE_HIDDEN;
                 ui_idle_animation_resume();
             }
             break;
         case PANEL_STATE_CONFIG_VISIBLE:
              if (dir == LV_DIR_TOP) {
-                animate_panel_out_top(s_config_btns);
+                animate_panel_out_top(config_buttons);
                 s_panel_state = PANEL_STATE_HIDDEN;
                 ui_idle_animation_resume();
             }
             break;
         case PANEL_STATE_SIDE_VISIBLE:
             if (dir == LV_DIR_LEFT) {
-                animate_panel_out_side(s_side_btns);
+                animate_panel_out_side(side_buttons);
                 s_panel_state = PANEL_STATE_HIDDEN;
                 ui_idle_animation_resume();
             }
@@ -9668,10 +10995,16 @@ void ui_actions_panel_hide_all(void) {
     }
     ESP_LOGD(TAG, "Forzando el ocultado de todos los paneles visibles.");
 
-    if (s_panel_state == PANEL_STATE_PLAYER_VISIBLE) animate_panel_out_top(s_player_btns);
-    else if (s_panel_state == PANEL_STATE_ADMIN_VISIBLE) animate_panel_out_top(s_admin_btns);
-    else if (s_panel_state == PANEL_STATE_CONFIG_VISIBLE) animate_panel_out_top(s_config_btns);
-    else if (s_panel_state == PANEL_STATE_SIDE_VISIBLE) animate_panel_out_side(s_side_btns);
+    // Definición de los grupos de botones para ocultar
+    lv_obj_t* player_buttons[] = { ui_buttons_get_btn_1(), ui_buttons_get_btn_2(), ui_buttons_get_btn_3() };
+    lv_obj_t* admin_buttons[] = { ui_buttons_get_btn_4(), ui_buttons_get_btn_5(), ui_buttons_get_btn_6() };
+    lv_obj_t* config_buttons[] = { ui_buttons_get_btn_7(), ui_buttons_get_btn_8(), ui_buttons_get_btn_9() };
+    lv_obj_t* side_buttons[] = { ui_buttons_get_evo_1(), ui_buttons_get_evo_2(), ui_buttons_get_evo_3(), ui_buttons_get_evo_4(), ui_buttons_get_evo_5() };
+
+    if (s_panel_state == PANEL_STATE_PLAYER_VISIBLE) animate_panel_out_top(player_buttons);
+    else if (s_panel_state == PANEL_STATE_ADMIN_VISIBLE) animate_panel_out_top(admin_buttons);
+    else if (s_panel_state == PANEL_STATE_CONFIG_VISIBLE) animate_panel_out_top(config_buttons);
+    else if (s_panel_state == PANEL_STATE_SIDE_VISIBLE) animate_panel_out_side(side_buttons);
     
     s_panel_state = PANEL_STATE_HIDDEN;
     if (s_hide_timer) {
@@ -9681,28 +11014,21 @@ void ui_actions_panel_hide_all(void) {
     ui_idle_animation_resume();
 }
 
-static void button_event_cb(lv_event_t *e) {
-    lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_PRESSED && s_hide_timer) {
-        lv_timer_reset(s_hide_timer);
-    }
-}
-
 --- END OF FILE: .\components\ui\ui_actions_panel.c ---
 
 --- START OF FILE: .\components\ui\ui_actions_panel.h ---
-/* Fecha: 16/08/2025 - 07:19  */
-/* Fichero: components/diymon_ui/ui_actions_panel.h */
-/* Último cambio: Añadida la declaración de ui_actions_panel_hide_all() para ocultar paneles bajo demanda. */
-/* Descripción: Interfaz pública para el gestor de paneles de acciones. Expone funciones para crear los paneles, manejar gestos y, ahora, forzar el ocultado de cualquier panel visible. */
-
+/* Fecha: 17/08/2025 - 01:29 
+# Fichero: components/ui/ui_actions_panel.h
+# Último cambio: Eliminados los getters de botones individuales tras la refactorización a un gestor de botones.
+# Descripción: Interfaz pública para el gestor de paneles de acciones. Ahora solo expone las funciones de alto nivel para crear, mostrar/ocultar y manejar gestos, ya que la gestión de los botones individuales se ha delegado al uttons_manager.
+*/
 #ifndef UI_ACTIONS_PANEL_H
 #define UI_ACTIONS_PANEL_H
 
 #include <lvgl.h>
 
 /**
- * @brief Crea todos los paneles de acción y sus botones.
+ * @brief Crea todos los paneles de acción, delegando la creación de botones al `buttons_manager`.
  * @param parent El objeto padre sobre el cual se crearán los botones.
  */
 void ui_actions_panel_create(lv_obj_t *parent);
@@ -9720,22 +11046,6 @@ void ui_actions_panel_handle_gesture(lv_dir_t dir, lv_coord_t start_x, lv_coord_
  *        Útil para forzar el cierre de los paneles, por ejemplo, al apagar la pantalla.
  */
 void ui_actions_panel_hide_all(void);
-
-// --- Getters para botones (se mantienen para la conexión de eventos) ---
-lv_obj_t* ui_actions_panel_get_eat_btn(void);
-lv_obj_t* ui_actions_panel_get_gym_btn(void);
-lv_obj_t* ui_actions_panel_get_atk_btn(void);
-lv_obj_t* ui_actions_panel_get_brightness_btn(void);
-lv_obj_t* ui_actions_panel_get_toggle_screen_btn(void);
-lv_obj_t* ui_actions_panel_get_admin_placeholder_btn(void);
-lv_obj_t* ui_actions_panel_get_reset_all_btn(void);
-lv_obj_t* ui_actions_panel_get_enable_file_server_btn(void);
-lv_obj_t* ui_actions_panel_get_config_placeholder_btn(void);
-lv_obj_t* ui_actions_panel_get_evo_fire_btn(void);
-lv_obj_t* ui_actions_panel_get_evo_water_btn(void);
-lv_obj_t* ui_actions_panel_get_evo_earth_btn(void);
-lv_obj_t* ui_actions_panel_get_evo_wind_btn(void);
-lv_obj_t* ui_actions_panel_get_evo_back_btn(void);
 
 #endif // UI_ACTIONS_PANEL_H
 
@@ -10353,15 +11663,13 @@ void ui_telemetry_force_update(void);
 --- END OF FILE: .\components\ui\ui_telemetry.h ---
 
 --- START OF FILE: .\components\ui\ui.c ---
-/* Fecha: 16/08/2025 - 08:34  */
-/* Fichero: components/diymon_ui/ui.c */
-/* Último cambio: Intercambiada la funcionalidad de los botones 6 y 9 para que el botón del panel de administración active el modo de configuración. */
-/* Descripción: Orquestador de la UI. Se ha modificado la conexión de eventos para que el tercer botón del panel de administración (botón 6) active el modo de configuración WiFi en tiempo real, mientras que el tercer botón del panel de configuración (botón 9) ahora actúa como un placeholder. */
+/* Fecha: 17/08/2025 - 01:31 
+# Fichero: components/ui/ui.c
+# Último cambio: Eliminada la función 'ui_connect_actions' y el callback de eventos centralizado para completar la refactorización de botones.
+# Descripción: Orquestador principal de la UI. Se ha eliminado la lógica de conexión de eventos, ya que ahora cada módulo de botón es responsable de conectar su propio callback. Esta es la limpieza final de la refactorización, haciendo que este fichero sea agnóstico a los botones específicos.
+*/
 #include "ui.h"
 #include "screens.h"
-#include "actions.h"
-#include "ui_actions_panel.h"
-#include "ui_asset_loader.h"
 #include "ui_action_animations.h"
 #include "esp_log.h"
 
@@ -10369,41 +11677,8 @@ extern lv_obj_t *g_main_screen_obj;
 
 static const char *TAG = "DIYMON_UI_MAIN";
 
-static void button_event_cb(lv_event_t *e) {
-    lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_PRESSED || code == LV_EVENT_CLICKED) {
-        diymon_action_id_t action_id = (diymon_action_id_t)(intptr_t)lv_event_get_user_data(e);
-        execute_diymon_action(action_id);
-    }
-}
-
-static void ui_connect_actions(void) {
-    // --- Panel de Jugador ---
-    lv_obj_add_event_cb(ui_actions_panel_get_eat_btn(), button_event_cb, LV_EVENT_PRESSED, (void*)ACTION_ID_COMER);
-    lv_obj_add_event_cb(ui_actions_panel_get_gym_btn(), button_event_cb, LV_EVENT_PRESSED, (void*)ACTION_ID_EJERCICIO);
-    lv_obj_add_event_cb(ui_actions_panel_get_atk_btn(), button_event_cb, LV_EVENT_PRESSED, (void*)ACTION_ID_ATACAR);
-
-    // --- Panel de Administración ---
-    lv_obj_add_event_cb(ui_actions_panel_get_brightness_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_BRIGHTNESS_CYCLE);
-    lv_obj_add_event_cb(ui_actions_panel_get_toggle_screen_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_TOGGLE_SCREEN);
-    // [CAMBIO] El botón 6 (tercero del panel de admin) ahora activa el modo de configuración WiFi
-    lv_obj_add_event_cb(ui_actions_panel_get_admin_placeholder_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_ACTIVATE_CONFIG_MODE);
-
-    // --- Panel de Evolución ---
-    lv_obj_add_event_cb(ui_actions_panel_get_evo_fire_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EVO_FIRE);
-    lv_obj_add_event_cb(ui_actions_panel_get_evo_water_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EVO_WATER);
-    lv_obj_add_event_cb(ui_actions_panel_get_evo_earth_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EVO_EARTH);
-    lv_obj_add_event_cb(ui_actions_panel_get_evo_wind_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EVO_WIND);
-    lv_obj_add_event_cb(ui_actions_panel_get_evo_back_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_EVO_BACK);
-    
-    // --- Panel de Configuración ---
-    lv_obj_add_event_cb(ui_actions_panel_get_reset_all_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_RESET_ALL);
-    lv_obj_add_event_cb(ui_actions_panel_get_enable_file_server_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_ENABLE_FILE_SERVER);
-    // [CAMBIO] El botón 9 (tercero del panel de config) ahora es un placeholder
-    lv_obj_add_event_cb(ui_actions_panel_get_config_placeholder_btn(), button_event_cb, LV_EVENT_CLICKED, (void*)ACTION_ID_CONFIG_PLACEHOLDER);
-
-    ESP_LOGI(TAG, "Eventos de todos los botones de acción conectados.");
-}
+// La función 'ui_connect_actions' y su 'button_event_cb' han sido eliminados.
+// La conexión de eventos ahora está encapsulada dentro de cada módulo de botón.
 
 void ui_preinit(void) {
     ESP_LOGI(TAG, "Pre-inicializando UI: reservando buffer de animación...");
@@ -10414,7 +11689,7 @@ void ui_init(void) {
     create_screens();
     
     if (g_main_screen_obj) {
-        ui_connect_actions();
+        // La llamada a ui_connect_actions() ha sido eliminada.
         lv_obj_add_event_cb(g_main_screen_obj, (lv_event_cb_t)delete_screen_main, LV_EVENT_DELETE, NULL);
     }
     
@@ -11325,7 +12600,7 @@ static esp_err_t save_post_handler(httpd_req_t *req) {
 
 // --- Manejador para servir la página principal desde la SD ---
 static esp_err_t root_get_handler(httpd_req_t *req) {
-    return serve_file_from_sd(req, "/sdcard/config/index.html");
+    return serve_file_from_sd(req, "/sdcard/config/Index.html");
 }
 
 // --- Manejador para servir la página de backup desde la SD ---
