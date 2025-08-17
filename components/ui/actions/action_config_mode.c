@@ -1,7 +1,7 @@
-/* Fecha: 17/08/2025 - 08:46  */
+/* Fecha: 17/08/2025 - 09:44  */
 /* Fichero: components/ui/actions/action_config_mode.c */
-/* Último cambio: Modificada la tarea de configuración para iniciar siempre en modo AP, eliminando el intento de conexión STA previo. */
-/* Descripción: Módulo que gestiona el modo de configuración WiFi. La lógica ha sido simplificada para que, al entrar en este modo, siempre se inicie un Punto de Acceso (AP) directamente. Se eliminó el intento de conexión a una red guardada (STA), haciendo el comportamiento más predecible para el usuario y cumpliendo el requisito de que el modo AP solo se active por acción explícita. */
+/* Último cambio: Actualizada la ruta de inclusión de 'telemetry_manager.h' para reflejar la refactorización a ui/telemetry/. */
+/* Descripción: Módulo que gestiona el modo de configuración WiFi. Se ha actualizado la ruta de inclusión para apuntar al nuevo directorio 'telemetry', manteniendo la consistencia con la refactorización de la lógica de sensores. */
 
 #include "actions/action_config_mode.h"
 #include "esp_log.h"
@@ -12,7 +12,7 @@
 #include "esp_lvgl_port.h"
 #include "bsp_api.h"
 #include "web_server.h"
-#include "telemetry_manager.h"
+#include "telemetry/telemetry_manager.h"
 #include "screens.h"
 #include "ui_idle_animation.h"
 #include "ui_actions_panel.h"

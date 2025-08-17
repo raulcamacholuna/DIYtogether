@@ -1,13 +1,13 @@
-/* Fecha: 17/08/2025 - 02:50  */
+/* Fecha: 17/08/2025 - 09:45  */
 /* Fichero: components/ui/screens/screens.c */
-/* Último cambio: Movido a 'screens/' y actualizado para usar el nuevo 'telemetry_manager'. */
-/* Descripción: Orquesta la creación de la pantalla principal y maneja sus eventos de alto nivel (gestos, clics). Se ha actualizado para usar el `telemetry_manager` del core de la UI. */
+/* Último cambio: Actualizada la ruta de inclusión de 'telemetry_manager.h' para reflejar la refactorización a ui/telemetry/. */
+/* Descripción: Orquesta la creación de la pantalla principal. Se ha actualizado la ruta de inclusión para apuntar al nuevo directorio 'telemetry', manteniendo la consistencia con la refactorización de la lógica de sensores. */
 
 #include "screens.h"
 #include "ui_idle_animation.h"
 #include "ui_actions_panel.h"
 #include "ui_action_animations.h"
-#include "core/telemetry_manager.h" // Actualizado desde ui_telemetry.h
+#include "telemetry/telemetry_manager.h"
 #include "diymon_ui_helpers.h"
 #include "esp_log.h"
 #include "bsp_api.h"
@@ -46,7 +46,7 @@ void create_screen_main(void) {
     ui_action_animations_create(g_main_screen_obj);
     g_idle_animation_obj = ui_idle_animation_start(g_main_screen_obj);
     ui_actions_panel_create(g_main_screen_obj);
-    telemetry_manager_create(g_main_screen_obj); // Actualizado desde ui_telemetry_create
+    telemetry_manager_create(g_main_screen_obj);
 
     ESP_LOGI(TAG, "Pantalla principal creada delegando en módulos.");
 }
@@ -108,7 +108,7 @@ void delete_screen_main(void) {
     }
     ui_idle_animation_stop();
     ui_action_animations_destroy();
-    telemetry_manager_destroy(); // Actualizado desde ui_telemetry_destroy
+    telemetry_manager_destroy();
     ui_assets_deinit();
 }
 

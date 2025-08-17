@@ -1,6 +1,6 @@
-/* Fecha: 17/08/2025 - 02:31  */
-/* Fichero: components/ui/core/telemetry_manager.h */
-/* Último cambio: Movido a ui/core/ y renombrado de ui_telemetry.h como parte de la refactorización. */
+/* Fecha: 17/08/2025 - 09:41  */
+/* Fichero: components/ui/telemetry/telemetry_manager.h */
+/* Último cambio: Movido a ui/telemetry/ como parte de la refactorización de telemetría. */
 /* Descripción: Interfaz del módulo de telemetría de la UI. Expone funciones para crear, destruir y actualizar los elementos visuales de telemetría (batería, EVO). */
 
 #ifndef TELEMETRY_MANAGER_H

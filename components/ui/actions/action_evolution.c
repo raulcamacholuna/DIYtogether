@@ -1,12 +1,12 @@
-/* Fecha: 17/08/2025 - 02:34  */
+/* Fecha: 17/08/2025 - 09:45  */
 /* Fichero: components/ui/actions/action_evolution.c */
-/* Último cambio: Actualizadas las llamadas al gestor de telemetría para reflejar la refactorización a ui/core/. */
-/* Descripción: Módulo que maneja los cambios de estado del Diymon. Se ha actualizado para llamar a telemetry_manager_update_values en lugar de la antigua función, adaptándose a la nueva estructura del núcleo de la UI. */
+/* Último cambio: Actualizada la ruta de inclusión de 'telemetry_manager.h' para reflejar la refactorización a ui/telemetry/. */
+/* Descripción: Módulo que maneja los cambios de estado del Diymon. Se ha actualizado la ruta de inclusión para apuntar al nuevo directorio 'telemetry', manteniendo la consistencia con la refactorización de la lógica de sensores. */
 
 #include "actions/action_evolution.h"
 #include "diymon_evolution.h"
 #include "ui_idle_animation.h"
-#include "telemetry_manager.h" // Actualizado desde ui_telemetry.h
+#include "telemetry/telemetry_manager.h"
 #include "ui_action_animations.h" // Para g_animation_img_obj
 #include "screens.h"              // Para g_main_screen_obj
 #include "esp_log.h"

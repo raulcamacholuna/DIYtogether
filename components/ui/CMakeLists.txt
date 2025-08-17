@@ -1,7 +1,7 @@
-# Fecha: 17/08/2025 - 05:53 
+# Fecha: 17/08/2025 - 09:43 
 # Fichero: components/ui/CMakeLists.txt
-# Último cambio: Modificado para compilar automáticamente TODOS los ficheros .c de assets/images/.
-# Descripción: El problema de los botones invisibles (ruido) se debía a que sus ficheros C de definición de imagen (ej. asset_btn_1.c) no se estaban incluyendo en la compilación, causando errores de enlazador. Esta modificación utiliza `file(GLOB ...)` para encontrar y compilar automáticamente todos los ficheros .c del directorio `assets/images/`. Esto elimina la necesidad de listarlos manualmente, resuelve el error de 'undefined reference' para el botón 1 y asegura que todos los iconos se enlacen y rendericen correctamente.
+# Último cambio: Añadido el subdirectorio 'telemetry' a las rutas de compilación e inclusión.
+# Descripción: Se ha actualizado el CMakeLists para que reconozca el nuevo directorio 'telemetry', asegurando que los ficheros 'telemetry_manager.c' y 'telemetry_task.c' se compilen y sus cabeceras sean encontradas. Esto completa la refactorización de la lógica de telemetría.
 
 file(GLOB component_sources
     "*.c"
@@ -10,10 +10,10 @@ file(GLOB component_sources
     "actions/*.c"
     "assets/styles/*.c"
     "buttons/*.c"
+    "telemetry/*.c"
 )
 
-# [CORRECCIÓN] Buscar y añadir automáticamente TODOS los ficheros .c del directorio de imágenes.
-# Esto asegura que BG.c, BG_config.c y todos los asset_btn_*.c se compilen y enlacen correctamente.
+# Buscar y añadir automáticamente TODOS los ficheros .c del directorio de imágenes.
 file(GLOB asset_sources "assets/images/*.c")
 list(APPEND component_sources ${asset_sources})
 
@@ -28,6 +28,7 @@ idf_component_register(
         "assets/styles"
         "assets/fonts"
         "assets/images"
+        "telemetry"
     PRIV_INCLUDE_DIRS "."
     REQUIRES
         lvgl

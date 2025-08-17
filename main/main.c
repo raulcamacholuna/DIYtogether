@@ -1,7 +1,7 @@
-/* Fecha: 17/08/2025 - 08:01  */
+/* Fecha: 17/08/2025 - 09:45  */
 /* Fichero: main/main.c */
-/* Último cambio: Simplificada la lógica de arranque para eliminar los modos de servicio obsoletos y unificar el inicio en la aplicación principal. */
-/* Descripción: Orquestador principal. Se ha refactorizado 'app_main' para que inicie directamente la aplicación principal. Se eliminaron las comprobaciones de arranque para el portal WiFi (basado en credenciales guardadas o pulsación de botón) y para el modo de servidor de ficheros (basado en flag de NVS). El único modo de configuración ahora es el servidor web accesible desde la UI, eliminando la redundancia y simplificando el flujo de arranque. */
+/* Último cambio: Actualizada la ruta de inclusión de 'telemetry_task.h' para reflejar la refactorización a ui/telemetry/. */
+/* Descripción: Orquestador principal. Se ha actualizado la ruta de inclusión para apuntar al nuevo directorio 'telemetry', manteniendo la consistencia con la refactorización de la lógica de sensores. */
 
 #include <stdio.h>
 #include <string.h>
@@ -25,7 +25,7 @@
 #include "ui_asset_loader.h" 
 #include "actions.h"
 #include "core/state_manager.h"
-#include "core/telemetry_task.h"
+#include "telemetry/telemetry_task.h"
 
 #include "esp_err.h"
 #include "esp_check.h"
