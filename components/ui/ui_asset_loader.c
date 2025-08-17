@@ -1,11 +1,10 @@
-/*
-# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_asset_loader.c
-# Fecha: $timestamp
-# Último cambio: Revertido a un modelo de assets enlazados en firmware para solucionar el lag de la SD.
-# Descripción: Se ha revertido la estrategia de carga de assets. En lugar de generar rutas de fichero para la SD, ahora se devuelve un puntero a un descriptor de imagen (`lv_img_dsc_t`) que estará compilado directamente en el firmware. Esto elimina las lentas operaciones de E/S de la tarjeta SD durante el renderizado, solucionando los graves problemas de rendimiento ("lag").
-*/
+/* Fecha: 17/08/2025 - 03:09  */
+/* Fichero: components/ui/ui_asset_loader.c */
+/* Último cambio: Actualizada la ruta de inclusión para 'ui_assets.h' para reflejar la nueva estructura de directorios. */
+/* Descripción: Implementa el cargador de assets. Se ha corregido la ruta de inclusión de los assets de imagen para que apunte a 'assets/images/ui_assets.h', adaptándose a la refactorización que centraliza todos los recursos de apariencia. */
+
 #include "ui_asset_loader.h"
-#include "ui_assets.h" // Este fichero contendrá las declaraciones 'extern' de los assets
+#include "assets/images/ui_assets.h" // Actualizado para reflejar la nueva ubicación
 #include "esp_log.h"
 
 static const char *TAG = "UI_ASSET_LOADER";

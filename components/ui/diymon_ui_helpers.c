@@ -1,7 +1,7 @@
-/* Fecha: 15/08/2025 - 05:05  */
-/* Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\diymon_ui_helpers.c */
-/* Último cambio: Corregida la construcción de rutas de assets para usar el punto de montaje VFS '/sdcard'. */
-/* Descripción: Se ha modificado ui_helpers_build_asset_path para que genere rutas VFS directas (ej: '/sdcard/...') en lugar de rutas LVGL ('S:/...'). Esto es necesario porque el nimation_loader utiliza funciones de E/S estándar de C (open, opendir) que no entienden el sistema de letras de unidad de LVGL, solucionando el error de 'directorio no encontrado'. */
+/* Fecha: 17/08/2025 - 03:10  */
+/* Fichero: components/ui/diymon_ui_helpers.c */
+/* Último cambio: Actualizada la ruta de inclusión del asset de fondo 'BG.h' para reflejar la refactorización. */
+/* Descripción: Se ha corregido la ruta de inclusión del asset de fondo para que apunte a 'assets/images/BG.h', adaptándose a la nueva estructura de directorios que centraliza todos los recursos de apariencia. */
 
 #include "diymon_ui_helpers.h"
 #include "diymon_evolution.h"
@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include "BG.h" // Incluir el nuevo asset de fondo
+#include "assets/images/BG.h" // Incluir el nuevo asset de fondo
 
 static const char* TAG_HELPERS = "UI_HELPERS";
 

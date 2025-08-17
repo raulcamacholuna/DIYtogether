@@ -66,9 +66,9 @@ build_flags = -D LVGL_VERSION_MAJOR=9
 --- END OF FILE: .\platformio.ini ---
 
 --- START OF FILE: .\README.md ---
-/* Fecha: 17/08/2025 - 02:52  */
+/* Fecha: 17/08/2025 - 03:11  */
 /* Fichero: .\README.md */
-/* Último cambio: Añadida nota aclaratoria en la sección de compilación para reflejar la robustez tras la refactorización de la UI. */
+/* Último cambio: Actualizada la nota de compilación para reflejar la refactorización de la UI con el nuevo directorio 'assets'. */
 /* Descripción: Documentación principal del proyecto, guía de inicio y visión general. */
 
 # DIYTogether - Tu Mascota Virtual DIY
@@ -134,13 +134,13 @@ DIYTogether es un proyecto de mascota virtual open-source basada en hardware ESP
 ### 2. Compilación y Subida del Firmware
 Este proyecto está configurado para ser compilado y subido fácilmente con PlatformIO.
 
-*(Nota: La estructura de componentes ha sido refactorizada para mejorar la modularidad, pero el proceso de compilación con PlatformIO no ha cambiado y sigue siendo el método recomendado.)*
+*(Nota: La estructura interna, especialmente en el componente 'ui', se está refactorizando continuamente para aislar la lógica en subdirectorios como 'core', 'screens', 'widgets' y 'assets'. A pesar de estos cambios, el proceso de compilación con PlatformIO sigue siendo el mismo y es el método recomendado.)*
 
 1.  **Clona el repositorio**:
-    ` ash
+    ```bash
     git clone [URL de tu repositorio]
     cd DIYtogether
-    `
+    ```
 2.  **Abre el proyecto en VS Code**:
     *   Abre VS Code.
     *   Ve a File > Open Folder... y selecciona la carpeta DIYtogether que acabas de clonar.
@@ -10821,22 +10821,19 @@ void ui_init(void);
 --- END OF FILE: .\components\ui\core\ui.h ---
 
 --- START OF FILE: .\components\ui\screens\config.c ---
-/* Fecha: 17/08/2025 - 02:49  */
+/* Fecha: 17/08/2025 - 03:10  */
 /* Fichero: components/ui/screens/config.c */
-/* Último cambio: Refactorizado y movido a 'screens/', renombrado de 'ui_config_screen.c'. */
-/* Descripción: Implementación de la pantalla de configuración. Encapsula la lógica de esta vista específica como parte de la refactorización de la UI. */
+/* Último cambio: Actualizada la ruta de inclusión del asset de fondo 'BG_config.h' para reflejar la refactorización. */
+/* Descripción: Implementación de la pantalla de configuración. Se ha corregido la inclusión del asset de fondo para que apunte a 'assets/images/BG_config.h', adaptándose a la nueva estructura de directorios, y se ha eliminado la declaración 'extern' local redundante. */
 
 #include "config.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "assets/images/BG_config.h"
 
 static const char *TAG = "UI_CONFIG_SCREEN";
-
-// Declaración externa del descriptor de la imagen de fondo compilada en el firmware.
-// Se espera que este símbolo esté definido en otro fichero .c (ej: BG_config.c).
-extern const lv_img_dsc_t bg_config;
 
 /**
  * @brief Callback que se ejecuta al presionar el botón de reinicio.
@@ -11521,18 +11518,18 @@ extern const lv_img_dsc_t bg_0;
 --- END OF FILE: .\components\ui\BG.h ---
 
 --- START OF FILE: .\components\ui\CMakeLists.txt ---
-# Fecha: 17/08/2025 - 02:53 
+# Fecha: 17/08/2025 - 03:20
 # Fichero: components/ui/CMakeLists.txt
-# Último cambio: Corregido el formato de los comentarios para que sea compatible con CMake.
-# Descripción: Se ha corregido un error de compilación cambiando los comentarios de estilo C (/* */) a estilo CMake (#). Este error impedía a CMake analizar el fichero.
+# Último cambio: Añadida la compilación de ficheros de assets de imagen para resolver el error del enlazador.
+# Descripción: El error 'undefined reference to asset_btn_1' ocurre porque los ficheros .c que definen las imágenes no se estaban compilando. Se ha añadido 'assets/images/*.c' a la lista de ficheros fuente para que el enlazador pueda encontrar las definiciones de los assets.
 
 file(GLOB component_sources
     "*.c"
     "core/*.c"
     "screens/*.c"
     "actions/*.c"
-    "styles/*.c"
-    "assets/*.c"
+    "assets/styles/*.c"
+    "assets/images/*.c"
     "buttons/*.c"
 )
 
@@ -11544,6 +11541,9 @@ idf_component_register(
         "actions"
         "core"
         "screens"
+        "assets/styles"
+        "assets/fonts"
+        "assets/images"
     PRIV_INCLUDE_DIRS "."
     REQUIRES
         lvgl
@@ -11553,14 +11553,13 @@ idf_component_register(
         wifi_portal
         web_server
 )
-
 --- END OF FILE: .\components\ui\CMakeLists.txt ---
 
 --- START OF FILE: .\components\ui\diymon_ui_helpers.c ---
-/* Fecha: 15/08/2025 - 05:05  */
-/* Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\diymon_ui_helpers.c */
-/* Último cambio: Corregida la construcción de rutas de assets para usar el punto de montaje VFS '/sdcard'. */
-/* Descripción: Se ha modificado ui_helpers_build_asset_path para que genere rutas VFS directas (ej: '/sdcard/...') en lugar de rutas LVGL ('S:/...'). Esto es necesario porque el nimation_loader utiliza funciones de E/S estándar de C (open, opendir) que no entienden el sistema de letras de unidad de LVGL, solucionando el error de 'directorio no encontrado'. */
+/* Fecha: 17/08/2025 - 03:10  */
+/* Fichero: components/ui/diymon_ui_helpers.c */
+/* Último cambio: Actualizada la ruta de inclusión del asset de fondo 'BG.h' para reflejar la refactorización. */
+/* Descripción: Se ha corregido la ruta de inclusión del asset de fondo para que apunte a 'assets/images/BG.h', adaptándose a la nueva estructura de directorios que centraliza todos los recursos de apariencia. */
 
 #include "diymon_ui_helpers.h"
 #include "diymon_evolution.h"
@@ -11569,7 +11568,7 @@ idf_component_register(
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include "BG.h" // Incluir el nuevo asset de fondo
+#include "assets/images/BG.h" // Incluir el nuevo asset de fondo
 
 static const char* TAG_HELPERS = "UI_HELPERS";
 
@@ -12470,14 +12469,13 @@ void ui_actions_panel_hide_all(void);
 --- END OF FILE: .\components\ui\ui_actions_panel.h ---
 
 --- START OF FILE: .\components\ui\ui_asset_loader.c ---
-/*
-# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_asset_loader.c
-# Fecha: $timestamp
-# Último cambio: Revertido a un modelo de assets enlazados en firmware para solucionar el lag de la SD.
-# Descripción: Se ha revertido la estrategia de carga de assets. En lugar de generar rutas de fichero para la SD, ahora se devuelve un puntero a un descriptor de imagen (`lv_img_dsc_t`) que estará compilado directamente en el firmware. Esto elimina las lentas operaciones de E/S de la tarjeta SD durante el renderizado, solucionando los graves problemas de rendimiento ("lag").
-*/
+/* Fecha: 17/08/2025 - 03:09  */
+/* Fichero: components/ui/ui_asset_loader.c */
+/* Último cambio: Actualizada la ruta de inclusión para 'ui_assets.h' para reflejar la nueva estructura de directorios. */
+/* Descripción: Implementa el cargador de assets. Se ha corregido la ruta de inclusión de los assets de imagen para que apunte a 'assets/images/ui_assets.h', adaptándose a la refactorización que centraliza todos los recursos de apariencia. */
+
 #include "ui_asset_loader.h"
-#include "ui_assets.h" // Este fichero contendrá las declaraciones 'extern' de los assets
+#include "assets/images/ui_assets.h" // Actualizado para reflejar la nueva ubicación
 #include "esp_log.h"
 
 static const char *TAG = "UI_ASSET_LOADER";

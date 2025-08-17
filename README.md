@@ -1,7 +1,7 @@
-/* Fecha: 17/08/2025 - 02:52  */
+/* Fecha: 17/08/2025 - 03:39  */
 /* Fichero: .\README.md */
-/* Último cambio: Añadida nota aclaratoria en la sección de compilación para reflejar la robustez tras la refactorización de la UI. */
-/* Descripción: Documentación principal del proyecto, guía de inicio y visión general. */
+/* Último cambio: Actualizada la nota de compilación para reflejar la arquitectura de UI refactorizada y corregido el escapado de caracteres para PowerShell. */
+/* Descripción: Documentación principal del proyecto. La nota sobre la estructura del componente 'ui' ahora detalla la nueva organización modular en subdirectorios (assets, core, screens, etc.) para reflejar la reciente refactorización. Se han escapado los caracteres de acento grave (backticks) para evitar errores de parser en PowerShell. */
 
 # DIYTogether - Tu Mascota Virtual DIY
 
@@ -13,7 +13,7 @@
 
 Constantemente sueño despierto.
 
-Fantaseo con ser *"ese tío guay"* para mis sobrinos, el que les enseña a crear, a entender la tecnología, a jugar con la electrónica y la domótica. Quería construir algo que nos uniera, un juego que les apasionara y despertara su curiosidad por dentro. Una excusa perfecta para aprender divirtiéndose y pasar tiempo de calidad juntos.
+Fantaseo con ser *`ese tío guay`* para mis sobrinos, el que les enseña a crear, a entender la tecnología, a jugar con la electrónica y la domótica. Quería construir algo que nos uniera, un juego que les apasionara y despertara su curiosidad por dentro. Una excusa perfecta para aprender divirtiéndose y pasar tiempo de calidad juntos.
 
 De esa idea nace **DIYTogether**.
 
@@ -23,9 +23,9 @@ Un proyecto que empezó con mis mejores amigos y que ahora abro al mundo, invita
 
 ## ¿Qué es DIYTogether?
 
-DIYTogether es un proyecto de mascota virtual open-source basada en hardware ESP32. Es un **"Tamagotchi para Hackers"** diseñado desde cero para ser:
+DIYTogether es un proyecto de mascota virtual open-source basada en hardware ESP32. Es un **`Tamagotchi para Hackers`** diseñado desde cero para ser:
 
-*   �� **Personalizable**: Crea y carga tus propios "Skins" (gráficos, animaciones y sonidos) sin necesidad de reprogramar nada. ¡Haz tu DIYTogether verdaderamente tuyo!
+*   🎨 **Personalizable**: Crea y carga tus propios "Skins" (gráficos, animaciones y sonidos) sin necesidad de reprogramar nada. ¡Haz tu DIYTogether verdaderamente tuyo!
 *   🧠 **Educativo**: Aprende electrónica, programación (C++/ESP-IDF) y conectividad IoT de una forma práctica y progresiva. Cada paso es una lección, y los errores son parte del viaje.
 *   🌍 **Interactivo**: Utiliza sensores como el acelerómetro y la conectividad Bluetooth para interactuar con tu criatura de formas nuevas y creativas.
 *   ❤️ **Abierto y Comunitario**: Todo el proyecto (firmware, hardware, diseños 3D) es libre. Queremos que lo copies, lo modifiques, lo mejores y lo compartas.
@@ -66,10 +66,16 @@ DIYTogether es un proyecto de mascota virtual open-source basada en hardware ESP
 ### 2. Compilación y Subida del Firmware
 Este proyecto está configurado para ser compilado y subido fácilmente con PlatformIO.
 
-*(Nota: La estructura de componentes ha sido refactorizada para mejorar la modularidad, pero el proceso de compilación con PlatformIO no ha cambiado y sigue siendo el método recomendado.)*
+*(Nota: La arquitectura del componente `ui` ha sido completamente refactorizada para seguir principios de diseño modular y de responsabilidad única. La lógica ahora está organizada en subdirectorios bien definidos:*
+*   ***`assets/`***: *Contiene todos los recursos estáticos (imágenes, fuentes).*
+*   ***`core/`***: *Orquesta la UI, gestiona el estado y la telemetría.*
+*   ***`screens/`***: *Define y controla las diferentes pantallas de la aplicación.*
+*   ***`actions/`***: *Encapsula la lógica de cada acción del usuario (comer, reiniciar, etc.).*
+*   ***`buttons/`***: *Módulos individuales para cada botón, encapsulando su creación y eventos.*
+*A pesar de esta estructura interna avanzada, el proceso de compilación con PlatformIO sigue siendo el mismo y es el método recomendado.)*
 
 1.  **Clona el repositorio**:
-    ` ash
+    `ash
     git clone [URL de tu repositorio]
     cd DIYtogether
     `
@@ -97,7 +103,7 @@ Este proyecto vive gracias a gente como tú. Si te gusta la idea, ¡involúcrate
 
 *   ⭐ **Dale una estrella a este repositorio**: ¡Nos ayuda a ganar visibilidad!
 *   💬 **Únete a nuestro canal de Discord/Telegram**: El mejor lugar para charlar, pedir ayuda y compartir tus creaciones.
-*   💡 **Aporta ideas o reporta bugs**: Abre un "Issue" aquí en GitHub.
+*   💡 **Aporta ideas o reporta bugs**: Abre un `Issue` aquí en GitHub.
 *   🚀 **Contribuye con código o diseños**: ¡Los Pull Requests son bienvenidos! Revisa nuestra [guía de contribución].
 
 Gracias por tu apoyo y por creer en un proyecto hecho con cariño y curiosidad.

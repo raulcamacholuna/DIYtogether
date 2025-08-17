@@ -1,19 +1,16 @@
-/* Fecha: 17/08/2025 - 02:49  */
+/* Fecha: 17/08/2025 - 03:42  */
 /* Fichero: components/ui/screens/config.c */
-/* Último cambio: Refactorizado y movido a 'screens/', renombrado de 'ui_config_screen.c'. */
-/* Descripción: Implementación de la pantalla de configuración. Encapsula la lógica de esta vista específica como parte de la refactorización de la UI. */
+/* Último cambio: Renombrada la función 'config_screen_show' a 'config_show' para que coincida con su declaración y resolver el error del enlazador. */
+/* Descripción: Implementación de la pantalla de configuración. El error de 'undefined reference' se debía a que la definición de la función en este fichero no coincidía con la declaración en el header y la llamada en main.c. Se ha estandarizado el nombre a 'config_show'. */
 
 #include "config.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "assets/images/BG_config.h"
 
 static const char *TAG = "UI_CONFIG_SCREEN";
-
-// Declaración externa del descriptor de la imagen de fondo compilada en el firmware.
-// Se espera que este símbolo esté definido en otro fichero .c (ej: BG_config.c).
-extern const lv_img_dsc_t bg_config;
 
 /**
  * @brief Callback que se ejecuta al presionar el botón de reinicio.
@@ -30,7 +27,7 @@ static void reset_button_event_cb(lv_event_t *e) {
 /**
  * @brief Crea y muestra la pantalla de configuración estática.
  */
-void config_screen_show(void) {
+void config_show(void) {
     // Crear una pantalla nueva y limpia
     lv_obj_t *scr = lv_obj_create(NULL);
     lv_obj_remove_style_all(scr); // Empezamos sin estilos por defecto
