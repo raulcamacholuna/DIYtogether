@@ -1,7 +1,7 @@
-/* Fecha: 18/08/2025 - 10:15  */
+/* Fecha: 18/08/2025 - 10:30  */
 /* Fichero: components/ui/ui_actions_panel.c */
-/* Último cambio: Añadido el flag LV_OBJ_FLAG_GESTURE_BUBBLE a todos los paneles para permitir la propagación de eventos de gesto. */
-/* Descripción: Se ha solucionado un error por el cual los gestos de swipe no funcionaban si se iniciaban sobre un panel ya visible. Al añadir el flag `LV_OBJ_FLAG_GESTURE_BUBBLE`, los paneles ahora permiten que los eventos de gesto "burbujeen" hasta la pantalla principal, que es la que contiene la lógica de transición, asegurando un comportamiento consistente. */
+/* Último cambio: Eliminadas las restricciones de borde (`EDGE_SWIPE_THRESHOLD`) para la detección de gestos. */
+/* Descripción: Se ha corregido el comportamiento del swipe. Ahora, los gestos para mostrar los paneles de acciones se detectan desde cualquier parte de la pantalla, no solo desde los bordes. Esto soluciona el problema por el cual el usuario tenía que iniciar el deslizamiento en una zona muy específica, mejorando la usabilidad de la interfaz. */
 
 #include "ui_actions_panel.h"
 #include "ui_idle_animation.h"
@@ -74,7 +74,7 @@ void ui_actions_panel_create(lv_obj_t *parent) {
     lv_obj_align(s_panel_player, LV_ALIGN_TOP_MID, 0, -TOP_PANEL_HEIGHT);
     lv_obj_add_flag(s_panel_player, LV_OBJ_FLAG_HIDDEN);
     lv_obj_remove_flag(s_panel_player, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_flag(s_panel_player, LV_OBJ_FLAG_GESTURE_BUBBLE); // [CORRECCIÓN CLAVE]
+    lv_obj_add_flag(s_panel_player, LV_OBJ_FLAG_GESTURE_BUBBLE);
     btn_1_create(s_panel_player);
     btn_2_create(s_panel_player);
     btn_3_create(s_panel_player);
@@ -87,7 +87,7 @@ void ui_actions_panel_create(lv_obj_t *parent) {
     lv_obj_align(s_panel_admin, LV_ALIGN_TOP_MID, 0, -TOP_PANEL_HEIGHT);
     lv_obj_add_flag(s_panel_admin, LV_OBJ_FLAG_HIDDEN);
     lv_obj_remove_flag(s_panel_admin, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_flag(s_panel_admin, LV_OBJ_FLAG_GESTURE_BUBBLE); // [CORRECCIÓN CLAVE]
+    lv_obj_add_flag(s_panel_admin, LV_OBJ_FLAG_GESTURE_BUBBLE);
     btn_4_create(s_panel_admin);
     btn_5_create(s_panel_admin);
     btn_6_create(s_panel_admin);
@@ -100,7 +100,7 @@ void ui_actions_panel_create(lv_obj_t *parent) {
     lv_obj_align(s_panel_config, LV_ALIGN_TOP_MID, 0, -TOP_PANEL_HEIGHT);
     lv_obj_add_flag(s_panel_config, LV_OBJ_FLAG_HIDDEN);
     lv_obj_remove_flag(s_panel_config, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_flag(s_panel_config, LV_OBJ_FLAG_GESTURE_BUBBLE); // [CORRECCIÓN CLAVE]
+    lv_obj_add_flag(s_panel_config, LV_OBJ_FLAG_GESTURE_BUBBLE);
     btn_7_create(s_panel_config);
     btn_8_create(s_panel_config);
     btn_9_create(s_panel_config);
@@ -113,7 +113,7 @@ void ui_actions_panel_create(lv_obj_t *parent) {
     lv_obj_align(s_panel_evo, LV_ALIGN_LEFT_MID, -SIDE_PANEL_WIDTH, 0);
     lv_obj_add_flag(s_panel_evo, LV_OBJ_FLAG_HIDDEN);
     lv_obj_remove_flag(s_panel_evo, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_flag(s_panel_evo, LV_OBJ_FLAG_GESTURE_BUBBLE); // [CORRECCIÓN CLAVE]
+    lv_obj_add_flag(s_panel_evo, LV_OBJ_FLAG_GESTURE_BUBBLE);
     evo_1_create(s_panel_evo);
     evo_2_create(s_panel_evo);
     evo_3_create(s_panel_evo);
@@ -208,10 +208,11 @@ void ui_actions_panel_handle_gesture(lv_dir_t dir, lv_coord_t start_x, lv_coord_
 
     switch(s_panel_state) {
         case PANEL_STATE_HIDDEN:
-            if (dir == LV_DIR_BOTTOM && start_y < EDGE_SWIPE_THRESHOLD) {
+            // [CORRECCIÓN] Se elimina la comprobación de la posición inicial del swipe.
+            if (dir == LV_DIR_BOTTOM) {
                 animate_panel_in_top(s_panel_player);
                 s_panel_state = PANEL_STATE_PLAYER_VISIBLE;
-            } else if (dir == LV_DIR_RIGHT && start_x < EDGE_SWIPE_THRESHOLD) {
+            } else if (dir == LV_DIR_RIGHT) {
                 animate_panel_in_side(s_panel_evo);
                 s_panel_state = PANEL_STATE_SIDE_VISIBLE;
             } else {
