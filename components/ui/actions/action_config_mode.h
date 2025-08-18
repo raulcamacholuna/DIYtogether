@@ -1,7 +1,7 @@
-/* Fecha: 17/08/2025 - 01:49  */
+/* Fecha: 18/08/2025 - 09:21  */
 /* Fichero: components/ui/actions/action_config_mode.h */
-/* Último cambio: Creación del módulo para la acción del modo de configuración. */
-/* Descripción: Interfaz pública para gestionar el ciclo de vida del modo de configuración. Expone funciones para iniciar y detener el modo, encapsulando su estado y la gestión de la tarea de red. */
+/* Último cambio: Eliminada la declaración de action_config_mode_stop al cambiar la lógica de salida a un reinicio. */
+/* Descripción: Interfaz pública para el modo de configuración. La función de detención se ha eliminado ya que la única salida del modo de configuración es ahora un reinicio del dispositivo, simplificando la API. */
 
 #ifndef ACTION_CONFIG_MODE_H
 #define ACTION_CONFIG_MODE_H
@@ -16,13 +16,6 @@ extern "C" {
  *        y lanza una tarea para gestionar la conexión y el servidor web.
  */
 void action_config_mode_start(void);
-
-/**
- * @brief Detiene el modo de configuración WiFi.
- *        Limpia los elementos de la UI de configuración, detiene la tarea
- *        de red y los servicios asociados, y restaura la UI principal.
- */
-void action_config_mode_stop(void);
 
 #ifdef __cplusplus
 }

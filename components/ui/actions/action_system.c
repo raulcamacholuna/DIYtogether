@@ -1,7 +1,7 @@
-/* Fecha: 18/08/2025 - 07:00  */
+/* Fecha: 18/08/2025 - 09:23  */
 /* Fichero: components/ui/actions/action_system.c */
-/* Último cambio: Eliminada la inclusión de 'wifi_portal.h' para resolver el error de compilación. */
-/* Descripción: Se ha eliminado la directiva '#include "wifi_portal.h"' porque el componente 'wifi_portal' fue borrado del proyecto. Las funciones para borrar credenciales ahora residen en el BSP o en un nuevo módulo de gestión de NVS, pero por ahora se elimina la dependencia directa para permitir la compilación. */
+/* Último cambio: Eliminada la implementación de action_system_enable_file_server. */
+/* Descripción: Se ha eliminado la función para activar el modo de servidor de ficheros. Esta funcionalidad ahora está integrada en el modo de configuración principal, por lo que este módulo solo se encarga del reseteo total del dispositivo. */
 
 #include "actions/action_system.h"
 #include "nvs_flash.h"
@@ -11,7 +11,7 @@
 #include "freertos/task.h"
 #include "diymon_evolution.h"
 #include "esp_log.h"
-#include "bsp_api.h" // Se asume que el borrado de credenciales estará aquí o en un gestor NVS
+#include "bsp_api.h"
 
 static const char *TAG = "ACTION_SYSTEM";
 
@@ -33,8 +33,6 @@ static void erase_nvs_key(const char* key) {
 
 /**
  * @brief Función interna para borrar credenciales WiFi.
- * @note Esto es una solución temporal. Idealmente, esta lógica debería estar
- *       en un módulo dedicado a la gestión de NVS o en el BSP.
  */
 static void erase_wifi_credentials_from_nvs(void) {
     nvs_handle_t nvs_handle;
@@ -58,7 +56,7 @@ void action_system_reset_all(void) {
     // Borra todas las configuraciones guardadas
     erase_wifi_credentials_from_nvs();
     diymon_evolution_reset_state();
-    erase_nvs_key("file_server"); // Se mantiene por si quedan restos de versiones anteriores
+    erase_nvs_key("file_server"); // Se mantiene para limpiar NVS de versiones anteriores
 
     ESP_LOGW(TAG, "Todas las configuraciones borradas. Reiniciando ahora.");
     vTaskDelay(pdMS_TO_TICKS(1000));

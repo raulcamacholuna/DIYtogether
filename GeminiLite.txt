@@ -8274,10 +8274,10 @@ void action_brightness_cycle(void);
 --- END OF FILE: .\components\ui\actions\action_brightness.h ---
 
 --- START OF FILE: .\components\ui\actions\action_config_mode.c ---
-/* Fecha: 18/08/2025 - 09:04  */
+/* Fecha: 18/08/2025 - 09:08  */
 /* Fichero: components/ui/actions/action_config_mode.c */
-/* Último cambio: Movida la llamada a `bsp_wifi_deinit` a la secuencia de apagado para asegurar una limpieza completa de recursos. */
-/* Descripción: Se ha corregido el problema de fallo de memoria al salir del modo de configuración. La causa era una fuga de recursos en el stack WiFi que no se liberaba completamente. Al llamar a `bsp_wifi_deinit`, que ahora maneja la desinicialización completa del WiFi y sus interfaces de red, se asegura que toda la memoria asociada se libere antes de intentar realocar el buffer de animación, solucionando el fallo. */
+/* Último cambio: Implementada la lógica para intentar conexión STA antes de iniciar el modo AP. */
+/* Descripción: Se ha corregido el comportamiento del modo de configuración. Ahora, al entrar, primero intenta conectarse a una red WiFi guardada. Si la conexión es exitosa, muestra la IP obtenida. Si falla o no hay credenciales, limpia el intento de conexión STA y luego inicia el modo Punto de Acceso (AP), resolviendo el problema de que siempre iniciaba en modo AP. */
 
 #include "actions/action_config_mode.h"
 #include "esp_log.h"
@@ -8308,29 +8308,70 @@ static httpd_handle_t s_server_handle = NULL; // Handle para el servidor web
 // --- Funciones de ayuda privadas del módulo ---
 
 /**
- * @brief Tarea de FreeRTOS para gestionar el modo de configuración (AP + Servidor Web).
+ * @brief Tarea de FreeRTOS para gestionar el modo de configuración.
+ *        Intenta conectar como STA si hay credenciales; si no, inicia un AP.
  */
 static void wifi_config_task(void *param) {
     bsp_wifi_init_stack();
-    bsp_wifi_start_ap();
-    
+
+    // 1. Intentar conectar como estación (STA) usando credenciales guardadas.
+    ESP_LOGI(TAG, "Intentando conectar a WiFi guardado...");
     lvgl_port_lock(0);
     if (s_is_config_mode_active && s_config_screen) {
         lv_obj_t *label1 = lv_obj_get_child(s_config_screen, 0);
+        lv_label_set_text(label1, "Conectando a WiFi...");
         lv_obj_t *label2 = lv_obj_get_child(s_config_screen, 1);
-        lv_label_set_text(label1, "Modo AP Activo");
-        lv_label_set_text(label2, "SSID: DIYTogether\nPass: MakeItYours\nIP: 192.168.4.1");
+        lv_label_set_text(label2, "Esperando IP...");
     }
     lvgl_port_unlock();
 
+    bsp_wifi_init_sta_from_nvs();
+
+    // 2. Esperar a obtener una IP.
+    bool connected = bsp_wifi_wait_for_ip(10000); // Timeout de 10 segundos
+
+    if (connected && s_is_config_mode_active) {
+        // 3a. Conexión exitosa: Mostrar IP y lanzar servidor.
+        char ip_addr[16];
+        bsp_wifi_get_ip(ip_addr);
+        ESP_LOGI(TAG, "Conectado exitosamente. IP: %s", ip_addr);
+
+        lvgl_port_lock(0);
+        if (s_is_config_mode_active && s_config_screen) {
+            lv_obj_t *label1 = lv_obj_get_child(s_config_screen, 0);
+            lv_obj_t *label2 = lv_obj_get_child(s_config_screen, 1);
+            lv_label_set_text(label1, "¡Conectado!");
+            lv_label_set_text_fmt(label2, "IP: %s\nAccede desde tu navegador", ip_addr);
+        }
+        lvgl_port_unlock();
+
+    } else if (s_is_config_mode_active) {
+        // 3b. Fallo en conexión o sin credenciales: Iniciar modo AP.
+        ESP_LOGI(TAG, "No se pudo conectar como STA. Iniciando modo AP.");
+        bsp_wifi_deinit(); // Limpiar el intento de STA fallido.
+
+        lvgl_port_lock(0);
+        if (s_is_config_mode_active && s_config_screen) {
+            lv_obj_t *label1 = lv_obj_get_child(s_config_screen, 0);
+            lv_obj_t *label2 = lv_obj_get_child(s_config_screen, 1);
+            lv_label_set_text(label1, "Modo AP Activo");
+            lv_label_set_text(label2, "SSID: DIYTogether\nPass: MakeItYours\nIP: 192.168.4.1");
+        }
+        lvgl_port_unlock();
+
+        bsp_wifi_start_ap();
+    }
+
+    // 4. Iniciar el servidor web en cualquier caso (STA o AP).
     if (s_is_config_mode_active) {
-        ESP_LOGI(TAG, "Iniciando servidor web para gestión de archivos.");
+        ESP_LOGI(TAG, "Iniciando servidor web para gestión.");
         s_server_handle = web_server_start();
     }
 
     s_wifi_task_handle = NULL;
     vTaskDelete(NULL);
 }
+
 
 /**
  * @brief Callback de evento para el botón 'Volver' del modo de configuración.

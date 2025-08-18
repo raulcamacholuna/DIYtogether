@@ -1,7 +1,7 @@
-/* Fecha: 17/08/2025 - 03:35  */
+/* Fecha: 18/08/2025 - 09:23  */
 /* Fichero: components/ui/actions/action_system.h */
-/* Último cambio: Creación del módulo para agrupar las acciones de sistema como primer paso de la refactorización de 'actions.c'. */
-/* Descripción: Interfaz pública para las acciones de sistema como 'activar servidor de ficheros' y 'reset total'. Este es el primer paso para descomponer el monolítico 'actions.c', siguiendo el Principio de Responsabilidad Única. */
+/* Último cambio: Eliminada la declaración de action_system_enable_file_server. */
+/* Descripción: Interfaz pública para las acciones de sistema. Se ha eliminado la acción del servidor de ficheros, ya que ahora está integrada en el modo de configuración principal, dejando solo la acción de reseteo total. */
 
 #ifndef ACTION_SYSTEM_H
 #define ACTION_SYSTEM_H
@@ -11,16 +11,9 @@ extern "C" {
 #endif
 
 /**
- * @brief Activa el modo de servidor de ficheros.
- *        Establece una bandera en NVS y reinicia el dispositivo para que
- *        app_main entre en el modo de servicio correspondiente.
- */
-void action_system_enable_file_server(void);
-
-/**
  * @brief Realiza un reseteo total del dispositivo.
- *        Borra las credenciales WiFi, el estado de evolución y la bandera
- *        del servidor de ficheros de la NVS, y luego reinicia.
+ *        Borra las credenciales WiFi y el estado de evolución de la NVS,
+ *        y luego reinicia.
  */
 void action_system_reset_all(void);
 
