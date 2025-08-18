@@ -1,6 +1,6 @@
-/* Fecha: 18/08/2025 - 09:22  */
+/* Fecha: 18/08/2025 - 09:27  */
 /* Fichero: components/ui/actions/action_config_mode.c */
-/* Último cambio: Reemplazada la lógica de 'volver' por un reinicio y eliminada la función de parada. */
+/* Último cambio: Corregida la cadena de texto 'Conectando a WiFi...' para eliminar un carácter no imprimible que se mostraba como un cuadrado. */
 /* Descripción: Se ha modificado el comportamiento del modo de configuración. El botón 'Volver' ahora es un botón 'Reiniciar' que reinicia el dispositivo. Se ha eliminado la función 'action_config_mode_stop' y su lógica de restauración de la UI, ya que el reinicio es ahora la única forma de salir de este modo, simplificando el ciclo de vida. */
 
 #include "actions/action_config_mode.h"
@@ -36,6 +36,7 @@ static void wifi_config_task(void *param) {
     lvgl_port_lock(0);
     if (s_is_config_mode_active && s_config_screen) {
         lv_obj_t *label1 = lv_obj_get_child(s_config_screen, 0);
+        // [CORRECCIÓN] Se reescribe la cadena para eliminar caracteres invisibles.
         lv_label_set_text(label1, "Conectando a WiFi...");
         lv_obj_t *label2 = lv_obj_get_child(s_config_screen, 1);
         lv_label_set_text(label2, "Esperando IP...");
@@ -55,7 +56,7 @@ static void wifi_config_task(void *param) {
         if (s_is_config_mode_active && s_config_screen) {
             lv_obj_t *label1 = lv_obj_get_child(s_config_screen, 0);
             lv_obj_t *label2 = lv_obj_get_child(s_config_screen, 1);
-            lv_label_set_text(label1, "¡Conectado!");
+            lv_label_set_text(label1, "Conectado!");
             lv_label_set_text_fmt(label2, "IP: %s\nAccede desde tu navegador", ip_addr);
         }
         lvgl_port_unlock();

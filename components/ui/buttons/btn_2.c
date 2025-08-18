@@ -1,12 +1,13 @@
-/* Fecha: 17/08/2025 - 05:17  */
+/* Fecha: 18/08/2025 - 09:53  */
 /* Fichero: components/ui/buttons/btn_2.c */
-/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
-/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+/* Último cambio: Añadida llamada al módulo de feedback y ajustado el evento a LV_EVENT_CLICKED. */
+/* Descripción: Implementación del botón 'Ejercicio'. Se invoca a `button_feedback_add` para respuesta visual y se usa el evento 'CLICKED' para disparar la acción, asegurando que el feedback visual se complete antes de la ejecución de la acción. */
 
 #include "btn_2.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
 #include "esp_log.h"
+#include "button_feedback.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
@@ -18,13 +19,12 @@ static lv_obj_t *s_btn_2_handle = NULL;
 
 /**
  * @brief Callback de evento específico para el botón 'Ejercicio'.
- *        Ejecuta la acción de ejercicio cuando se presiona el botón.
  * @param e Puntero al evento de LVGL.
  */
 static void btn_2_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_PRESSED) {
-        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de ejercicio.");
+    if (code == LV_EVENT_CLICKED) {
+        ESP_LOGI(TAG, "¡Evento CLICKED recibido! Ejecutando acción de ejercicio.");
         execute_diymon_action(ACTION_ID_EJERCICIO);
     }
 }
@@ -53,13 +53,15 @@ void btn_2_create(lv_obj_t *parent) {
     lv_obj_center(img);
 
     // --- Posición DENTRO de su panel padre ---
-    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
     lv_obj_align(s_btn_2_handle, LV_ALIGN_LEFT_MID, (BUTTON_SIZE + BUTTON_PADDING) * 1, 0);
     
-    // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_btn_2_handle, btn_2_event_cb, LV_EVENT_PRESSED, NULL);
+    // --- Conexión del evento de acción ---
+    lv_obj_add_event_cb(s_btn_2_handle, btn_2_event_cb, LV_EVENT_CLICKED, NULL);
+
+    // --- Añadir feedback visual ---
+    button_feedback_add(s_btn_2_handle);
     
-    ESP_LOGI(TAG, "Botón 'Ejercicio' (BTN_2) creado y posicionado dentro de su panel.");
+    ESP_LOGI(TAG, "Botón 'Ejercicio' (BTN_2) creado con feedback visual.");
 }
 
 /**

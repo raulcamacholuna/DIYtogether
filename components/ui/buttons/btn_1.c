@@ -1,11 +1,13 @@
-/* Fecha: 17/08/2025 - 07:11  */
+/* Fecha: 18/08/2025 - 09:49  */
 /* Fichero: components/ui/buttons/btn_1.c */
-/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
-/* Descripción: Se ha corregido un error de posicionamiento del botón que impedía su correcta visualización. Se ha reemplazado la lógica de posicionamiento absoluto (lv_obj_set_pos) y ocultación explícita por un alineamiento relativo (lv_obj_align) dentro de su panel padre. Esto soluciona el problema por el cual el botón no aparecía al desplegarse el panel de acciones. */
+/* Último cambio: Corregido el evento de acción a LV_EVENT_CLICKED para restaurar la funcionalidad. */
+/* Descripción: Implementación del botón 'Comer'. Se ha corregido el evento que dispara la acción de 'RELEASED' a 'CLICKED'. Este es el evento de alto nivel correcto para una pulsación, resolviendo el problema por el cual la acción no se registraba, mientras se mantiene el feedback visual en los eventos de 'press' y 'release'. */
+
 #include "btn_1.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
 #include "esp_log.h"
+#include "button_feedback.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
@@ -17,13 +19,13 @@ static lv_obj_t *s_btn_1_handle = NULL;
 
 /**
  * @brief Callback de evento específico para el botón 'Comer'.
- *        Ejecuta la acción de comer cuando se presiona el botón.
  * @param e Puntero al evento de LVGL.
  */
 static void btn_1_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_PRESSED) {
-        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de comer.");
+    // [CORRECCIÓN] La acción se debe ejecutar en el evento CLICKED.
+    if (code == LV_EVENT_CLICKED) {
+        ESP_LOGI(TAG, "¡Evento CLICKED recibido! Ejecutando acción de comer.");
         execute_diymon_action(ACTION_ID_COMER);
     }
 }
@@ -52,13 +54,16 @@ void btn_1_create(lv_obj_t *parent) {
     lv_obj_center(img);
 
     // --- Posición DENTRO de su panel padre ---
-    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
     lv_obj_align(s_btn_1_handle, LV_ALIGN_LEFT_MID, (BUTTON_SIZE + BUTTON_PADDING) * 0, 0);
 
-    // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_btn_1_handle, btn_1_event_cb, LV_EVENT_PRESSED, NULL);
+    // --- Conexión del evento de acción ---
+    // [CORRECCIÓN] Se registra el callback para el evento CLICKED.
+    lv_obj_add_event_cb(s_btn_1_handle, btn_1_event_cb, LV_EVENT_CLICKED, NULL);
+
+    // --- Añadir feedback visual ---
+    button_feedback_add(s_btn_1_handle);
     
-    ESP_LOGI(TAG, "Botón 'Comer' (BTN_1) creado y posicionado dentro de su panel.");
+    ESP_LOGI(TAG, "Botón 'Comer' (BTN_1) creado con feedback visual.");
 }
 
 /**
