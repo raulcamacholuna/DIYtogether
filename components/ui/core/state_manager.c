@@ -1,7 +1,7 @@
-/* Fecha: 17/08/2025 - 02:30  */
+/* Fecha: 18/08/2025 - 07:08  */
 /* Fichero: components/ui/core/state_manager.c */
-/* Último cambio: Movido a ui/core/ y renombrado de ui_state_manager.c como parte de la refactorización. */
-/* Descripción: Implementación del gestor de estado de la UI. Contiene la lógica para manejar la inactividad, el atenuado y apagado de la pantalla, y el patrón de despertar. */
+/* Último cambio: Implementadas funciones para pausar y reanudar el gestor de estado. */
+/* Descripción: Se añade la lógica para pausar y reanudar los temporizadores de inactividad. Esto es crucial para modos de operación como el servidor web, donde no hay interacción táctil con la pantalla, evitando que se apague inesperadamente y cause errores en otras tareas. */
 
 #include "state_manager.h"
 #include "screen_manager.h"
@@ -24,6 +24,8 @@ static wake_up_state_t s_wake_state = WAKE_STATE_OFF;
 static uint8_t s_wake_click_count = 0;
 static lv_timer_t *s_double_click_timer = NULL;
 static lv_timer_t *s_wake_prime_timer = NULL;
+static lv_timer_t *s_inactivity_timer = NULL;
+static bool s_is_paused = false; // Flag para pausar el gestor
 
 // --- Funciones de ayuda y callbacks ---
 
@@ -49,6 +51,7 @@ static void wake_prime_timer_cb(lv_timer_t * timer) {
 }
 
 static void screen_touch_event_cb(lv_event_t * e) {
+    if (s_is_paused) return; // Ignorar eventos si está pausado
     lv_event_code_t code = lv_event_get_code(e);
     lv_disp_t * disp = lv_display_get_default();
     if (!disp) return;
@@ -96,6 +99,8 @@ static void screen_touch_event_cb(lv_event_t * e) {
 }
 
 static void inactivity_timer_cb(lv_timer_t * timer) {
+    if (s_is_paused) return; // No hacer nada si está pausado
+
     lv_disp_t * disp = lv_display_get_default();
     if (!disp) return;
     
@@ -116,12 +121,32 @@ static void inactivity_timer_cb(lv_timer_t * timer) {
     }
 }
 
-// --- Función de inicialización pública ---
+// --- Funciones de inicialización y control públicas ---
+
 void state_manager_init(void) {
-    lv_timer_create(inactivity_timer_cb, 5000, NULL);
+    s_inactivity_timer = lv_timer_create(inactivity_timer_cb, 5000, NULL);
     lv_obj_t * scr = lv_screen_active();
     if (scr) {
         lv_obj_add_event_cb(scr, screen_touch_event_cb, LV_EVENT_ALL, NULL);
     }
     ESP_LOGI(TAG, "Gestor de estado de UI inicializado. Manejadores de inactividad activos.");
+}
+
+void state_manager_pause(void) {
+    if (!s_is_paused) {
+        s_is_paused = true;
+        ESP_LOGI(TAG, "Gestor de estado PAUSADO. La pantalla no se atenuará ni apagará por inactividad.");
+    }
+}
+
+void state_manager_resume(void) {
+    if (s_is_paused) {
+        s_is_paused = false;
+        // Resetea el contador de inactividad para dar al usuario tiempo completo antes del próximo evento.
+        lv_disp_t * disp = lv_display_get_default();
+        if (disp) {
+            lv_display_trigger_activity(disp);
+        }
+        ESP_LOGI(TAG, "Gestor de estado REANUDADO.");
+    }
 }

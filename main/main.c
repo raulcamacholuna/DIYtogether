@@ -1,7 +1,7 @@
-/* Fecha: 17/08/2025 - 09:45  */
+/* Fecha: 18/08/2025 - 07:09  */
 /* Fichero: main/main.c */
-/* Último cambio: Actualizada la ruta de inclusión de 'telemetry_task.h' para reflejar la refactorización a ui/telemetry/. */
-/* Descripción: Orquestador principal. Se ha actualizado la ruta de inclusión para apuntar al nuevo directorio 'telemetry', manteniendo la consistencia con la refactorización de la lógica de sensores. */
+/* Último cambio: Verificación de estabilidad y limpieza de la lógica de arranque. */
+/* Descripción: Orquestador principal. El flujo de arranque se ha consolidado y estabilizado. Se han eliminado todos los modos de servicio obsoletos (portal cautivo, servidor de ficheros activado por NVS). La única vía de configuración es ahora el modo de servidor web, invocado desde la UI, que gestiona su propio ciclo de vida de red y pausa los temporizadores de pantalla para garantizar un funcionamiento estable. El proyecto se encuentra en un estado de compilación y ejecución estable. */
 
 #include <stdio.h>
 #include <string.h>
@@ -44,7 +44,7 @@ void app_main(void) {
     ui_preinit();
 
     // 3. Iniciar directamente la aplicación principal.
-    //    Se han eliminado todos los modos de arranque alternativos (portal WiFi, servidor de archivos, etc.).
+    //    Se han eliminado todos los modos de arranque alternativos.
     //    El único modo de configuración es ahora el servidor web, que se activa desde la propia UI.
     run_main_application_mode();
     

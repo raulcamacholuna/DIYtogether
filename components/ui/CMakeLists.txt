@@ -1,10 +1,10 @@
-# Fecha: 17/08/2025 - 09:43 
+# Fecha: 18/08/2025 - 06:55 
 # Fichero: components/ui/CMakeLists.txt
-# Último cambio: Añadido el subdirectorio 'telemetry' a las rutas de compilación e inclusión.
-# Descripción: Se ha actualizado el CMakeLists para que reconozca el nuevo directorio 'telemetry', asegurando que los ficheros 'telemetry_manager.c' y 'telemetry_task.c' se compilen y sus cabeceras sean encontradas. Esto completa la refactorización de la lógica de telemetría.
+# Último cambio: Eliminada la dependencia 'wifi_portal' al centralizar la configuración.
+# Descripción: Se ha eliminado 'wifi_portal' de la lista de dependencias. La funcionalidad de portal cautivo ya no se utiliza, ya que el único modo de configuración es el servidor web accesible desde la UI, que es manejado por los componentes 'bsp' (para el AP) y 'web_server'.
 
 file(GLOB component_sources
-    "*.c"
+    "*.c" 
     "core/*.c"
     "screens/*.c"
     "actions/*.c"
@@ -35,6 +35,5 @@ idf_component_register(
         bsp
         core
         screen_manager
-        wifi_portal
         web_server
 )

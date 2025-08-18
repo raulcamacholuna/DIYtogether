@@ -1,7 +1,7 @@
-/* Fecha: 17/08/2025 - 09:44  */
+/* Fecha: 18/08/2025 - 07:07  */
 /* Fichero: components/ui/actions/action_config_mode.c */
-/* Último cambio: Actualizada la ruta de inclusión de 'telemetry_manager.h' para reflejar la refactorización a ui/telemetry/. */
-/* Descripción: Módulo que gestiona el modo de configuración WiFi. Se ha actualizado la ruta de inclusión para apuntar al nuevo directorio 'telemetry', manteniendo la consistencia con la refactorización de la lógica de sensores. */
+/* Último cambio: Implementado el apagado controlado del servidor web para resolver el error de socket. */
+/* Descripción: Se ha modificado el ciclo de vida del modo de configuración para que guarde el handle del servidor web al iniciarlo y llame explícitamente a 'web_server_stop' antes de detener la WiFi. Este cambio de secuencia es crucial y soluciona el error 'httpd_sock_err: error in send : 11', que ocurría porque se intentaba usar un socket después de que la interfaz de red subyacente hubiera sido deshabilitada. */
 
 #include "actions/action_config_mode.h"
 #include "esp_log.h"
@@ -17,6 +17,7 @@
 #include "ui_idle_animation.h"
 #include "ui_actions_panel.h"
 #include "ui_action_animations.h"
+#include "core/state_manager.h"
 
 static const char *TAG = "ACTION_CONFIG_MODE";
 
@@ -26,6 +27,7 @@ static lv_obj_t *s_config_status_label1 = NULL;
 static lv_obj_t *s_config_status_label2 = NULL;
 static lv_obj_t *s_config_back_button = NULL;
 static TaskHandle_t s_wifi_task_handle = NULL;
+static httpd_handle_t s_server_handle = NULL; // Handle para el servidor web
 
 // --- Funciones de ayuda privadas del módulo ---
 
@@ -33,11 +35,9 @@ static TaskHandle_t s_wifi_task_handle = NULL;
  * @brief Tarea de FreeRTOS para gestionar el modo de configuración (AP + Servidor Web).
  */
 static void wifi_config_task(void *param) {
-    // 1. Inicializar el stack de red (si no lo está ya) y arrancar en modo AP.
     bsp_wifi_init_stack();
     bsp_wifi_start_ap();
     
-    // 2. Actualizar la interfaz de usuario para mostrar la información del AP.
     lvgl_port_lock(0);
     if (s_is_config_mode_active) {
         lv_label_set_text(s_config_status_label1, "Modo AP Activo");
@@ -45,10 +45,9 @@ static void wifi_config_task(void *param) {
     }
     lvgl_port_unlock();
 
-    // 3. Iniciar el servidor web que permite la gestión de archivos.
     if (s_is_config_mode_active) {
         ESP_LOGI(TAG, "Iniciando servidor web para gestión de archivos.");
-        web_server_start();
+        s_server_handle = web_server_start();
     }
 
     s_wifi_task_handle = NULL;
@@ -69,7 +68,8 @@ void action_config_mode_start(void) {
     s_is_config_mode_active = true;
     ESP_LOGI(TAG, "Entrando en modo de configuración WiFi (AP + Servidor Web).");
 
-    // Detener la UI normal
+    state_manager_pause();
+
     ui_actions_panel_hide_all();
     ui_idle_animation_stop();
     telemetry_manager_destroy();
@@ -77,7 +77,6 @@ void action_config_mode_start(void) {
     
     vTaskDelay(pdMS_TO_TICKS(500));
 
-    // Crear la UI para el modo de configuración
     s_config_status_label1 = lv_label_create(g_main_screen_obj);
     s_config_status_label2 = lv_label_create(g_main_screen_obj);
     lv_obj_set_style_text_color(s_config_status_label1, lv_color_white(), 0);
@@ -96,7 +95,6 @@ void action_config_mode_start(void) {
     lv_label_set_text(lbl, "VOLVER");
     lv_obj_center(lbl);
 
-    // Lanzar la tarea que gestiona la red
     xTaskCreate(wifi_config_task, "wifi_cfg_task", 4096, NULL, 5, &s_wifi_task_handle);
 }
 
@@ -105,23 +103,26 @@ void action_config_mode_stop(void) {
         ESP_LOGI(TAG, "Saliendo del modo de configuración WiFi.");
         s_is_config_mode_active = false;
 
+        // [CORRECCIÓN CRÍTICA] Detener el servidor web ANTES de apagar la WiFi.
+        web_server_stop(s_server_handle);
+        s_server_handle = NULL;
+
         if (s_wifi_task_handle) { vTaskDelete(s_wifi_task_handle); s_wifi_task_handle = NULL; }
         
-        // Detener y limpiar los recursos de red
         esp_wifi_stop();
         esp_wifi_deinit();
 
         esp_netif_t* ap_netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
         if (ap_netif) { esp_netif_destroy(ap_netif); }
         
-        // Limpiar la UI del modo de configuración
         if (s_config_status_label1) { lv_obj_del(s_config_status_label1); s_config_status_label1 = NULL; }
         if (s_config_status_label2) { lv_obj_del(s_config_status_label2); s_config_status_label2 = NULL; }
         if (s_config_back_button) { lv_obj_del(s_config_back_button); s_config_back_button = NULL; }
 
-        // Restaurar la UI principal
         if(g_animation_img_obj) lv_obj_clear_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
         telemetry_manager_create(g_main_screen_obj);
         ui_idle_animation_start(g_main_screen_obj);
+        
+        state_manager_resume();
     }
 }

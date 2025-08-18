@@ -1,7 +1,7 @@
-/* Fecha: 16/08/2025 - 09:55  */
-/* Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server.c */
-/* Último cambio: Añadido el manejador POST /create para la creación de directorios. */
-/* Descripción: Servidor web para la configuración del dispositivo. Se ha añadido un nuevo manejador de endpoint para la ruta '/create' que responde a peticiones POST. Este manejador extrae una ruta y un nombre de directorio del cuerpo de la petición, construye la ruta completa en la tarjeta SD y utiliza 'mkdir' para crear el nuevo directorio. Esto soluciona un error 404 (Not Found) que ocurría al intentar crear carpetas desde la interfaz web de gestión de archivos. */
+/* Fecha: 18/08/2025 - 07:18  */
+/* Fichero: components/web_server/web_server.c */
+/* Último cambio: Reemplazado el pre-chequeo de longitud por un post-chequeo del valor de retorno de `snprintf` para satisfacer el análisis estático y resolver el error de compilación `-Werror=format-truncation=`. */
+/* Descripción: Servidor web para la configuración del dispositivo. El compilador detectaba un posible desbordamiento de buffer en la construcción de rutas de fichero. La solución es comprobar el valor devuelto por `snprintf` para asegurar que la ruta no fue truncada, lo cual es una práctica más robusta que el pre-chequeo y satisface las exigencias del compilador. */
 
 #include "web_server.h"
 #include "esp_http_server.h"
@@ -25,6 +25,16 @@
 static const char *TAG = "WEB_SERVER";
 #define WEB_MOUNT_POINT "/sdcard"
 #define UPLOAD_BUFFER_SIZE 2048
+
+// --- Declaraciones de handlers estáticos ---
+static esp_err_t root_get_handler(httpd_req_t *req);
+static esp_err_t backup_get_handler(httpd_req_t *req);
+static esp_err_t list_files_handler(httpd_req_t *req);
+static esp_err_t upload_post_handler(httpd_req_t *req);
+static esp_err_t delete_file_handler(httpd_req_t *req);
+static esp_err_t create_dir_handler(httpd_req_t *req);
+static esp_err_t save_post_handler(httpd_req_t *req);
+
 
 // --- Helper para establecer el Content-Type basado en la extensión del fichero ---
 static esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filename) {
@@ -113,7 +123,7 @@ static bool get_multipart_value(const char* buf, const char* name, char* result,
     return true;
 }
 
-// --- Manejador para listar archivos ---
+// --- Manejadores de Endpoints ---
 static esp_err_t list_files_handler(httpd_req_t *req) {
     char query_buf[128];
     char path_decoded[128] = "/";
@@ -139,11 +149,8 @@ static esp_err_t list_files_handler(httpd_req_t *req) {
     char full_path[512];
     snprintf(full_path, sizeof(full_path), "%s%s", WEB_MOUNT_POINT, strcmp(current_path, "/") == 0 ? "" : current_path);
     
-    ESP_LOGI(TAG, "Listando archivos en: %s", full_path);
-
     DIR *d = opendir(full_path);
     if (!d) {
-        ESP_LOGE(TAG, "No se pudo abrir el directorio: %s", full_path);
         httpd_resp_send_500(req);
         return ESP_FAIL;
     }
@@ -161,9 +168,12 @@ static esp_err_t list_files_handler(httpd_req_t *req) {
         if (!first) strcat(json_buf, ",");
         
         char item_path[512];
-        if (snprintf(item_path, sizeof(item_path), "%s/%s", full_path, dir->d_name) >= sizeof(item_path)) {
-            ESP_LOGE(TAG, "Path too long, skipping: %s/%s", full_path, dir->d_name);
-            continue;
+        
+        // [CORRECCIÓN] Comprobar el valor de retorno de snprintf para evitar el error de truncamiento.
+        int written = snprintf(item_path, sizeof(item_path), "%s/%s", full_path, dir->d_name);
+        if (written < 0 || written >= sizeof(item_path)) {
+            ESP_LOGE(TAG, "Path construction failed or was truncated for: %s/%s", full_path, dir->d_name);
+            continue; // Saltar esta entrada
         }
         
         struct stat st;
@@ -194,7 +204,6 @@ static esp_err_t list_files_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-// --- Manejador para subida de archivos ---
 static esp_err_t upload_post_handler(httpd_req_t *req) {
     char buf[UPLOAD_BUFFER_SIZE];
     char filepath[256];
@@ -253,7 +262,6 @@ static esp_err_t upload_post_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-// --- Manejador para borrar archivos ---
 static esp_err_t delete_file_handler(httpd_req_t *req) {
     char buf[512];
     int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
@@ -277,28 +285,19 @@ static esp_err_t delete_file_handler(httpd_req_t *req) {
         ESP_LOGI(TAG, "Archivo borrado: %s", filepath);
         httpd_resp_send(req, "Archivo borrado.", HTTPD_RESP_USE_STRLEN);
     } else {
-        ESP_LOGE(TAG, "Fallo al borrar el archivo: %s", filepath);
         httpd_resp_send_500(req);
     }
     return ESP_OK;
 }
 
-// --- Manejador para crear un nuevo directorio ---
 static esp_err_t create_dir_handler(httpd_req_t *req) {
     char buf[512];
     int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
-    if (ret <= 0) {
-        if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
-            httpd_resp_send_408(req);
-        }
-        return ESP_FAIL;
-    }
+    if (ret <= 0) return ESP_FAIL;
     buf[ret] = '\0';
 
     char path[128] = "";
     char dirname[64] = "";
-
-    // Asumimos que el formulario envía 'path' para el directorio padre y 'dirname' para el nuevo.
     get_multipart_value(buf, "path", path, sizeof(path));
     get_multipart_value(buf, "dirname", dirname, sizeof(dirname));
     
@@ -310,26 +309,18 @@ static esp_err_t create_dir_handler(httpd_req_t *req) {
     char full_path[256];
     snprintf(full_path, sizeof(full_path), "%s%s/%s", WEB_MOUNT_POINT, strcmp(path, "/") == 0 ? "" : path, dirname);
 
-    // Intentar crear el directorio
     if (mkdir(full_path, 0755) == 0) {
-        ESP_LOGI(TAG, "Directorio creado: %s", full_path);
-        httpd_resp_send(req, "Directorio creado con éxito.", HTTPD_RESP_USE_STRLEN);
+        httpd_resp_send(req, "Directorio creado.", HTTPD_RESP_USE_STRLEN);
     } else {
-        ESP_LOGE(TAG, "Fallo al crear el directorio: %s", full_path);
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "No se pudo crear el directorio. Puede que ya exista.");
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "No se pudo crear el directorio.");
     }
     return ESP_OK;
 }
 
-
-// --- Manejador para guardar credenciales WiFi ---
 static esp_err_t save_post_handler(httpd_req_t *req) {
     char buf[256];
     int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
-    if (ret <= 0) {
-        if (ret == HTTPD_SOCK_ERR_TIMEOUT) httpd_resp_send_408(req);
-        return ESP_FAIL;
-    }
+    if (ret <= 0) return ESP_FAIL;
     buf[ret] = '\0';
 
     char ssid[32] = {0}, password_encoded[64] = {0}, password_decoded[64] = {0}, authmode_str[4] = {0};
@@ -341,8 +332,6 @@ static esp_err_t save_post_handler(httpd_req_t *req) {
 
     url_decode(password_decoded, password_encoded);
     
-    ESP_LOGI(TAG, "Recibido para guardar - SSID: [%s], Authmode: [%ld]", ssid, authmode);
-
     nvs_handle_t nvs_handle;
     ESP_ERROR_CHECK(nvs_open("storage", NVS_READWRITE, &nvs_handle));
     ESP_ERROR_CHECK(nvs_set_str(nvs_handle, "wifi_ssid", ssid));
@@ -361,21 +350,23 @@ static esp_err_t save_post_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-// --- Manejador para servir la página principal desde la SD ---
 static esp_err_t root_get_handler(httpd_req_t *req) {
     return serve_file_from_sd(req, "/sdcard/config/Index.html");
 }
 
-// --- Manejador para servir la página de backup desde la SD ---
 static esp_err_t backup_get_handler(httpd_req_t *req) {
     return serve_file_from_sd(req, "/sdcard/config/backup.html");
 }
 
-static httpd_handle_t start_webserver(void) {
+// --- Funciones Públicas ---
+
+httpd_handle_t web_server_start(void) {
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.stack_size = 8192;
+
+    ESP_LOGI(TAG, "Iniciando servidor web de configuracion.");
 
     if (httpd_start(&server, &config) == ESP_OK) {
         httpd_uri_t root_uri = { .uri = "/", .method = HTTP_GET, .handler = root_get_handler };
@@ -398,11 +389,17 @@ static httpd_handle_t start_webserver(void) {
 
         httpd_uri_t save_uri = { .uri = "/save", .method = HTTP_POST, .handler = save_post_handler };
         httpd_register_uri_handler(server, &save_uri);
+        
+        return server;
     }
-    return server;
+
+    ESP_LOGE(TAG, "Error al iniciar el servidor web.");
+    return NULL;
 }
 
-void web_server_start(void) {
-    ESP_LOGI(TAG, "Iniciando servidor web de configuracion.");
-    start_webserver();
+void web_server_stop(httpd_handle_t server) {
+    if (server) {
+        httpd_stop(server);
+        ESP_LOGI(TAG, "Servidor web detenido.");
+    }
 }

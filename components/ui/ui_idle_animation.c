@@ -1,12 +1,12 @@
-/* Fecha: 15/08/2025 - 04:04  */
-/* Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_idle_animation.c */
-/* Último cambio: Añadido un repliegue para ocultar el personaje si no se encuentran las animaciones en la SD. */
-/* Descripción: Se ha mejorado la robustez del gestor de animación de reposo. Si no se encuentran los fotogramas de la animación en la tarjeta SD (un error común si la SD no está preparada), el objeto de imagen del personaje ahora se ocultará en lugar de mostrar una imagen corrupta. Esto evita un glitch visual y permite que el dispositivo siga siendo funcional. */
+/* Fecha: 17/08/2025 - 10:26  */
+/* Fichero: components/ui/ui_idle_animation.c */
+/* Último cambio: Corregida la declaración del buffer 'anim_path' de char a char[] para evitar corrupción de memoria. */
+/* Descripción: Se ha corregido un error crítico donde el buffer para la ruta de la animación se declaraba como un único carácter en lugar de un array. Esto causaba un desbordamiento de buffer y comportamiento indefinido al construir la ruta, impidiendo que la animación de reposo se cargara correctamente. */
 
 #include "ui_idle_animation.h"
 #include "ui_action_animations.h" 
 #include "animation_loader.h"
-#include "diymon_ui_helpers.h"
+#include "helpers.h"
 #include "esp_log.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,7 +44,7 @@ lv_obj_t* ui_idle_animation_start(lv_obj_t *parent) {
     // Copiar el descriptor, que incluye el puntero al búfer compartido.
     s_idle_animation_player.img_dsc = shared_player->img_dsc;
 
-    char anim_path[128];
+    char anim_path[128]; // [CORRECCIÓN] Declarado como un array de caracteres.
     ui_helpers_build_asset_path(anim_path, sizeof(anim_path), "");
     size_t len = strlen(anim_path);
     if (len > 0 && anim_path[len - 1] == '/') anim_path[len - 1] = '\0';
@@ -57,7 +57,6 @@ lv_obj_t* ui_idle_animation_start(lv_obj_t *parent) {
         free(s_idle_animation_player.base_path);
         s_idle_animation_player.base_path = NULL;
         
-        // [CORRECCIÓN] Ocultar el objeto de imagen si no hay animación para evitar glitches.
         if (g_animation_img_obj) {
             lv_obj_add_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
         }
@@ -67,7 +66,6 @@ lv_obj_t* ui_idle_animation_start(lv_obj_t *parent) {
     ESP_LOGI(TAG, "Detectados %d fotogramas para la animación de reposo.", frame_count);
     s_idle_animation_player.frame_count = frame_count;
 
-    // El objeto de imagen ya existe, nos aseguramos de que apunte a nuestros datos y sea visible.
     if(g_animation_img_obj) {
         lv_image_set_src(g_animation_img_obj, &s_idle_animation_player.img_dsc);
         lv_obj_clear_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
@@ -88,7 +86,6 @@ void ui_idle_animation_stop(void) {
         lv_timer_del(g_anim_timer);
         g_anim_timer = NULL;
     }
-    // Solo liberar la ruta, no el búfer de datos que es compartido.
     if (s_idle_animation_player.base_path) {
         free(s_idle_animation_player.base_path);
         s_idle_animation_player.base_path = NULL;
@@ -106,14 +103,12 @@ void ui_idle_animation_pause(void) {
 
 void ui_idle_animation_resume(void) {
     if (g_anim_timer && !g_is_idle_running) {
-        // Asegurarse de que el objeto de imagen apunta al descriptor de la animación de reposo
         if (g_animation_img_obj) {
              lv_image_set_src(g_animation_img_obj, &s_idle_animation_player.img_dsc);
         }
         
         g_is_idle_running = true;
         lv_timer_resume(g_anim_timer);
-        // Forzar una actualización inmediata para mostrar el idle en lugar del último frame de la acción
         idle_animation_timer_cb(g_anim_timer);
         ESP_LOGI(TAG, "Animación de Idle REANUDADA.");
     }

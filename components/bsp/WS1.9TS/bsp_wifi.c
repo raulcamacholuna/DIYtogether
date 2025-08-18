@@ -1,7 +1,7 @@
-/* Fecha: 16/08/2025 - 07:50  */
-/* Fichero: components/diymon_bsp/WS1.9TS/bsp_wifi.c */
-/* Último cambio: Hecha la inicialización del stack de red (netif, event loop) idempotente para evitar un crash al llamarla múltiples veces. */
-/* Descripción: Gestor de conexión WiFi. El crash (ESP_ERR_INVALID_STATE) ocurría porque `esp_event_loop_create_default()` era llamado en el arranque principal y de nuevo al entrar en modo configuración. La función `bsp_wifi_init_stack` ahora utiliza una bandera estática para asegurar que el stack de red solo se inicialice una vez, resolviendo el error. */
+/* Fecha: 18/08/2025 - 07:12  */
+/* Fichero: components/bsp/WS1.9TS/bsp_wifi.c */
+/* Último cambio: Implementada la función bsp_wifi_erase_credentials para centralizar la gestión de NVS. */
+/* Descripción: Se ha implementado la función `bsp_wifi_erase_credentials` que borra las claves WiFi (SSID, contraseña, authmode) de la NVS. Esto centraliza la lógica de gestión de credenciales dentro del BSP, eliminando la necesidad de que otros módulos (como `action_system`) manipulen directamente la NVS para esta tarea. */
 #include "bsp_api.h"
 #include <string.h>
 #include "freertos/FreeRTOS.h"
@@ -153,4 +153,19 @@ void bsp_wifi_init_sta(const char *ssid, const char *pass) {
         ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
         ESP_ERROR_CHECK(esp_wifi_start());
     }
+}
+
+void bsp_wifi_erase_credentials(void) {
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Error (%s) abriendo NVS para borrar credenciales.", esp_err_to_name(err));
+        return;
+    }
+    nvs_erase_key(nvs_handle, "wifi_ssid");
+    nvs_erase_key(nvs_handle, "wifi_pass");
+    nvs_erase_key(nvs_handle, "wifi_authmode");
+    nvs_commit(nvs_handle);
+    nvs_close(nvs_handle);
+    ESP_LOGI(TAG, "Credenciales WiFi borradas de NVS.");
 }

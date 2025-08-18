@@ -1,14 +1,14 @@
-/* Fecha: 17/08/2025 - 09:45  */
+/* Fecha: 17/08/2025 - 10:19  */
 /* Fichero: components/ui/screens/screens.c */
-/* Último cambio: Actualizada la ruta de inclusión de 'telemetry_manager.h' para reflejar la refactorización a ui/telemetry/. */
-/* Descripción: Orquesta la creación de la pantalla principal. Se ha actualizado la ruta de inclusión para apuntar al nuevo directorio 'telemetry', manteniendo la consistencia con la refactorización de la lógica de sensores. */
+/* Último cambio: Actualizada la inclusión de 'diymon_ui_helpers.h' a 'helpers.h' para reflejar el renombramiento del fichero. */
+/* Descripción: Orquesta la creación de la pantalla principal. Se ha actualizado la ruta de inclusión para apuntar a 'helpers.h', manteniendo la consistencia con la refactorización de nombres. */
 
 #include "screens.h"
 #include "ui_idle_animation.h"
 #include "ui_actions_panel.h"
 #include "ui_action_animations.h"
 #include "telemetry/telemetry_manager.h"
-#include "diymon_ui_helpers.h"
+#include "helpers.h" // Actualizado desde diymon_ui_helpers.h
 #include "esp_log.h"
 #include "bsp_api.h"
 #include "screen_manager.h"

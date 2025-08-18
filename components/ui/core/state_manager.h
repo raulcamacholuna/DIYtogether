@@ -1,7 +1,7 @@
-/* Fecha: 17/08/2025 - 02:29  */
+/* Fecha: 18/08/2025 - 06:48  */
 /* Fichero: components/ui/core/state_manager.h */
-/* Último cambio: Movido a ui/core/ y renombrado de ui_state_manager.h como parte de la refactorización. */
-/* Descripción: Interfaz pública del gestor de estado de la UI. Responsable de manejar la inactividad, atenuado/apagado de pantalla y lógica de despertar. */
+/* Último cambio: Añadidas funciones para pausar y reanudar el gestor de estado. */
+/* Descripción: Interfaz pública del gestor de estado. Se añaden 'state_manager_pause' y 'state_manager_resume' para permitir que otros módulos (como el modo de configuración) desactiven temporalmente la gestión de inactividad de la pantalla, evitando que la pantalla se apague durante operaciones como el uso del servidor web. */
 
 #ifndef STATE_MANAGER_H
 #define STATE_MANAGER_H
@@ -20,6 +20,16 @@ extern "C" {
  * Debe ser llamado una vez después de que la UI principal haya sido creada.
  */
 void state_manager_init(void);
+
+/**
+ * @brief Pausa el gestor de estado, deteniendo los temporizadores de inactividad.
+ */
+void state_manager_pause(void);
+
+/**
+ * @brief Reanuda el gestor de estado, reactivando los temporizadores de inactividad.
+ */
+void state_manager_resume(void);
 
 #ifdef __cplusplus
 }

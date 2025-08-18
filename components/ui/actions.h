@@ -1,6 +1,6 @@
-/* Fecha: 16/08/2025 - 07:32  */
-/* Fichero: components/diymon_ui/actions.h */
-/* Último cambio: Añadida la acción ACTION_ID_ACTIVATE_CONFIG_MODE para entrar al modo configuracion desde la UI. */
+/* Fecha: 18/08/2025 - 06:53  */
+/* Fichero: components/ui/actions.h */
+/* Último cambio: Eliminada la acción ACTION_ID_ENABLE_FILE_SERVER para unificar la configuración en un único modo. */
 /* Descripción: Define la interfaz para el sistema de acciones, incluyendo los IDs de acción y la función principal de ejecución. Es el punto central para entender qué interacciones de usuario son posibles. */
 
 #ifndef ACTIONS_H
@@ -34,8 +34,7 @@ typedef enum {
     // Acciones del panel de configuración (superior 3)
     ACTION_ID_ACTIVATE_CONFIG_MODE,   // 11
     ACTION_ID_RESET_ALL,              // 12
-    ACTION_ID_ENABLE_FILE_SERVER,     // 13
-    ACTION_ID_CONFIG_PLACEHOLDER,     // 14
+    ACTION_ID_CONFIG_PLACEHOLDER,     // 13
 
     ACTION_ID_COUNT 
 } diymon_action_id_t;

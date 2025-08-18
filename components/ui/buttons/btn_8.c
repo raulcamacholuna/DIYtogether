@@ -1,7 +1,7 @@
-/* Fecha: 17/08/2025 - 05:21  */
+/* Fecha: 18/08/2025 - 06:55  */
 /* Fichero: components/ui/buttons/btn_8.c */
-/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
-/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+/* Último cambio: Reasignada la acción del botón a ACTION_ID_CONFIG_PLACEHOLDER tras eliminar el modo de servidor de ficheros. */
+/* Descripción: Este botón activaba anteriormente el modo de servidor de ficheros. Como esa funcionalidad ahora está integrada en el modo de configuración principal, el botón se ha convertido en un placeholder. Ahora dispara una acción genérica que no realiza ninguna operación, manteniendo la consistencia de la UI mientras se rediseña su función. */
 
 #include "btn_8.h"
 #include "ui_asset_loader.h"
@@ -17,20 +17,20 @@ static const char *TAG = "BTN_8";
 static lv_obj_t *s_btn_8_handle = NULL;
 
 /**
- * @brief Callback de evento específico para el botón 'Servidor de Ficheros'.
- *        Ejecuta la acción de habilitar el servidor de ficheros.
- * @param e Puntero al evento de LVGL.
+ * @brief Callback de evento para el botón 8.
  */
 static void btn_8_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_PRESSED) {
-        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de servidor de ficheros.");
-        execute_diymon_action(ACTION_ID_ENABLE_FILE_SERVER);
+        ESP_LOGI(TAG, "Botón 8 (placeholder) presionado.");
+        // [CORRECCIÓN] La acción del servidor de ficheros ha sido eliminada.
+        // Ahora se dispara una acción placeholder que no hace nada.
+        execute_diymon_action(ACTION_ID_CONFIG_PLACEHOLDER);
     }
 }
 
 /**
- * @brief Crea el objeto del botón 'Servidor de Ficheros'.
+ * @brief Crea el objeto del botón 8.
  */
 void btn_8_create(lv_obj_t *parent) {
     s_btn_8_handle = lv_btn_create(parent);
@@ -44,6 +44,7 @@ void btn_8_create(lv_obj_t *parent) {
 
     // --- Icono del botón ---
     lv_obj_t *img = lv_img_create(s_btn_8_handle);
+    // [CORRECCIÓN] Se mantiene el icono original por ahora, pero la acción ha cambiado.
     const lv_img_dsc_t* icon_src = ui_assets_get_icon(ASSET_ICON_ENABLE_FILE_SERVER);
     if (icon_src) {
         lv_img_set_src(img, icon_src);
@@ -53,17 +54,16 @@ void btn_8_create(lv_obj_t *parent) {
     lv_obj_center(img);
 
     // --- Posición DENTRO de su panel padre ---
-    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
     lv_obj_align(s_btn_8_handle, LV_ALIGN_LEFT_MID, (BUTTON_SIZE + BUTTON_PADDING) * 1, 0);
 
     // --- Conexión del evento ---
     lv_obj_add_event_cb(s_btn_8_handle, btn_8_event_cb, LV_EVENT_PRESSED, NULL);
     
-    ESP_LOGI(TAG, "Botón 'Servidor Ficheros' (BTN_8) creado y posicionado dentro de su panel.");
+    ESP_LOGI(TAG, "Botón 8 (placeholder) creado y posicionado.");
 }
 
 /**
- * @brief Obtiene el manejador del botón 'Servidor de Ficheros'.
+ * @brief Obtiene el manejador del botón 8.
  */
 lv_obj_t* btn_8_get_handle(void) {
     return s_btn_8_handle;

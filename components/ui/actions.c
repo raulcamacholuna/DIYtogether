@@ -1,7 +1,7 @@
-/* Fecha: 17/08/2025 - 01:51  */
+/* Fecha: 18/08/2025 - 06:54  */
 /* Fichero: components/ui/actions.c */
-/* Último cambio: Refactorizado para delegar la ejecución de acciones a módulos específicos. */
-/* Descripción: Orquestador de acciones refactorizado. Este fichero ya no contiene la lógica de implementación de las acciones. En su lugar, incluye las cabeceras de los módulos de acción (ction_*.h) y, en la función xecute_diymon_action, simplemente llama a la función correspondiente de cada módulo. Esto completa la refactorización, haciendo que este fichero sea un director de orquesta limpio y fácil de mantener. */
+/* Último cambio: Eliminado el case para ACTION_ID_ENABLE_FILE_SERVER para reflejar la unificación de los modos de configuración. */
+/* Descripción: Orquestador de acciones refactorizado. Se ha eliminado el punto de entrada para el antiguo modo de servidor de ficheros. Ahora, toda la funcionalidad de configuración se inicia a través de ACTION_ID_ACTIVATE_CONFIG_MODE, que activa una UI con un servidor web integrado. */
 
 #include "actions.h"
 #include "esp_log.h"
@@ -19,17 +19,11 @@ static const char *TAG = "DIYMON_ACTIONS";
 void execute_diymon_action(diymon_action_id_t action_id) {
     ESP_LOGI(TAG, "Ejecutando acción ID: %d", action_id);
 
-    // El modo de configuración es especial porque bloquea otras acciones.
-    // La lógica de bloqueo ahora está dentro del propio módulo.
     if (action_id == ACTION_ID_ACTIVATE_CONFIG_MODE) {
         action_config_mode_start();
         return;
     }
     
-    // Aquí podríamos añadir una comprobación para no ejecutar acciones si
-    // el modo config está activo, pero esa lógica ahora reside en cada módulo si es necesario.
-    // Por simplicidad, asumimos que la UI no permite disparar otras acciones en ese modo.
-
     switch(action_id) {
         // --- Acciones de Interacción ---
         case ACTION_ID_COMER:
@@ -50,10 +44,7 @@ void execute_diymon_action(diymon_action_id_t action_id) {
             action_screen_toggle();
             break;
 
-        // --- Acciones de Sistema (Modo Operación y Reset) ---
-        case ACTION_ID_ENABLE_FILE_SERVER:
-            action_system_enable_file_server();
-            break;
+        // --- Acciones de Sistema (Reset) ---
         case ACTION_ID_RESET_ALL:
             action_system_reset_all();
             break;

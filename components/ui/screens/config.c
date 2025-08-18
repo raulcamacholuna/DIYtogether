@@ -1,14 +1,14 @@
-/* Fecha: 17/08/2025 - 03:42  */
+/* Fecha: 17/08/2025 - 10:16  */
 /* Fichero: components/ui/screens/config.c */
-/* Último cambio: Renombrada la función 'config_screen_show' a 'config_show' para que coincida con su declaración y resolver el error del enlazador. */
-/* Descripción: Implementación de la pantalla de configuración. El error de 'undefined reference' se debía a que la definición de la función en este fichero no coincidía con la declaración en el header y la llamada en main.c. Se ha estandarizado el nombre a 'config_show'. */
+/* Último cambio: Actualizada la inclusión del asset de fondo para usar la cabecera centralizada 'ui_assets.h'. */
+/* Descripción: Implementación de la pantalla de configuración. Se ha modificado para incluir 'assets/images/ui_assets.h', que ahora declara todos los assets de imagen del proyecto, incluyendo 'bg_config'. Esto completa la refactorización para centralizar los recursos gráficos. */
 
 #include "config.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "assets/images/BG_config.h"
+#include "assets/images/ui_assets.h" // Actualizado para usar la cabecera central de assets
 
 static const char *TAG = "UI_CONFIG_SCREEN";
 
@@ -35,7 +35,7 @@ void config_show(void) {
 
     // Crear un objeto de imagen para el fondo de pantalla
     lv_obj_t *bg_img = lv_image_create(scr);
-    lv_image_set_src(bg_img, &bg_config);
+    lv_image_set_src(bg_img, &bg_config); // Usa el asset declarado en ui_assets.h
     lv_obj_set_pos(bg_img, 0, 0);
     lv_obj_add_flag(bg_img, LV_OBJ_FLAG_IGNORE_LAYOUT); // Asegura que no afecte a otros elementos
 
@@ -50,5 +50,5 @@ void config_show(void) {
 
     // Cargar la nueva pantalla
     lv_screen_load(scr);
-    ESP_LOGI(TAG, "Pantalla de configuración estática con fondo I8 mostrada.");
+    ESP_LOGI(TAG, "Pantalla de configuración estática con fondo mostrada.");
 }

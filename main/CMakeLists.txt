@@ -1,7 +1,7 @@
-# Fecha: 16/08/2025 - 09:38 
+# Fecha: 18/08/2025 - 06:56 
 # Fichero: main/CMakeLists.txt
-# Último cambio: Corregida la dependencia 'diymon_bsp' a 'bsp' para resolver el error de compilación.
-# Descripción: El sistema de compilación no encuentra el componente 'diymon_bsp' porque el directorio fue renombrado a 'bsp'. Esta corrección actualiza el nombre en la lista de dependencias de 'main', que es la causa raíz del error "Failed to resolve component 'diymon_bsp' required by component 'main'".
+# Último cambio: Eliminada la dependencia 'wifi_portal' al centralizar la configuración.
+# Descripción: Se ha eliminado 'wifi_portal' de la lista de dependencias de 'main'. Esta funcionalidad ha quedado obsoleta tras unificar el modo de configuración en un único servidor web accesible desde la UI, simplificando la estructura de dependencias del proyecto.
 
 idf_component_register(
     SRCS 
@@ -10,11 +10,10 @@ idf_component_register(
     INCLUDE_DIRS "."
     
     REQUIRES
-        # Componentes de la aplicación (con nombres actualizados)
+        # Componentes de la aplicación
         bsp
         core
         ui
-        wifi_portal
         web_server
         screen_manager
 

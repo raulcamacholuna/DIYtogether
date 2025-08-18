@@ -1,12 +1,11 @@
-/*
-# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_action_animations.c
-# Fecha: $timestamp
-# Último cambio: Implementada la función de pre-reserva de buffer y refactorizada la creación.
-# Descripción: Se define la función `ui_action_animations_preinit_buffer` para reservar el buffer de animación compartido al inicio de la aplicación. La función `ui_action_animations_create` ahora solo crea el objeto de imagen LVGL, utilizando el buffer ya reservado. Esto soluciona el error de enlazado 'undefined reference' y previene la fragmentación del heap.
-*/
+/* Fecha: 17/08/2025 - 10:25  */
+/* Fichero: components/ui/ui_action_animations.c */
+/* Último cambio: Actualizada la inclusión de 'diymon_ui_helpers.h' a 'helpers.h' para corregir el error de compilación. */
+/* Descripción: Se ha corregido la directiva de inclusión para que apunte al fichero de cabecera renombrado 'helpers.h'. Esto resuelve el error 'No such file or directory' que impedía la compilación. */
+
 #include "ui_action_animations.h"
 #include "animation_loader.h"
-#include "diymon_ui_helpers.h"
+#include "helpers.h" // Corregido desde diymon_ui_helpers.h
 #include "ui_idle_animation.h"
 #include "esp_log.h"
 #include <stdio.h>
