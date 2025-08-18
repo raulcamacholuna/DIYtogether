@@ -1,7 +1,7 @@
-/* Fecha: 18/08/2025 - 06:48  */
+/* Fecha: 18/08/2025 - 08:00  */
 /* Fichero: components/ui/core/state_manager.h */
-/* Último cambio: Añadidas funciones para pausar y reanudar el gestor de estado. */
-/* Descripción: Interfaz pública del gestor de estado. Se añaden 'state_manager_pause' y 'state_manager_resume' para permitir que otros módulos (como el modo de configuración) desactiven temporalmente la gestión de inactividad de la pantalla, evitando que la pantalla se apague durante operaciones como el uso del servidor web. */
+/* Último cambio: Añadida la función state_manager_destroy para liberar recursos. */
+/* Descripción: Interfaz pública del gestor de estado. Se añade una función 'destroy' para eliminar los temporizadores de LVGL y liberar memoria cuando el gestor no es necesario, como en el modo de configuración. Esto optimiza el uso de recursos y previene la ejecución de callbacks innecesarios. */
 
 #ifndef STATE_MANAGER_H
 #define STATE_MANAGER_H
@@ -30,6 +30,15 @@ void state_manager_pause(void);
  * @brief Reanuda el gestor de estado, reactivando los temporizadores de inactividad.
  */
 void state_manager_resume(void);
+
+/**
+ * @brief Destruye el gestor de estado y libera sus recursos.
+ *
+ * Elimina todos los temporizadores de LVGL creados por el gestor,
+ * liberando memoria y deteniendo su lógica por completo.
+ */
+void state_manager_destroy(void);
+
 
 #ifdef __cplusplus
 }

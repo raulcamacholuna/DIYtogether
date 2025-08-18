@@ -1,7 +1,7 @@
-/* Fecha: 17/08/2025 - 09:43  */
+/* Fecha: 18/08/2025 - 07:37  */
 /* Fichero: components/ui/telemetry/telemetry_task.c */
-/* Último cambio: Movido a ui/telemetry/ como parte de la refactorización de telemetría. */
-/* Descripción: Implementa una tarea de FreeRTOS dedicada a leer el sensor de batería y empujar los datos a la UI. Esta tarea vive en su propio directorio para encapsular toda la lógica de obtención y presentación de datos de sensores. */
+/* Último cambio: Pausada la lógica de la tarea cuando el WiFi está en modo AP para resolver el error de socket del servidor web. */
+/* Descripción: Se ha añadido una comprobación al inicio del bucle de la tarea para detectar si el dispositivo está en modo Punto de Acceso (AP). Si es así, la tarea se detiene y espera, evitando leer sensores y actualizar la UI. Esto elimina la contención de recursos con el servidor web, que es la causa raíz de los errores de socket ('error in send : 11') durante la transferencia de ficheros. */
 
 #include "telemetry_task.h"
 #include "freertos/FreeRTOS.h"
@@ -10,6 +10,7 @@
 #include "bsp_api.h"
 #include "telemetry_manager.h"
 #include <math.h> // Para fmax y fmin
+#include "esp_wifi.h" // Necesario para comprobar el modo WiFi
 
 static const char *TAG = "TELEMETRY_TASK";
 
@@ -29,6 +30,13 @@ static void telemetry_task_main(void *pvParameters) {
     const uint32_t ui_update_ticks = UI_UPDATE_INTERVAL_MS / TELEMETRY_TASK_DELAY_MS;
 
     while (1) {
+        // [CORRECCIÓN] Pausar la telemetría si el modo AP está activo para evitar conflictos con el servidor web.
+        wifi_mode_t current_mode;
+        if (esp_wifi_get_mode(&current_mode) == ESP_OK && current_mode == WIFI_MODE_AP) {
+            vTaskDelay(pdMS_TO_TICKS(1000)); // Esperar un segundo y volver a comprobar.
+            continue; // Saltar el resto del bucle.
+        }
+
         vTaskDelay(pdMS_TO_TICKS(TELEMETRY_TASK_DELAY_MS));
 
         // --- Actualización de la UI (periódica) ---

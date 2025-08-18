@@ -1,7 +1,7 @@
-/* Fecha: 18/08/2025 - 07:09  */
+/* Fecha: 18/08/2025 - 08:25  */
 /* Fichero: main/main.c */
-/* Último cambio: Verificación de estabilidad y limpieza de la lógica de arranque. */
-/* Descripción: Orquestador principal. El flujo de arranque se ha consolidado y estabilizado. Se han eliminado todos los modos de servicio obsoletos (portal cautivo, servidor de ficheros activado por NVS). La única vía de configuración es ahora el modo de servidor web, invocado desde la UI, que gestiona su propio ciclo de vida de red y pausa los temporizadores de pantalla para garantizar un funcionamiento estable. El proyecto se encuentra en un estado de compilación y ejecución estable. */
+/* Último cambio: Eliminada la inicialización y conexión automática de WiFi en el arranque. */
+/* Descripción: Se ha eliminado toda la lógica de inicialización de WiFi del arranque principal (app_main). Ahora, el dispositivo arranca sin activar la red. La responsabilidad de gestionar el ciclo de vida de WiFi (activar, conectar, desactivar) se delega completamente al módulo 'action_config_mode', que se invoca por interacción del usuario. */
 
 #include <stdio.h>
 #include <string.h>
@@ -40,12 +40,14 @@ void app_main(void) {
     // 1. Inicializar la memoria no volátil.
     nvs_flash_init();
 
+    // [CORRECCIÓN] Se elimina la inicialización de WiFi del arranque.
+    // La red solo se activará bajo demanda desde el menú de configuración.
+    ESP_LOGI(TAG, "Arrancando en modo offline. WiFi se activará bajo demanda.");
+
     // 2. Pre-reservar los buffers de memoria más grandes para la UI para evitar fragmentación.
     ui_preinit();
 
-    // 3. Iniciar directamente la aplicación principal.
-    //    Se han eliminado todos los modos de arranque alternativos.
-    //    El único modo de configuración es ahora el servidor web, que se activa desde la propia UI.
+    // 3. El sistema ahora arranca directamente en el modo de aplicación principal.
     run_main_application_mode();
     
     // Este bucle no debería alcanzarse, pero es una buena práctica tenerlo.
@@ -68,33 +70,32 @@ static bool verify_sdcard_contents(void) {
 
 static void run_main_application_mode(void) {
     ESP_LOGI(TAG, "Cargando aplicación principal...");
+    
+    // 1. Inicializa todo el hardware y LVGL.
     hardware_manager_init();
     
+    // 2. Verifica la tarjeta SD.
     bool is_sd_ok = verify_sdcard_contents();
 
-    // El motor de evolución se inicializa independientemente del estado de la SD
-    // porque guarda su estado en la NVS interna.
+    // 3. Inicializa los sistemas de software (Evolución y Assets).
     diymon_evolution_init();
-    
-    // Los assets de iconos se cargan desde el firmware, por lo que no dependen de la SD.
     ui_assets_init();
 
-    // Inicializa LVGL y la UI.
+    // 4. Construye la UI completa.
     if (lvgl_port_lock(0)) {
-        // Monta el sistema de ficheros de la SD para que LVGL pueda acceder a las animaciones.
         if (is_sd_ok) {
             hardware_manager_mount_lvgl_filesystem();
         }
         
-        ui_init(); // Crea todos los elementos de la UI.
-        state_manager_init(); // Inicia el gestor de inactividad de pantalla.
+        ui_init(); // Crea todos los elementos.
+        state_manager_init(); // Inicia el gestor de inactividad.
         lvgl_port_unlock();
     }
     ESP_LOGI(TAG, "Interfaz de Usuario principal inicializada.");
 
+    // 5. Decide el siguiente paso basado en el estado de la SD.
     if (!is_sd_ok) {
-        // Si la tarjeta SD falla, se notifica al usuario entrando automáticamente
-        // al modo de configuración para que pueda subir los archivos.
+        // Si la SD falla, se invoca la acción de modo configuración.
         ESP_LOGW(TAG, "Fallo en la SD. Entrando automáticamente en modo de configuración WiFi...");
         vTaskDelay(pdMS_TO_TICKS(500));
         execute_diymon_action(ACTION_ID_ACTIVATE_CONFIG_MODE);

@@ -1,7 +1,7 @@
-/* Fecha: 18/08/2025 - 07:10  */
+/* Fecha: 18/08/2025 - 08:25  */
 /* Fichero: components/bsp/include/bsp_api.h */
-/* Último cambio: Añadida la declaración de bsp_wifi_erase_credentials para centralizar la gestión de NVS. */
-/* Descripción: Interfaz pública del BSP. Se añade una nueva función para borrar las credenciales WiFi guardadas en la NVS. Este es el primer paso para centralizar toda la lógica de gestión de credenciales WiFi dentro del BSP, eliminando la duplicación de código en otros componentes. */
+/* Último cambio: Añadida la declaración de bsp_wifi_deinit para permitir la desactivación del stack WiFi. */
+/* Descripción: Interfaz pública del BSP. Se añade una nueva función para de-inicializar completamente el stack WiFi. Esto es crucial para poder activar y desactivar la red bajo demanda desde el modo de configuración, liberando memoria y recursos cuando no se necesita. */
 #ifndef BSP_API_H
 #define BSP_API_H
 
@@ -34,7 +34,8 @@ void bsp_wifi_start_ap(void);
 void bsp_wifi_init_sta_from_nvs(void);
 bool bsp_wifi_wait_for_ip(uint32_t timeout_ms);
 void bsp_wifi_get_ip(char *ip);
-void bsp_wifi_erase_credentials(void); // <-- NUEVA FUNCIÓN
+void bsp_wifi_erase_credentials(void);
+void bsp_wifi_deinit(void); // <-- NUEVA FUNCIÓN
 
 // --- FUNCIONES DE CONTROL ---
 void bsp_display_set_brightness(int percentage);

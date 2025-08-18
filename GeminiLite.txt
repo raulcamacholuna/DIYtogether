@@ -1843,7 +1843,7 @@ CONFIG_LOG_IN_IRAM=y
 #
 CONFIG_LWIP_ENABLE=y
 CONFIG_LWIP_LOCAL_HOSTNAME="espressif"
-CONFIG_LWIP_TCPIP_TASK_PRIO=18
+CONFIG_LWIP_TCPIP_TASK_PRIO=2
 # CONFIG_LWIP_TCPIP_CORE_LOCKING is not set
 # CONFIG_LWIP_CHECK_THREAD_SAFETY is not set
 CONFIG_LWIP_DNS_SUPPORT_MDNS_QUERIES=y
@@ -2996,12 +2996,10 @@ CONFIG_SEMIHOSTFS_MAX_MOUNT_POINTS=1
 --- END OF FILE: .\sdkconfig ---
 
 --- START OF FILE: .\components\bsp\include\bsp_api.h ---
-/*
-  Fichero: ./components/diymon_bsp/include/bsp_api.h
-  Fecha: 13/08/2025 - 05:00 
-  Último cambio: Añadida la declaración de bsp_wifi_init_sta para corregir un error de compilación.
-  Descripción: Interfaz pública del BSP. Se añade una nueva función para iniciar el WiFi en modo estación con credenciales pasadas como argumento.
-*/
+/* Fecha: 18/08/2025 - 07:10  */
+/* Fichero: components/bsp/include/bsp_api.h */
+/* Último cambio: Añadida la declaración de bsp_wifi_erase_credentials para centralizar la gestión de NVS. */
+/* Descripción: Interfaz pública del BSP. Se añade una nueva función para borrar las credenciales WiFi guardadas en la NVS. Este es el primer paso para centralizar toda la lógica de gestión de credenciales WiFi dentro del BSP, eliminando la duplicación de código en otros componentes. */
 #ifndef BSP_API_H
 #define BSP_API_H
 
@@ -3034,6 +3032,7 @@ void bsp_wifi_start_ap(void);
 void bsp_wifi_init_sta_from_nvs(void);
 bool bsp_wifi_wait_for_ip(uint32_t timeout_ms);
 void bsp_wifi_get_ip(char *ip);
+void bsp_wifi_erase_credentials(void); // <-- NUEVA FUNCIÓN
 
 // --- FUNCIONES DE CONTROL ---
 void bsp_display_set_brightness(int percentage);
@@ -3056,7 +3055,6 @@ int bsp_get_display_vres(void);
 size_t bsp_get_display_buffer_size(void);
 
 #endif // BSP_API_H
-
 
 --- END OF FILE: .\components\bsp\include\bsp_api.h ---
 
@@ -4421,10 +4419,10 @@ extern "C" {
 --- END OF FILE: .\components\bsp\WS1.9TS\bsp_touch.h ---
 
 --- START OF FILE: .\components\bsp\WS1.9TS\bsp_wifi.c ---
-/* Fecha: 16/08/2025 - 07:50  */
-/* Fichero: components/diymon_bsp/WS1.9TS/bsp_wifi.c */
-/* Último cambio: Hecha la inicialización del stack de red (netif, event loop) idempotente para evitar un crash al llamarla múltiples veces. */
-/* Descripción: Gestor de conexión WiFi. El crash (ESP_ERR_INVALID_STATE) ocurría porque `esp_event_loop_create_default()` era llamado en el arranque principal y de nuevo al entrar en modo configuración. La función `bsp_wifi_init_stack` ahora utiliza una bandera estática para asegurar que el stack de red solo se inicialice una vez, resolviendo el error. */
+/* Fecha: 18/08/2025 - 07:12  */
+/* Fichero: components/bsp/WS1.9TS/bsp_wifi.c */
+/* Último cambio: Implementada la función bsp_wifi_erase_credentials para centralizar la gestión de NVS. */
+/* Descripción: Se ha implementado la función `bsp_wifi_erase_credentials` que borra las claves WiFi (SSID, contraseña, authmode) de la NVS. Esto centraliza la lógica de gestión de credenciales dentro del BSP, eliminando la necesidad de que otros módulos (como `action_system`) manipulen directamente la NVS para esta tarea. */
 #include "bsp_api.h"
 #include <string.h>
 #include "freertos/FreeRTOS.h"
@@ -4576,6 +4574,21 @@ void bsp_wifi_init_sta(const char *ssid, const char *pass) {
         ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
         ESP_ERROR_CHECK(esp_wifi_start());
     }
+}
+
+void bsp_wifi_erase_credentials(void) {
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Error (%s) abriendo NVS para borrar credenciales.", esp_err_to_name(err));
+        return;
+    }
+    nvs_erase_key(nvs_handle, "wifi_ssid");
+    nvs_erase_key(nvs_handle, "wifi_pass");
+    nvs_erase_key(nvs_handle, "wifi_authmode");
+    nvs_commit(nvs_handle);
+    nvs_close(nvs_handle);
+    ESP_LOGI(TAG, "Credenciales WiFi borradas de NVS.");
 }
 
 --- END OF FILE: .\components\bsp\WS1.9TS\bsp_wifi.c ---
@@ -5071,87 +5084,6 @@ void diymon_evolution_reset_state(void) {
 }
 
 --- END OF FILE: .\components\core\diymon_evolution.c ---
-
---- START OF FILE: .\components\ftp_server\CMakeLists.txt ---
-#
-# Fichero: ./components/ftp_server/CMakeLists.txt
-# Fecha: 11/08/2025 - 19:30
-# Último cambio: Creación del componente.
-# Descripción: Registro y dependencias para el componente del servidor FTP.
-#
-idf_component_register(SRCS "ftp_server.c"
-                    INCLUDE_DIRS "."
-                    REQUIRES
-                        driver
-                        esp_wifi
-                        esp_event
-                        nvs_flash
-                        lvgl
-                        esp_lvgl_port
-                        log
-                        # En una implementación real, aquí se añadiría la librería FTP
-                        # como, por ejemplo, 'espressif/esp_ftp_server'
-)
---- END OF FILE: .\components\ftp_server\CMakeLists.txt ---
-
---- START OF FILE: .\components\ftp_server\ftp_server.c ---
-/*
-  Fichero: ./components/ftp_server/ftp_server.c
-  Fecha: 12/08/2025 - 03:30
-  Último cambio: Convertido a modo sin pantalla (headless).
-  Descripción: Implementa un modo de operación para el servidor FTP.
-               Inicia el servicio y entra en un bucle infinito, ya que no
-               hay interfaz de usuario para salir de este modo.
-*/
-#include "ftp_server.h"
-#include "esp_log.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-
-// #include "esp_ftp_server.h" // Incluir aquí la librería real
-
-static const char *TAG = "FTP_SERVER";
-
-void ftp_server_start(void) {
-    ESP_LOGI(TAG, "Iniciando modo de servidor FTP (headless).");
-    
-    // Aquí iría la llamada a la función de inicialización de la librería FTP
-    // Ejemplo: esp_ftp_server_start("/sdcard");
-    ESP_LOGW(TAG, "La logica del servidor FTP no esta implementada, solo el flujo de la aplicacion.");
-
-    // Bucle infinito para mantener el modo de servicio activo
-    while(1) {
-        vTaskDelay(pdMS_TO_TICKS(10000));
-    }
-}
---- END OF FILE: .\components\ftp_server\ftp_server.c ---
-
---- START OF FILE: .\components\ftp_server\ftp_server.h ---
-/*
-  Fichero: ./components/ftp_server/ftp_server.h
-  Fecha: 12/08/2025 - 03:30
-  Último cambio: Simplificado para el modo sin pantalla.
-  Descripción: Interfaz pública para el componente del servidor FTP.
-*/
-#ifndef FTP_SERVER_H
-#define FTP_SERVER_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/**
- * @brief Inicia el modo de operación del servidor FTP.
- * @note  Esta es una función de bloqueo que no retorna.
- */
-void ftp_server_start(void);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif // FTP_SERVER_H
---- END OF FILE: .\components\ftp_server\ftp_server.h ---
 
 --- START OF FILE: .\components\iot_button\include\button_adc.h ---
 /* SPDX-FileCopyrightText: 2022-2025 Espressif Systems (Shanghai) CO LTD
@@ -8300,10 +8232,10 @@ void action_brightness_cycle(void);
 --- END OF FILE: .\components\ui\actions\action_brightness.h ---
 
 --- START OF FILE: .\components\ui\actions\action_config_mode.c ---
-/* Fecha: 17/08/2025 - 02:33  */
+/* Fecha: 18/08/2025 - 08:02  */
 /* Fichero: components/ui/actions/action_config_mode.c */
-/* Último cambio: Actualizadas las llamadas al gestor de telemetría para reflejar la refactorización a ui/core/. */
-/* Descripción: Módulo que gestiona el modo de configuración WiFi. Se han actualizado las llamadas a las funciones de telemetría (de ui_telemetry_* a telemetry_manager_*) para mantener la consistencia con la nueva estructura del núcleo de la UI. */
+/* Último cambio: Integrada la destrucción y reinicialización de la UI para liberar memoria en modo configuración. */
+/* Descripción: Se ha modificado el ciclo de vida del modo de configuración. Al iniciar, ahora destruye la UI principal (delete_screen_main) y el gestor de estado (state_manager_destroy) para liberar la máxima memoria RAM posible. Al salir, reinicializa la UI (ui_init, state_manager_init) y la tarea de telemetría, restaurando completamente el estado de la aplicación. Esto optimiza el uso de memoria y previene conflictos de recursos. */
 
 #include "actions/action_config_mode.h"
 #include "esp_log.h"
@@ -8314,60 +8246,44 @@ void action_brightness_cycle(void);
 #include "esp_lvgl_port.h"
 #include "bsp_api.h"
 #include "web_server.h"
-#include "telemetry_manager.h"
+#include "telemetry/telemetry_task.h"
+#include "telemetry/telemetry_manager.h"
 #include "screens.h"
 #include "ui_idle_animation.h"
 #include "ui_actions_panel.h"
 #include "ui_action_animations.h"
-#include "wifi_portal.h" // Incluido para bsp_wifi_*
+#include "core/state_manager.h"
+#include "core/ui.h" // Necesario para ui_init
 
 static const char *TAG = "ACTION_CONFIG_MODE";
 
 // --- Variables estáticas privadas del módulo ---
 static bool s_is_config_mode_active = false;
-static lv_obj_t *s_config_status_label1 = NULL;
-static lv_obj_t *s_config_status_label2 = NULL;
-static lv_obj_t *s_config_back_button = NULL;
+static lv_obj_t *s_config_screen = NULL;
 static TaskHandle_t s_wifi_task_handle = NULL;
+static httpd_handle_t s_server_handle = NULL; // Handle para el servidor web
 
 // --- Funciones de ayuda privadas del módulo ---
 
 /**
- * @brief Tarea de FreeRTOS para gestionar la conexión WiFi y el servidor web en segundo plano.
+ * @brief Tarea de FreeRTOS para gestionar el modo de configuración (AP + Servidor Web).
  */
 static void wifi_config_task(void *param) {
-    lvgl_port_lock(0);
-    if (s_is_config_mode_active && s_config_status_label1) {
-        lv_label_set_text(s_config_status_label1, "Conectando...");
-        lv_label_set_text(s_config_status_label2, "Usando credenciales guardadas.");
-    }
-    lvgl_port_unlock();
-
     bsp_wifi_init_stack();
-    bsp_wifi_init_sta_from_nvs();
-    bool ip_ok = bsp_wifi_wait_for_ip(15000);
-
-    if (!ip_ok && s_is_config_mode_active) {
-        bsp_wifi_start_ap();
-    }
+    bsp_wifi_start_ap();
     
     lvgl_port_lock(0);
     if (s_is_config_mode_active) {
-        char ip_addr_buffer[16] = "192.168.4.1";
-        if (ip_ok) {
-            bsp_wifi_get_ip(ip_addr_buffer);
-            lv_label_set_text(s_config_status_label1, "Conectado!");
-            lv_label_set_text_fmt(s_config_status_label2, "IP: %s", ip_addr_buffer);
-        } else {
-            lv_label_set_text(s_config_status_label1, "Modo AP Activo");
-            lv_label_set_text(s_config_status_label2, "SSID: DIYTogether\nPass: MakeItYours\nIP: 192.168.4.1");
-        }
+        lv_obj_t *label1 = lv_obj_get_child(s_config_screen, 0);
+        lv_obj_t *label2 = lv_obj_get_child(s_config_screen, 1);
+        lv_label_set_text(label1, "Modo AP Activo");
+        lv_label_set_text(label2, "SSID: DIYTogether\nPass: MakeItYours\nIP: 192.168.4.1");
     }
     lvgl_port_unlock();
 
     if (s_is_config_mode_active) {
         ESP_LOGI(TAG, "Iniciando servidor web para gestión de archivos.");
-        web_server_start();
+        s_server_handle = web_server_start();
     }
 
     s_wifi_task_handle = NULL;
@@ -8386,59 +8302,75 @@ static void config_back_button_event_cb(lv_event_t *e) {
 void action_config_mode_start(void) {
     if (s_is_config_mode_active) return;
     s_is_config_mode_active = true;
-    ESP_LOGI(TAG, "Entrando en modo de configuración WiFi sin reinicio.");
+    ESP_LOGI(TAG, "Entrando en modo de configuración: Liberando recursos de la UI principal.");
 
-    ui_actions_panel_hide_all();
-    ui_idle_animation_stop();
-    telemetry_manager_destroy();
-    if (g_animation_img_obj) lv_obj_add_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
+    // [OPTIMIZACIÓN] Destruir la UI principal para liberar memoria
+    lvgl_port_lock(0);
+    state_manager_destroy();
+    delete_screen_main();
+    lvgl_port_unlock();
     
-    vTaskDelay(pdMS_TO_TICKS(500));
+    // Crear una pantalla simple para el modo config
+    lvgl_port_lock(0);
+    s_config_screen = lv_obj_create(NULL);
+    lv_obj_set_style_bg_color(s_config_screen, lv_color_black(), 0);
 
-    s_config_status_label1 = lv_label_create(g_main_screen_obj);
-    s_config_status_label2 = lv_label_create(g_main_screen_obj);
-    lv_obj_set_style_text_color(s_config_status_label1, lv_color_white(), 0);
-    lv_obj_set_style_text_align(s_config_status_label1, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_width(s_config_status_label1, lv_pct(90));
-    lv_obj_align(s_config_status_label1, LV_ALIGN_CENTER, 0, -40);
-    lv_obj_set_style_text_color(s_config_status_label2, lv_color_white(), 0);
-    lv_obj_set_style_text_align(s_config_status_label2, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_width(s_config_status_label2, lv_pct(90));
-    lv_obj_align(s_config_status_label2, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_t *label1 = lv_label_create(s_config_screen);
+    lv_obj_t *label2 = lv_label_create(s_config_screen);
+    lv_obj_set_style_text_color(label1, lv_color_white(), 0);
+    lv_obj_set_style_text_align(label1, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_width(label1, lv_pct(90));
+    lv_obj_align(label1, LV_ALIGN_CENTER, 0, -40);
+    lv_label_set_text(label1, "Iniciando WiFi...");
+    
+    lv_obj_set_style_text_color(label2, lv_color_white(), 0);
+    lv_obj_set_style_text_align(label2, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_width(label2, lv_pct(90));
+    lv_obj_align(label2, LV_ALIGN_CENTER, 0, 0);
+    lv_label_set_text(label2, "");
 
-    s_config_back_button = lv_btn_create(g_main_screen_obj);
-    lv_obj_align(s_config_back_button, LV_ALIGN_BOTTOM_MID, 0, -20);
-    lv_obj_add_event_cb(s_config_back_button, config_back_button_event_cb, LV_EVENT_CLICKED, NULL);
-    lv_obj_t* lbl = lv_label_create(s_config_back_button);
+    lv_obj_t* back_button = lv_btn_create(s_config_screen);
+    lv_obj_align(back_button, LV_ALIGN_BOTTOM_MID, 0, -20);
+    lv_obj_add_event_cb(back_button, config_back_button_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_t* lbl = lv_label_create(back_button);
     lv_label_set_text(lbl, "VOLVER");
     lv_obj_center(lbl);
+
+    lv_screen_load(s_config_screen);
+    lvgl_port_unlock();
 
     xTaskCreate(wifi_config_task, "wifi_cfg_task", 4096, NULL, 5, &s_wifi_task_handle);
 }
 
 void action_config_mode_stop(void) {
-    if (s_is_config_mode_active) {
-        ESP_LOGI(TAG, "Saliendo del modo de configuración WiFi.");
-        s_is_config_mode_active = false;
+    if (!s_is_config_mode_active) return;
+    
+    ESP_LOGI(TAG, "Saliendo del modo de configuración y restaurando UI.");
+    s_is_config_mode_active = false;
 
-        if (s_wifi_task_handle) { vTaskDelete(s_wifi_task_handle); s_wifi_task_handle = NULL; }
-        
-        esp_wifi_stop();
-        esp_wifi_deinit();
+    web_server_stop(s_server_handle);
+    s_server_handle = NULL;
 
-        esp_netif_t* sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-        if (sta_netif) { esp_netif_destroy(sta_netif); }
-        esp_netif_t* ap_netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
-        if (ap_netif) { esp_netif_destroy(ap_netif); }
+    if (s_wifi_task_handle) { vTaskDelete(s_wifi_task_handle); s_wifi_task_handle = NULL; }
+    
+    esp_wifi_stop();
+    esp_wifi_deinit();
 
-        if (s_config_status_label1) { lv_obj_del(s_config_status_label1); s_config_status_label1 = NULL; }
-        if (s_config_status_label2) { lv_obj_del(s_config_status_label2); s_config_status_label2 = NULL; }
-        if (s_config_back_button) { lv_obj_del(s_config_back_button); s_config_back_button = NULL; }
-
-        if(g_animation_img_obj) lv_obj_clear_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
-        telemetry_manager_create(g_main_screen_obj);
-        ui_idle_animation_start(g_main_screen_obj);
+    esp_netif_t* ap_netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
+    if (ap_netif) { esp_netif_destroy(ap_netif); }
+    
+    // [OPTIMIZACIÓN] Reinicializar la UI completa
+    lvgl_port_lock(0);
+    if (s_config_screen) {
+        lv_obj_del(s_config_screen);
+        s_config_screen = NULL;
     }
+    ui_init();
+    state_manager_init();
+    lvgl_port_unlock();
+
+    // Reiniciar tareas de la aplicación
+    telemetry_task_start();
 }
 
 --- END OF FILE: .\components\ui\actions\action_config_mode.c ---
@@ -8479,15 +8411,15 @@ void action_config_mode_stop(void);
 --- END OF FILE: .\components\ui\actions\action_config_mode.h ---
 
 --- START OF FILE: .\components\ui\actions\action_evolution.c ---
-/* Fecha: 17/08/2025 - 02:34  */
+/* Fecha: 17/08/2025 - 09:45  */
 /* Fichero: components/ui/actions/action_evolution.c */
-/* Último cambio: Actualizadas las llamadas al gestor de telemetría para reflejar la refactorización a ui/core/. */
-/* Descripción: Módulo que maneja los cambios de estado del Diymon. Se ha actualizado para llamar a telemetry_manager_update_values en lugar de la antigua función, adaptándose a la nueva estructura del núcleo de la UI. */
+/* Último cambio: Actualizada la ruta de inclusión de 'telemetry_manager.h' para reflejar la refactorización a ui/telemetry/. */
+/* Descripción: Módulo que maneja los cambios de estado del Diymon. Se ha actualizado la ruta de inclusión para apuntar al nuevo directorio 'telemetry', manteniendo la consistencia con la refactorización de la lógica de sensores. */
 
 #include "actions/action_evolution.h"
 #include "diymon_evolution.h"
 #include "ui_idle_animation.h"
-#include "telemetry_manager.h" // Actualizado desde ui_telemetry.h
+#include "telemetry/telemetry_manager.h"
 #include "ui_action_animations.h" // Para g_animation_img_obj
 #include "screens.h"              // Para g_main_screen_obj
 #include "esp_log.h"
@@ -8708,10 +8640,10 @@ void action_screen_toggle(void);
 --- END OF FILE: .\components\ui\actions\action_screen.h ---
 
 --- START OF FILE: .\components\ui\actions\action_system.c ---
-/* Fecha: 17/08/2025 - 01:51  */
+/* Fecha: 18/08/2025 - 07:00  */
 /* Fichero: components/ui/actions/action_system.c */
-/* Último cambio: Implementación de las acciones de sistema (servidor de ficheros, reset). */
-/* Descripción: Módulo que implementa acciones destructivas o que cambian el modo de operación del dispositivo. Interactúa con NVS para establecer banderas o borrar configuraciones y fuerza reinicios del sistema. */
+/* Último cambio: Eliminada la inclusión de 'wifi_portal.h' para resolver el error de compilación. */
+/* Descripción: Se ha eliminado la directiva '#include "wifi_portal.h"' porque el componente 'wifi_portal' fue borrado del proyecto. Las funciones para borrar credenciales ahora residen en el BSP o en un nuevo módulo de gestión de NVS, pero por ahora se elimina la dependencia directa para permitir la compilación. */
 
 #include "actions/action_system.h"
 #include "nvs_flash.h"
@@ -8719,9 +8651,9 @@ void action_screen_toggle(void);
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "wifi_portal.h"
 #include "diymon_evolution.h"
 #include "esp_log.h"
+#include "bsp_api.h" // Se asume que el borrado de credenciales estará aquí o en un gestor NVS
 
 static const char *TAG = "ACTION_SYSTEM";
 
@@ -8742,22 +8674,22 @@ static void erase_nvs_key(const char* key) {
 }
 
 /**
- * @brief Implementación de la activación del modo servidor de ficheros.
+ * @brief Función interna para borrar credenciales WiFi.
+ * @note Esto es una solución temporal. Idealmente, esta lógica debería estar
+ *       en un módulo dedicado a la gestión de NVS o en el BSP.
  */
-void action_system_enable_file_server(void) {
+static void erase_wifi_credentials_from_nvs(void) {
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
-    if (err == ESP_OK) {
-        nvs_set_str(nvs_handle, "file_server", "1");
-        nvs_commit(nvs_handle);
-        nvs_close(nvs_handle);
-        ESP_LOGI(TAG, "Bandera 'file_server' establecida. Reiniciando en modo servidor de ficheros...");
-        vTaskDelay(pdMS_TO_TICKS(500));
-        esp_restart();
-    } else {
-        ESP_LOGE(TAG, "Error al abrir NVS para establecer la bandera 'file_server'.");
-    }
+    if (err != ESP_OK) return;
+    nvs_erase_key(nvs_handle, "wifi_ssid");
+    nvs_erase_key(nvs_handle, "wifi_pass");
+    nvs_erase_key(nvs_handle, "wifi_authmode");
+    nvs_commit(nvs_handle);
+    nvs_close(nvs_handle);
+    ESP_LOGI(TAG, "Credenciales WiFi borradas de NVS.");
 }
+
 
 /**
  * @brief Implementación del reseteo total del dispositivo.
@@ -8766,9 +8698,9 @@ void action_system_reset_all(void) {
     ESP_LOGW(TAG, "Ejecutando reseteo total del dispositivo...");
     
     // Borra todas las configuraciones guardadas
-    wifi_portal_erase_credentials();
+    erase_wifi_credentials_from_nvs();
     diymon_evolution_reset_state();
-    erase_nvs_key("file_server");
+    erase_nvs_key("file_server"); // Se mantiene por si quedan restos de versiones anteriores
 
     ESP_LOGW(TAG, "Todas las configuraciones borradas. Reiniciando ahora.");
     vTaskDelay(pdMS_TO_TICKS(1000));
@@ -9589,10 +9521,10 @@ lv_obj_t* btn_7_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\btn_7.h ---
 
 --- START OF FILE: .\components\ui\buttons\btn_8.c ---
-/* Fecha: 17/08/2025 - 05:21  */
+/* Fecha: 18/08/2025 - 06:55  */
 /* Fichero: components/ui/buttons/btn_8.c */
-/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
-/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+/* Último cambio: Reasignada la acción del botón a ACTION_ID_CONFIG_PLACEHOLDER tras eliminar el modo de servidor de ficheros. */
+/* Descripción: Este botón activaba anteriormente el modo de servidor de ficheros. Como esa funcionalidad ahora está integrada en el modo de configuración principal, el botón se ha convertido en un placeholder. Ahora dispara una acción genérica que no realiza ninguna operación, manteniendo la consistencia de la UI mientras se rediseña su función. */
 
 #include "btn_8.h"
 #include "ui_asset_loader.h"
@@ -9608,20 +9540,20 @@ static const char *TAG = "BTN_8";
 static lv_obj_t *s_btn_8_handle = NULL;
 
 /**
- * @brief Callback de evento específico para el botón 'Servidor de Ficheros'.
- *        Ejecuta la acción de habilitar el servidor de ficheros.
- * @param e Puntero al evento de LVGL.
+ * @brief Callback de evento para el botón 8.
  */
 static void btn_8_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_PRESSED) {
-        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de servidor de ficheros.");
-        execute_diymon_action(ACTION_ID_ENABLE_FILE_SERVER);
+        ESP_LOGI(TAG, "Botón 8 (placeholder) presionado.");
+        // [CORRECCIÓN] La acción del servidor de ficheros ha sido eliminada.
+        // Ahora se dispara una acción placeholder que no hace nada.
+        execute_diymon_action(ACTION_ID_CONFIG_PLACEHOLDER);
     }
 }
 
 /**
- * @brief Crea el objeto del botón 'Servidor de Ficheros'.
+ * @brief Crea el objeto del botón 8.
  */
 void btn_8_create(lv_obj_t *parent) {
     s_btn_8_handle = lv_btn_create(parent);
@@ -9635,6 +9567,7 @@ void btn_8_create(lv_obj_t *parent) {
 
     // --- Icono del botón ---
     lv_obj_t *img = lv_img_create(s_btn_8_handle);
+    // [CORRECCIÓN] Se mantiene el icono original por ahora, pero la acción ha cambiado.
     const lv_img_dsc_t* icon_src = ui_assets_get_icon(ASSET_ICON_ENABLE_FILE_SERVER);
     if (icon_src) {
         lv_img_set_src(img, icon_src);
@@ -9644,17 +9577,16 @@ void btn_8_create(lv_obj_t *parent) {
     lv_obj_center(img);
 
     // --- Posición DENTRO de su panel padre ---
-    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
     lv_obj_align(s_btn_8_handle, LV_ALIGN_LEFT_MID, (BUTTON_SIZE + BUTTON_PADDING) * 1, 0);
 
     // --- Conexión del evento ---
     lv_obj_add_event_cb(s_btn_8_handle, btn_8_event_cb, LV_EVENT_PRESSED, NULL);
     
-    ESP_LOGI(TAG, "Botón 'Servidor Ficheros' (BTN_8) creado y posicionado dentro de su panel.");
+    ESP_LOGI(TAG, "Botón 8 (placeholder) creado y posicionado.");
 }
 
 /**
- * @brief Obtiene el manejador del botón 'Servidor de Ficheros'.
+ * @brief Obtiene el manejador del botón 8.
  */
 lv_obj_t* btn_8_get_handle(void) {
     return s_btn_8_handle;
@@ -10485,10 +10417,10 @@ lv_obj_t* evo_5_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\evo_5.h ---
 
 --- START OF FILE: .\components\ui\core\state_manager.c ---
-/* Fecha: 17/08/2025 - 02:30  */
+/* Fecha: 18/08/2025 - 08:01  */
 /* Fichero: components/ui/core/state_manager.c */
-/* Último cambio: Movido a ui/core/ y renombrado de ui_state_manager.c como parte de la refactorización. */
-/* Descripción: Implementación del gestor de estado de la UI. Contiene la lógica para manejar la inactividad, el atenuado y apagado de la pantalla, y el patrón de despertar. */
+/* Último cambio: Implementada la función state_manager_destroy para liberar los temporizadores. */
+/* Descripción: Se ha añadido la implementación de state_manager_destroy, que se encarga de eliminar de forma segura todos los temporizadores de LVGL que el gestor de estado crea. Esto permite liberar memoria y detener la lógica de inactividad cuando se entra en modos de operación donde no es necesaria, como el modo de configuración. */
 
 #include "state_manager.h"
 #include "screen_manager.h"
@@ -10511,6 +10443,8 @@ static wake_up_state_t s_wake_state = WAKE_STATE_OFF;
 static uint8_t s_wake_click_count = 0;
 static lv_timer_t *s_double_click_timer = NULL;
 static lv_timer_t *s_wake_prime_timer = NULL;
+static lv_timer_t *s_inactivity_timer = NULL;
+static bool s_is_paused = false; // Flag para pausar el gestor
 
 // --- Funciones de ayuda y callbacks ---
 
@@ -10536,6 +10470,7 @@ static void wake_prime_timer_cb(lv_timer_t * timer) {
 }
 
 static void screen_touch_event_cb(lv_event_t * e) {
+    if (s_is_paused) return; // Ignorar eventos si está pausado
     lv_event_code_t code = lv_event_get_code(e);
     lv_disp_t * disp = lv_display_get_default();
     if (!disp) return;
@@ -10583,6 +10518,8 @@ static void screen_touch_event_cb(lv_event_t * e) {
 }
 
 static void inactivity_timer_cb(lv_timer_t * timer) {
+    if (s_is_paused) return; // No hacer nada si está pausado
+
     lv_disp_t * disp = lv_display_get_default();
     if (!disp) return;
     
@@ -10603,9 +10540,10 @@ static void inactivity_timer_cb(lv_timer_t * timer) {
     }
 }
 
-// --- Función de inicialización pública ---
+// --- Funciones de inicialización y control públicas ---
+
 void state_manager_init(void) {
-    lv_timer_create(inactivity_timer_cb, 5000, NULL);
+    s_inactivity_timer = lv_timer_create(inactivity_timer_cb, 5000, NULL);
     lv_obj_t * scr = lv_screen_active();
     if (scr) {
         lv_obj_add_event_cb(scr, screen_touch_event_cb, LV_EVENT_ALL, NULL);
@@ -10613,13 +10551,50 @@ void state_manager_init(void) {
     ESP_LOGI(TAG, "Gestor de estado de UI inicializado. Manejadores de inactividad activos.");
 }
 
+void state_manager_pause(void) {
+    if (!s_is_paused) {
+        s_is_paused = true;
+        ESP_LOGI(TAG, "Gestor de estado PAUSADO. La pantalla no se atenuará ni apagará por inactividad.");
+    }
+}
+
+void state_manager_resume(void) {
+    if (s_is_paused) {
+        s_is_paused = false;
+        // Resetea el contador de inactividad para dar al usuario tiempo completo antes del próximo evento.
+        lv_disp_t * disp = lv_display_get_default();
+        if (disp) {
+            lv_display_trigger_activity(disp);
+        }
+        ESP_LOGI(TAG, "Gestor de estado REANUDADO.");
+    }
+}
+
+void state_manager_destroy(void) {
+    if (s_inactivity_timer) {
+        lv_timer_del(s_inactivity_timer);
+        s_inactivity_timer = NULL;
+    }
+    if (s_double_click_timer) {
+        lv_timer_del(s_double_click_timer);
+        s_double_click_timer = NULL;
+    }
+    if (s_wake_prime_timer) {
+        lv_timer_del(s_wake_prime_timer);
+        s_wake_prime_timer = NULL;
+    }
+    // No es necesario eliminar el screen_touch_event_cb, ya que la pantalla
+    // a la que está asociado será eliminada por el llamante.
+    ESP_LOGI(TAG, "Gestor de estado DESTRUIDO. Todos los temporizadores liberados.");
+}
+
 --- END OF FILE: .\components\ui\core\state_manager.c ---
 
 --- START OF FILE: .\components\ui\core\state_manager.h ---
-/* Fecha: 17/08/2025 - 02:29  */
+/* Fecha: 18/08/2025 - 08:00  */
 /* Fichero: components/ui/core/state_manager.h */
-/* Último cambio: Movido a ui/core/ y renombrado de ui_state_manager.h como parte de la refactorización. */
-/* Descripción: Interfaz pública del gestor de estado de la UI. Responsable de manejar la inactividad, atenuado/apagado de pantalla y lógica de despertar. */
+/* Último cambio: Añadida la función state_manager_destroy para liberar recursos. */
+/* Descripción: Interfaz pública del gestor de estado. Se añade una función 'destroy' para eliminar los temporizadores de LVGL y liberar memoria cuando el gestor no es necesario, como en el modo de configuración. Esto optimiza el uso de recursos y previene la ejecución de callbacks innecesarios. */
 
 #ifndef STATE_MANAGER_H
 #define STATE_MANAGER_H
@@ -10639,6 +10614,25 @@ extern "C" {
  */
 void state_manager_init(void);
 
+/**
+ * @brief Pausa el gestor de estado, deteniendo los temporizadores de inactividad.
+ */
+void state_manager_pause(void);
+
+/**
+ * @brief Reanuda el gestor de estado, reactivando los temporizadores de inactividad.
+ */
+void state_manager_resume(void);
+
+/**
+ * @brief Destruye el gestor de estado y libera sus recursos.
+ *
+ * Elimina todos los temporizadores de LVGL creados por el gestor,
+ * liberando memoria y deteniendo su lógica por completo.
+ */
+void state_manager_destroy(void);
+
+
 #ifdef __cplusplus
 }
 #endif
@@ -10646,240 +10640,6 @@ void state_manager_init(void);
 #endif // STATE_MANAGER_H
 
 --- END OF FILE: .\components\ui\core\state_manager.h ---
-
---- START OF FILE: .\components\ui\core\telemetry_manager.c ---
-/* Fecha: 17/08/2025 - 02:31  */
-/* Fichero: components/ui/core/telemetry_manager.c */
-/* Último cambio: Movido a ui/core/ y renombrado de ui_telemetry.c, actualizando nombres de funciones para consistencia. */
-/* Descripción: Implementación del módulo de telemetría de la UI. Ahora es un receptor pasivo de datos, actualizando los labels cuando la función 'telemetry_manager_update_values' es llamada por una tarea externa. */
-
-#include "telemetry_manager.h"
-#include "esp_log.h"
-#include "diymon_evolution.h"
-#include "esp_lvgl_port.h" // Necesario para el bloqueo thread-safe
-
-static const char *TAG = "TELEMETRY_MANAGER";
-
-/* Variables estáticas para los objetos de la UI */
-static lv_obj_t *s_battery_label = NULL;
-static lv_obj_t *s_evo_label = NULL;
-
-/**
- * @brief Crea y configura los elementos de la UI para la telemetría.
- */
-void telemetry_manager_create(lv_obj_t *parent) {
-    if (!parent) {
-        ESP_LOGE(TAG, "El objeto padre es nulo. No se puede crear la telemetría.");
-        return;
-    }
-
-    // Contenedor para la telemetría en la esquina inferior derecha
-    lv_obj_t * telemetry_cont = lv_obj_create(parent);
-    lv_obj_remove_style_all(telemetry_cont);
-    lv_obj_set_size(telemetry_cont, 120, 50);
-    lv_obj_align(telemetry_cont, LV_ALIGN_BOTTOM_RIGHT, -5, -5);
-    lv_obj_set_flex_flow(telemetry_cont, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(telemetry_cont, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-
-    // Etiqueta para el nivel de batería
-    s_battery_label = lv_label_create(telemetry_cont);
-    lv_obj_set_style_text_color(s_battery_label, lv_color_white(), 0);
-    lv_label_set_text(s_battery_label, "Bateria...");
-
-    // Etiqueta para el código de evolución
-    s_evo_label = lv_label_create(telemetry_cont);
-    lv_obj_set_style_text_color(s_evo_label, lv_color_white(), 0);
-    lv_label_set_text(s_evo_label, "EVO: ...");
-    
-    // Forzar una actualización inicial con valores por defecto
-    telemetry_manager_update_values(100);
-    ESP_LOGI(TAG, "Módulo de telemetría creado.");
-}
-
-/**
- * @brief Destruye los recursos asociados al módulo de telemetría.
- */
-void telemetry_manager_destroy(void) {
-    // Ya no hay temporizador que borrar. LVGL se encarga de los objetos hijos.
-    s_battery_label = NULL;
-    s_evo_label = NULL;
-    ESP_LOGI(TAG, "Módulo de telemetría destruido.");
-}
-
-/**
- * @brief Actualiza los valores mostrados en los labels de telemetría.
- */
-void telemetry_manager_update_values(uint8_t battery_percentage) {
-    // Bloquear el mutex de LVGL ya que esta función será llamada desde otra tarea
-    if (lvgl_port_lock(0)) {
-        if (s_battery_label) {
-            lv_label_set_text_fmt(s_battery_label, "%s %d%%", LV_SYMBOL_BATTERY_FULL, battery_percentage);
-        }
-        if (s_evo_label) {
-            const char* evo_code = diymon_get_current_code();
-            lv_label_set_text_fmt(s_evo_label, "EVO: %s", evo_code ? evo_code : "N/A");
-        }
-        lvgl_port_unlock();
-    }
-}
-
---- END OF FILE: .\components\ui\core\telemetry_manager.c ---
-
---- START OF FILE: .\components\ui\core\telemetry_manager.h ---
-/* Fecha: 17/08/2025 - 02:31  */
-/* Fichero: components/ui/core/telemetry_manager.h */
-/* Último cambio: Movido a ui/core/ y renombrado de ui_telemetry.h como parte de la refactorización. */
-/* Descripción: Interfaz del módulo de telemetría de la UI. Expone funciones para crear, destruir y actualizar los elementos visuales de telemetría (batería, EVO). */
-
-#ifndef TELEMETRY_MANAGER_H
-#define TELEMETRY_MANAGER_H
-
-#include <lvgl.h>
-#include <stdint.h> // for uint8_t
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/**
- * @brief Crea y configura los elementos de la UI para la telemetría.
- * 
- * @param parent El objeto padre sobre el cual se crearán los labels.
- */
-void telemetry_manager_create(lv_obj_t *parent);
-
-/**
- * @brief Destruye los recursos asociados al módulo de telemetría.
- */
-void telemetry_manager_destroy(void);
-
-/**
- * @brief Actualiza los valores mostrados en los labels de telemetría.
- *        Esta función es segura para ser llamada desde otras tareas (thread-safe).
- * 
- * @param battery_percentage El nivel de batería actual en porcentaje (0-100).
- */
-void telemetry_manager_update_values(uint8_t battery_percentage);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif // TELEMETRY_MANAGER_H
-
---- END OF FILE: .\components\ui\core\telemetry_manager.h ---
-
---- START OF FILE: .\components\ui\core\telemetry_task.c ---
-/* Fecha: 17/08/2025 - 02:32  */
-/* Fichero: components/ui/core/telemetry_task.c */
-/* Último cambio: Movido a ui/core/ y actualizada la llamada al gestor de telemetría para reflejar el cambio de nombre. */
-/* Descripción: Implementa una tarea de FreeRTOS dedicada a leer sensores y empujar los datos a la UI. Se ha actualizado para llamar a `telemetry_manager_update_values` en lugar de `ui_telemetry_update_values`. */
-
-#include "telemetry_task.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "esp_log.h"
-#include "bsp_api.h"
-#include "screen_manager.h"
-#include "telemetry_manager.h" // Actualizado desde ui_telemetry.h
-#include <math.h> // Para sqrtf
-
-static const char *TAG = "TELEMETRY_TASK";
-
-// --- Constantes de configuración de la tarea ---
-#define TELEMETRY_TASK_STACK_SIZE   4096
-#define TELEMETRY_TASK_PRIORITY     5
-#define TELEMETRY_TASK_DELAY_MS     200
-#define SHAKE_THRESHOLD_G           1.5f // Umbral de agitación en G's
-#define UI_UPDATE_INTERVAL_MS       5000 // Actualizar la UI cada 5 segundos
-
-/**
- * @brief Tarea principal que se ejecuta en segundo plano.
- */
-static void telemetry_task_main(void *pvParameters) {
-    ESP_LOGI(TAG, "Tarea de telemetría iniciada.");
-
-    uint32_t ui_update_counter = 0;
-    const uint32_t ui_update_ticks = UI_UPDATE_INTERVAL_MS / TELEMETRY_TASK_DELAY_MS;
-
-    while (1) {
-        vTaskDelay(pdMS_TO_TICKS(TELEMETRY_TASK_DELAY_MS));
-
-        // --- Lectura de Sensores ---
-        float acc[3], gyro[3];
-        bsp_imu_read(acc, gyro);
-
-        float voltage;
-        uint16_t adc_val;
-        bsp_battery_get_voltage(&voltage, &adc_val);
-        // Lógica simple para convertir voltaje a porcentaje (ajustar según la curva de la batería)
-        uint8_t battery_percentage = (uint8_t)fmax(0.0, fmin(100.0, (voltage - 3.2) / (4.2 - 3.2) * 100.0));
-
-
-        // --- Lógica de Shake-to-Wake ---
-        float acceleration_magnitude = sqrtf(acc[0] * acc[0] + acc[1] * acc[1] + acc[2] * acc[2]) / 9.81f;
-        if (acceleration_magnitude > SHAKE_THRESHOLD_G) {
-            if (screen_manager_is_off()) {
-                ESP_LOGI(TAG, "¡Agitación detectada! (Magnitud: %.2f G). Despertando pantalla.", acceleration_magnitude);
-                screen_manager_turn_on();
-            }
-        }
-        
-        // --- Actualización de la UI (periódica) ---
-        ui_update_counter++;
-        if (ui_update_counter >= ui_update_ticks) {
-            ui_update_counter = 0;
-            // Empujar los nuevos valores a la UI para que los muestre
-            telemetry_manager_update_values(battery_percentage); // Actualizado desde ui_telemetry_update_values
-        }
-    }
-}
-
-/**
- * @brief Inicia la tarea de telemetría.
- */
-void telemetry_task_start(void) {
-    xTaskCreate(
-        telemetry_task_main,
-        "telemetry_task",
-        TELEMETRY_TASK_STACK_SIZE,
-        NULL,
-        TELEMETRY_TASK_PRIORITY,
-        NULL
-    );
-}
-
---- END OF FILE: .\components\ui\core\telemetry_task.c ---
-
---- START OF FILE: .\components\ui\core\telemetry_task.h ---
-/* Fecha: 17/08/2025 - 02:31  */
-/* Fichero: components/ui/core/telemetry_task.h */
-/* Último cambio: Movido a ui/core/ como parte de la refactorización. */
-/* Descripción: Interfaz pública para la tarea de telemetría. Esta tarea se ejecuta en segundo plano para leer sensores, actualizar la UI y gestionar la lógica de 'shake-to-wake'. */
-
-#ifndef TELEMETRY_TASK_H
-#define TELEMETRY_TASK_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/**
- * @brief Inicia la tarea de telemetría en segundo plano.
- *
- * Crea y lanza una tarea de FreeRTOS que se encargará de leer periódicamente
- * los sensores del dispositivo (batería, IMU) y de actualizar la UI con
- * esta información. También implementa la lógica de 'shake-to-wake'.
- */
-void telemetry_task_start(void);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif // TELEMETRY_TASK_H
-
---- END OF FILE: .\components\ui\core\telemetry_task.h ---
 
 --- START OF FILE: .\components\ui\core\ui.c ---
 /* Fecha: 17/08/2025 - 02:29  */
@@ -10969,17 +10729,17 @@ void ui_init(void);
 --- END OF FILE: .\components\ui\core\ui.h ---
 
 --- START OF FILE: .\components\ui\screens\config.c ---
-/* Fecha: 17/08/2025 - 03:42  */
+/* Fecha: 17/08/2025 - 10:16  */
 /* Fichero: components/ui/screens/config.c */
-/* Último cambio: Renombrada la función 'config_screen_show' a 'config_show' para que coincida con su declaración y resolver el error del enlazador. */
-/* Descripción: Implementación de la pantalla de configuración. El error de 'undefined reference' se debía a que la definición de la función en este fichero no coincidía con la declaración en el header y la llamada en main.c. Se ha estandarizado el nombre a 'config_show'. */
+/* Último cambio: Actualizada la inclusión del asset de fondo para usar la cabecera centralizada 'ui_assets.h'. */
+/* Descripción: Implementación de la pantalla de configuración. Se ha modificado para incluir 'assets/images/ui_assets.h', que ahora declara todos los assets de imagen del proyecto, incluyendo 'bg_config'. Esto completa la refactorización para centralizar los recursos gráficos. */
 
 #include "config.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "assets/images/BG_config.h"
+#include "assets/images/ui_assets.h" // Actualizado para usar la cabecera central de assets
 
 static const char *TAG = "UI_CONFIG_SCREEN";
 
@@ -11006,7 +10766,7 @@ void config_show(void) {
 
     // Crear un objeto de imagen para el fondo de pantalla
     lv_obj_t *bg_img = lv_image_create(scr);
-    lv_image_set_src(bg_img, &bg_config);
+    lv_image_set_src(bg_img, &bg_config); // Usa el asset declarado en ui_assets.h
     lv_obj_set_pos(bg_img, 0, 0);
     lv_obj_add_flag(bg_img, LV_OBJ_FLAG_IGNORE_LAYOUT); // Asegura que no afecte a otros elementos
 
@@ -11021,7 +10781,7 @@ void config_show(void) {
 
     // Cargar la nueva pantalla
     lv_screen_load(scr);
-    ESP_LOGI(TAG, "Pantalla de configuración estática con fondo I8 mostrada.");
+    ESP_LOGI(TAG, "Pantalla de configuración estática con fondo mostrada.");
 }
 
 --- END OF FILE: .\components\ui\screens\config.c ---
@@ -11107,17 +10867,17 @@ typedef struct {
 --- END OF FILE: .\components\ui\screens\screen_interface.h ---
 
 --- START OF FILE: .\components\ui\screens\screens.c ---
-/* Fecha: 17/08/2025 - 02:50  */
+/* Fecha: 17/08/2025 - 10:19  */
 /* Fichero: components/ui/screens/screens.c */
-/* Último cambio: Movido a 'screens/' y actualizado para usar el nuevo 'telemetry_manager'. */
-/* Descripción: Orquesta la creación de la pantalla principal y maneja sus eventos de alto nivel (gestos, clics). Se ha actualizado para usar el `telemetry_manager` del core de la UI. */
+/* Último cambio: Actualizada la inclusión de 'diymon_ui_helpers.h' a 'helpers.h' para reflejar el renombramiento del fichero. */
+/* Descripción: Orquesta la creación de la pantalla principal. Se ha actualizado la ruta de inclusión para apuntar a 'helpers.h', manteniendo la consistencia con la refactorización de nombres. */
 
 #include "screens.h"
 #include "ui_idle_animation.h"
 #include "ui_actions_panel.h"
 #include "ui_action_animations.h"
-#include "core/telemetry_manager.h" // Actualizado desde ui_telemetry.h
-#include "diymon_ui_helpers.h"
+#include "telemetry/telemetry_manager.h"
+#include "helpers.h" // Actualizado desde diymon_ui_helpers.h
 #include "esp_log.h"
 #include "bsp_api.h"
 #include "screen_manager.h"
@@ -11155,7 +10915,7 @@ void create_screen_main(void) {
     ui_action_animations_create(g_main_screen_obj);
     g_idle_animation_obj = ui_idle_animation_start(g_main_screen_obj);
     ui_actions_panel_create(g_main_screen_obj);
-    telemetry_manager_create(g_main_screen_obj); // Actualizado desde ui_telemetry_create
+    telemetry_manager_create(g_main_screen_obj);
 
     ESP_LOGI(TAG, "Pantalla principal creada delegando en módulos.");
 }
@@ -11217,7 +10977,7 @@ void delete_screen_main(void) {
     }
     ui_idle_animation_stop();
     ui_action_animations_destroy();
-    telemetry_manager_destroy(); // Actualizado desde ui_telemetry_destroy
+    telemetry_manager_destroy();
     ui_assets_deinit();
 }
 
@@ -11361,11 +11121,239 @@ void welcome_screen_show(void (*on_start_cb)(void));
 
 --- END OF FILE: .\components\ui\screens\welcome.h ---
 
+--- START OF FILE: .\components\ui\telemetry\telemetry_manager.c ---
+/* Fecha: 17/08/2025 - 09:42  */
+/* Fichero: components/ui/telemetry/telemetry_manager.c */
+/* Último cambio: Movido a ui/telemetry/ como parte de la refactorización de telemetría. */
+/* Descripción: Implementación del módulo de telemetría de la UI. Es un receptor pasivo de datos que actualiza los labels cuando la función 'telemetry_manager_update_values' es llamada por una tarea externa. */
+
+#include "telemetry_manager.h"
+#include "esp_log.h"
+#include "diymon_evolution.h"
+#include "esp_lvgl_port.h" // Necesario para el bloqueo thread-safe
+
+static const char *TAG = "TELEMETRY_MANAGER";
+
+/* Variables estáticas para los objetos de la UI */
+static lv_obj_t *s_battery_label = NULL;
+static lv_obj_t *s_evo_label = NULL;
+
+/**
+ * @brief Crea y configura los elementos de la UI para la telemetría.
+ */
+void telemetry_manager_create(lv_obj_t *parent) {
+    if (!parent) {
+        ESP_LOGE(TAG, "El objeto padre es nulo. No se puede crear la telemetría.");
+        return;
+    }
+
+    // Contenedor para la telemetría en la esquina inferior derecha
+    lv_obj_t * telemetry_cont = lv_obj_create(parent);
+    lv_obj_remove_style_all(telemetry_cont);
+    lv_obj_set_size(telemetry_cont, 120, 50);
+    lv_obj_align(telemetry_cont, LV_ALIGN_BOTTOM_RIGHT, -5, -5);
+    lv_obj_set_flex_flow(telemetry_cont, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(telemetry_cont, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    // Etiqueta para el nivel de batería
+    s_battery_label = lv_label_create(telemetry_cont);
+    lv_obj_set_style_text_color(s_battery_label, lv_color_white(), 0);
+    lv_label_set_text(s_battery_label, "Bateria...");
+
+    // Etiqueta para el código de evolución
+    s_evo_label = lv_label_create(telemetry_cont);
+    lv_obj_set_style_text_color(s_evo_label, lv_color_white(), 0);
+    lv_label_set_text(s_evo_label, "EVO: ...");
+    
+    // Forzar una actualización inicial con valores por defecto
+    telemetry_manager_update_values(100);
+    ESP_LOGI(TAG, "Módulo de telemetría creado.");
+}
+
+/**
+ * @brief Destruye los recursos asociados al módulo de telemetría.
+ */
+void telemetry_manager_destroy(void) {
+    // Ya no hay temporizador que borrar. LVGL se encarga de los objetos hijos.
+    s_battery_label = NULL;
+    s_evo_label = NULL;
+    ESP_LOGI(TAG, "Módulo de telemetría destruido.");
+}
+
+/**
+ * @brief Actualiza los valores mostrados en los labels de telemetría.
+ */
+void telemetry_manager_update_values(uint8_t battery_percentage) {
+    // Bloquear el mutex de LVGL ya que esta función será llamada desde otra tarea
+    if (lvgl_port_lock(0)) {
+        if (s_battery_label) {
+            lv_label_set_text_fmt(s_battery_label, "%s %d%%", LV_SYMBOL_BATTERY_FULL, battery_percentage);
+        }
+        if (s_evo_label) {
+            const char* evo_code = diymon_get_current_code();
+            lv_label_set_text_fmt(s_evo_label, "EVO: %s", evo_code ? evo_code : "N/A");
+        }
+        lvgl_port_unlock();
+    }
+}
+
+--- END OF FILE: .\components\ui\telemetry\telemetry_manager.c ---
+
+--- START OF FILE: .\components\ui\telemetry\telemetry_manager.h ---
+/* Fecha: 17/08/2025 - 09:41  */
+/* Fichero: components/ui/telemetry/telemetry_manager.h */
+/* Último cambio: Movido a ui/telemetry/ como parte de la refactorización de telemetría. */
+/* Descripción: Interfaz del módulo de telemetría de la UI. Expone funciones para crear, destruir y actualizar los elementos visuales de telemetría (batería, EVO). */
+
+#ifndef TELEMETRY_MANAGER_H
+#define TELEMETRY_MANAGER_H
+
+#include <lvgl.h>
+#include <stdint.h> // for uint8_t
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Crea y configura los elementos de la UI para la telemetría.
+ * 
+ * @param parent El objeto padre sobre el cual se crearán los labels.
+ */
+void telemetry_manager_create(lv_obj_t *parent);
+
+/**
+ * @brief Destruye los recursos asociados al módulo de telemetría.
+ */
+void telemetry_manager_destroy(void);
+
+/**
+ * @brief Actualiza los valores mostrados en los labels de telemetría.
+ *        Esta función es segura para ser llamada desde otras tareas (thread-safe).
+ * 
+ * @param battery_percentage El nivel de batería actual en porcentaje (0-100).
+ */
+void telemetry_manager_update_values(uint8_t battery_percentage);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // TELEMETRY_MANAGER_H
+
+--- END OF FILE: .\components\ui\telemetry\telemetry_manager.h ---
+
+--- START OF FILE: .\components\ui\telemetry\telemetry_task.c ---
+/* Fecha: 18/08/2025 - 07:37  */
+/* Fichero: components/ui/telemetry/telemetry_task.c */
+/* Último cambio: Pausada la lógica de la tarea cuando el WiFi está en modo AP para resolver el error de socket del servidor web. */
+/* Descripción: Se ha añadido una comprobación al inicio del bucle de la tarea para detectar si el dispositivo está en modo Punto de Acceso (AP). Si es así, la tarea se detiene y espera, evitando leer sensores y actualizar la UI. Esto elimina la contención de recursos con el servidor web, que es la causa raíz de los errores de socket ('error in send : 11') durante la transferencia de ficheros. */
+
+#include "telemetry_task.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_log.h"
+#include "bsp_api.h"
+#include "telemetry_manager.h"
+#include <math.h> // Para fmax y fmin
+#include "esp_wifi.h" // Necesario para comprobar el modo WiFi
+
+static const char *TAG = "TELEMETRY_TASK";
+
+// --- Constantes de configuración de la tarea ---
+#define TELEMETRY_TASK_STACK_SIZE   4096
+#define TELEMETRY_TASK_PRIORITY     5
+#define TELEMETRY_TASK_DELAY_MS     200
+#define UI_UPDATE_INTERVAL_MS       5000 // Actualizar la UI cada 5 segundos
+
+/**
+ * @brief Tarea principal que se ejecuta en segundo plano.
+ */
+static void telemetry_task_main(void *pvParameters) {
+    ESP_LOGI(TAG, "Tarea de telemetría iniciada.");
+
+    uint32_t ui_update_counter = 0;
+    const uint32_t ui_update_ticks = UI_UPDATE_INTERVAL_MS / TELEMETRY_TASK_DELAY_MS;
+
+    while (1) {
+        // [CORRECCIÓN] Pausar la telemetría si el modo AP está activo para evitar conflictos con el servidor web.
+        wifi_mode_t current_mode;
+        if (esp_wifi_get_mode(&current_mode) == ESP_OK && current_mode == WIFI_MODE_AP) {
+            vTaskDelay(pdMS_TO_TICKS(1000)); // Esperar un segundo y volver a comprobar.
+            continue; // Saltar el resto del bucle.
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(TELEMETRY_TASK_DELAY_MS));
+
+        // --- Actualización de la UI (periódica) ---
+        ui_update_counter++;
+        if (ui_update_counter >= ui_update_ticks) {
+            ui_update_counter = 0;
+            
+            // --- Lectura del Sensor de Batería ---
+            float voltage;
+            uint16_t adc_val;
+            bsp_battery_get_voltage(&voltage, &adc_val);
+            // Lógica simple para convertir voltaje a porcentaje (ajustar según la curva de la batería)
+            uint8_t battery_percentage = (uint8_t)fmax(0.0, fmin(100.0, (voltage - 3.2) / (4.2 - 3.2) * 100.0));
+
+            // Empujar los nuevos valores a la UI para que los muestre
+            telemetry_manager_update_values(battery_percentage);
+        }
+    }
+}
+
+/**
+ * @brief Inicia la tarea de telemetría.
+ */
+void telemetry_task_start(void) {
+    xTaskCreate(
+        telemetry_task_main,
+        "telemetry_task",
+        TELEMETRY_TASK_STACK_SIZE,
+        NULL,
+        TELEMETRY_TASK_PRIORITY,
+        NULL
+    );
+}
+
+--- END OF FILE: .\components\ui\telemetry\telemetry_task.c ---
+
+--- START OF FILE: .\components\ui\telemetry\telemetry_task.h ---
+/* Fecha: 17/08/2025 - 09:42  */
+/* Fichero: components/ui/telemetry/telemetry_task.h */
+/* Último cambio: Movido a ui/telemetry/ como parte de la refactorización de telemetría. */
+/* Descripción: Interfaz pública para la tarea de telemetría. Esta tarea se ejecuta en segundo plano para leer periódicamente el estado de la batería y actualizar la UI. */
+
+#ifndef TELEMETRY_TASK_H
+#define TELEMETRY_TASK_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Inicia la tarea de telemetría en segundo plano.
+ *
+ * Crea y lanza una tarea de FreeRTOS que se encargará de leer periódicamente
+ * el estado de la batería del dispositivo y de actualizar la UI con
+ * esta información.
+ */
+void telemetry_task_start(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // TELEMETRY_TASK_H
+
+--- END OF FILE: .\components\ui\telemetry\telemetry_task.h ---
+
 --- START OF FILE: .\components\ui\actions.c ---
-/* Fecha: 17/08/2025 - 01:51  */
+/* Fecha: 18/08/2025 - 06:54  */
 /* Fichero: components/ui/actions.c */
-/* Último cambio: Refactorizado para delegar la ejecución de acciones a módulos específicos. */
-/* Descripción: Orquestador de acciones refactorizado. Este fichero ya no contiene la lógica de implementación de las acciones. En su lugar, incluye las cabeceras de los módulos de acción (ction_*.h) y, en la función xecute_diymon_action, simplemente llama a la función correspondiente de cada módulo. Esto completa la refactorización, haciendo que este fichero sea un director de orquesta limpio y fácil de mantener. */
+/* Último cambio: Eliminado el case para ACTION_ID_ENABLE_FILE_SERVER para reflejar la unificación de los modos de configuración. */
+/* Descripción: Orquestador de acciones refactorizado. Se ha eliminado el punto de entrada para el antiguo modo de servidor de ficheros. Ahora, toda la funcionalidad de configuración se inicia a través de ACTION_ID_ACTIVATE_CONFIG_MODE, que activa una UI con un servidor web integrado. */
 
 #include "actions.h"
 #include "esp_log.h"
@@ -11383,17 +11371,11 @@ static const char *TAG = "DIYMON_ACTIONS";
 void execute_diymon_action(diymon_action_id_t action_id) {
     ESP_LOGI(TAG, "Ejecutando acción ID: %d", action_id);
 
-    // El modo de configuración es especial porque bloquea otras acciones.
-    // La lógica de bloqueo ahora está dentro del propio módulo.
     if (action_id == ACTION_ID_ACTIVATE_CONFIG_MODE) {
         action_config_mode_start();
         return;
     }
     
-    // Aquí podríamos añadir una comprobación para no ejecutar acciones si
-    // el modo config está activo, pero esa lógica ahora reside en cada módulo si es necesario.
-    // Por simplicidad, asumimos que la UI no permite disparar otras acciones en ese modo.
-
     switch(action_id) {
         // --- Acciones de Interacción ---
         case ACTION_ID_COMER:
@@ -11414,10 +11396,7 @@ void execute_diymon_action(diymon_action_id_t action_id) {
             action_screen_toggle();
             break;
 
-        // --- Acciones de Sistema (Modo Operación y Reset) ---
-        case ACTION_ID_ENABLE_FILE_SERVER:
-            action_system_enable_file_server();
-            break;
+        // --- Acciones de Sistema (Reset) ---
         case ACTION_ID_RESET_ALL:
             action_system_reset_all();
             break;
@@ -11454,9 +11433,9 @@ void execute_diymon_action(diymon_action_id_t action_id) {
 --- END OF FILE: .\components\ui\actions.c ---
 
 --- START OF FILE: .\components\ui\actions.h ---
-/* Fecha: 16/08/2025 - 07:32  */
-/* Fichero: components/diymon_ui/actions.h */
-/* Último cambio: Añadida la acción ACTION_ID_ACTIVATE_CONFIG_MODE para entrar al modo configuracion desde la UI. */
+/* Fecha: 18/08/2025 - 06:53  */
+/* Fichero: components/ui/actions.h */
+/* Último cambio: Eliminada la acción ACTION_ID_ENABLE_FILE_SERVER para unificar la configuración en un único modo. */
 /* Descripción: Define la interfaz para el sistema de acciones, incluyendo los IDs de acción y la función principal de ejecución. Es el punto central para entender qué interacciones de usuario son posibles. */
 
 #ifndef ACTIONS_H
@@ -11490,8 +11469,7 @@ typedef enum {
     // Acciones del panel de configuración (superior 3)
     ACTION_ID_ACTIVATE_CONFIG_MODE,   // 11
     ACTION_ID_RESET_ALL,              // 12
-    ACTION_ID_ENABLE_FILE_SERVER,     // 13
-    ACTION_ID_CONFIG_PLACEHOLDER,     // 14
+    ACTION_ID_CONFIG_PLACEHOLDER,     // 13
 
     ACTION_ID_COUNT 
 } diymon_action_id_t;
@@ -11646,75 +11624,23 @@ uint16_t animation_loader_count_frames(const char *path, const char *prefix);
 #endif // ANIMATION_LOADER_H
 --- END OF FILE: .\components\ui\animation_loader.h ---
 
---- START OF FILE: .\components\ui\background.h ---
-/*
- * Fichero: ./components/diymon_ui/background.h
- * Fecha: 13/08/2025 - 10:40 
- * Último cambio: Creación del fichero con el asset del fondo de pantalla.
- * Descripción: Contiene el fondo de pantalla (BG.bin) como un array de C para ser compilado directamente en el firmware.
- */
-#ifndef BACKGROUND_H
-#define BACKGROUND_H
-
-#include <lvgl.h>
-
-// Contenido del fichero BG.bin (evolución 0)
-static const uint8_t bg_0_map[] = {
-    // Aquí debería ir el contenido real del fichero BG.bin convertido a un array C.
-    // Por ahora, usamos datos de relleno para que compile.
-    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F
-};
-
-// Descriptor de imagen LVGL que apunta al array del fondo.
-const lv_img_dsc_t bg_0 = {
-    .header.cf = LV_COLOR_FORMAT_RGB565,
-    .header.w = 170,
-    .header.h = 320,
-    .header.stride = 170 * 2,
-    .data_size = sizeof(bg_0_map),
-    .data = bg_0_map,
-};
-
-#endif // BACKGROUND_H
-
---- END OF FILE: .\components\ui\background.h ---
-
---- START OF FILE: .\components\ui\BG_config.h ---
-/*
- * Fichero: ./components/diymon_ui/BG.h
- * Fecha: 13/08/2025 - 05:59 
- * Último cambio: Creación del fichero.
- * Descripción: Declara el descriptor de la imagen de fondo `bg_0` que está
- *              definida en BG.c para que sea accesible desde otros módulos.
- */
-#ifndef BG_CONFIG_H
-#define BG_CONFIG_H
-
-#include <lvgl.h>
-
-extern const lv_img_dsc_t bg_config;
-
-#endif // BG_CONFIG_H
-
---- END OF FILE: .\components\ui\BG_config.h ---
-
 --- START OF FILE: .\components\ui\CMakeLists.txt ---
-# Fecha: 17/08/2025 - 05:53 
+# Fecha: 18/08/2025 - 06:55 
 # Fichero: components/ui/CMakeLists.txt
-# Último cambio: Modificado para compilar automáticamente TODOS los ficheros .c de assets/images/.
-# Descripción: El problema de los botones invisibles (ruido) se debía a que sus ficheros C de definición de imagen (ej. asset_btn_1.c) no se estaban incluyendo en la compilación, causando errores de enlazador. Esta modificación utiliza `file(GLOB ...)` para encontrar y compilar automáticamente todos los ficheros .c del directorio `assets/images/`. Esto elimina la necesidad de listarlos manualmente, resuelve el error de 'undefined reference' para el botón 1 y asegura que todos los iconos se enlacen y rendericen correctamente.
+# Último cambio: Eliminada la dependencia 'wifi_portal' al centralizar la configuración.
+# Descripción: Se ha eliminado 'wifi_portal' de la lista de dependencias. La funcionalidad de portal cautivo ya no se utiliza, ya que el único modo de configuración es el servidor web accesible desde la UI, que es manejado por los componentes 'bsp' (para el AP) y 'web_server'.
 
 file(GLOB component_sources
-    "*.c"
+    "*.c" 
     "core/*.c"
     "screens/*.c"
     "actions/*.c"
     "assets/styles/*.c"
     "buttons/*.c"
+    "telemetry/*.c"
 )
 
-# [CORRECCIÓN] Buscar y añadir automáticamente TODOS los ficheros .c del directorio de imágenes.
-# Esto asegura que BG.c, BG_config.c y todos los asset_btn_*.c se compilen y enlacen correctamente.
+# Buscar y añadir automáticamente TODOS los ficheros .c del directorio de imágenes.
 file(GLOB asset_sources "assets/images/*.c")
 list(APPEND component_sources ${asset_sources})
 
@@ -11729,96 +11655,17 @@ idf_component_register(
         "assets/styles"
         "assets/fonts"
         "assets/images"
+        "telemetry"
     PRIV_INCLUDE_DIRS "."
     REQUIRES
         lvgl
         bsp
         core
         screen_manager
-        wifi_portal
         web_server
 )
 
 --- END OF FILE: .\components\ui\CMakeLists.txt ---
-
---- START OF FILE: .\components\ui\diymon_ui_helpers.c ---
-/* Fecha: 17/08/2025 - 03:10  */
-/* Fichero: components/ui/diymon_ui_helpers.c */
-/* Último cambio: Actualizada la ruta de inclusión del asset de fondo 'BG.h' para reflejar la refactorización. */
-/* Descripción: Se ha corregido la ruta de inclusión del asset de fondo para que apunte a 'assets/images/BG.h', adaptándose a la nueva estructura de directorios que centraliza todos los recursos de apariencia. */
-
-#include "diymon_ui_helpers.h"
-#include "diymon_evolution.h"
-#include "esp_log.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
-#include "assets/images/BG.h" // Incluir el nuevo asset de fondo
-
-static const char* TAG_HELPERS = "UI_HELPERS";
-
-// Función interna para obtener el nombre del directorio de evolución (ej: "1.1.1" -> "111")
-static void get_evolution_dir_name(char* dir_name_buffer, size_t buffer_size) {
-    const char* evo_code = diymon_get_current_code();
-    memset(dir_name_buffer, 0, buffer_size);
-    int j = 0;
-    for (int i = 0; evo_code[i] != '\0' && j < buffer_size - 1; i++) {
-        if (evo_code[i] != '.') {
-            dir_name_buffer[j++] = evo_code[i];
-        }
-    }
-}
-
-// Construye la ruta a un asset de animación en la SD.
-void ui_helpers_build_asset_path(char* buffer, size_t buffer_size, const char* asset_filename) {
-    char dir_name[9];
-    get_evolution_dir_name(dir_name, sizeof(dir_name));
-    // [CORRECCIÓN] Se usa el punto de montaje VFS real '/sdcard' porque animation_loader usa 'opendir' estándar.
-    snprintf(buffer, buffer_size, "S:/diymon/%s/%s/", dir_name, asset_filename);
-}
-
-// Carga la imagen de fondo desde el firmware creando un objeto de imagen.
-void ui_helpers_load_background(lv_obj_t* parent) {
-    ESP_LOGI(TAG_HELPERS, "Creando objeto de imagen para el fondo desde firmware.");
-    lv_obj_t *bg_img = lv_image_create(parent);
-    lv_image_set_src(bg_img, &bg_0);
-    lv_obj_set_pos(bg_img, 0, 0); 
-    lv_obj_move_background(bg_img); 
-}
-
-// La función para liberar el buffer de fondo ya no es necesaria.
-void ui_helpers_free_background_buffer() {
-    ESP_LOGD(TAG_HELPERS, "ui_helpers_free_background_buffer ya no es necesaria y ha sido ignorada.");
-}
-
-// Implementaciones placeholder para que compile
-void ui_helpers_create_diymon_gif(lv_obj_t* parent) {}
-void ui_helpers_free_gif_buffer() {}
-
---- END OF FILE: .\components\ui\diymon_ui_helpers.c ---
-
---- START OF FILE: .\components\ui\diymon_ui_helpers.h ---
-/*
- * Fichero: ./components/diymon_ui/diymon_ui_helpers.h
- * Fecha: 13/08/2025 - 05:41 
- * Último cambio: Eliminada la declaración de la función para liberar el buffer de fondo.
- * Descripción: Funciones de ayuda para la interfaz de usuario. Se elimina la declaración de `ui_helpers_free_background_buffer` ya que el fondo se carga ahora desde el firmware y no requiere un buffer dinámico.
- */
-#ifndef DIYMON_UI_HELPERS_H
-#define DIYMON_UI_HELPERS_H
-
-#include "lvgl.h"
-
-void ui_helpers_build_asset_path(char* buffer, size_t buffer_size, const char* asset_filename);
-void ui_helpers_load_background(lv_obj_t* parent);
-void ui_helpers_free_background_buffer();
-void ui_helpers_create_diymon_gif(lv_obj_t* parent);
-void ui_helpers_free_gif_buffer();
-
-#endif // DIYMON_UI_HELPERS_H
-
---- END OF FILE: .\components\ui\diymon_ui_helpers.h ---
 
 --- START OF FILE: .\components\ui\fonts.h ---
 #ifndef EEZ_LVGL_UI_FONTS_H
@@ -11839,156 +11686,81 @@ extern "C" {
 #endif /*EEZ_LVGL_UI_FONTS_H*/
 --- END OF FILE: .\components\ui\fonts.h ---
 
---- START OF FILE: .\components\ui\screens.c ---
-/* Fecha: 16/08/2025 - 08:42  */
-/* Fichero: components/diymon_ui/screens.c */
-/* Último cambio: Añadida la lógica para ocultar los paneles de acciones al hacer clic en la pantalla. */
-/* Descripción: Gestor de la pantalla principal. Maneja los eventos de entrada globales como gestos para mostrar paneles y, ahora, clics para ocultarlos, coordinando el estado de la animación de reposo. */
-#include "screens.h"
-#include "ui_idle_animation.h"
-#include "ui_actions_panel.h"
-#include "ui_action_animations.h"
-#include "ui_telemetry.h"
-#include "diymon_ui_helpers.h"
+--- START OF FILE: .\components\ui\helpers.c ---
+/* Fecha: 17/08/2025 - 10:18  */
+/* Fichero: components/ui/helpers.c */
+/* Último cambio: Renombrado de 'diymon_ui_helpers.c' y actualizada la inclusión de la cabecera. */
+/* Descripción: Implementación de las funciones de ayuda de la UI. Se ha renombrado el fichero y se ha actualizado la directiva #include para que apunte a 'helpers.h', completando la estandarización de nombres. */
+
+#include "helpers.h"
+#include "diymon_evolution.h"
 #include "esp_log.h"
-#include "bsp_api.h"
-#include "screen_manager.h"
-#include "ui_asset_loader.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include "assets/images/ui_assets.h"
 
-static const char *TAG = "SCREENS";
+static const char* TAG_HELPERS = "UI_HELPERS";
 
-static lv_timer_t *s_resume_idle_timer = NULL;
-
-lv_obj_t *g_idle_animation_obj = NULL;
-lv_obj_t *g_main_screen_obj = NULL;
-
-static lv_coord_t touch_start_x = -1;
-static lv_coord_t touch_start_y = -1;
-
-static void main_screen_event_cb(lv_event_t *e);
-
-static void resume_idle_timer_cb(lv_timer_t *timer) {
-    ESP_LOGD(TAG, "Temporizador de reanudación de idle disparado.");
-    ui_idle_animation_resume();
-    s_resume_idle_timer = NULL;
-}
-
-void create_screen_main(void) {
-    g_main_screen_obj = lv_obj_create(NULL);
-    lv_obj_set_size(g_main_screen_obj, 170, 320);
-    lv_obj_add_flag(g_main_screen_obj, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(g_main_screen_obj, main_screen_event_cb, LV_EVENT_ALL, NULL);
-    
-    lv_obj_set_scroll_dir(g_main_screen_obj, LV_DIR_ALL);
-    lv_obj_set_scrollbar_mode(g_main_screen_obj, LV_SCROLLBAR_MODE_OFF);
-
-    ui_helpers_load_background(g_main_screen_obj);
-
-    ui_action_animations_create(g_main_screen_obj);
-    g_idle_animation_obj = ui_idle_animation_start(g_main_screen_obj);
-    ui_actions_panel_create(g_main_screen_obj);
-    ui_telemetry_create(g_main_screen_obj);
-
-    ESP_LOGI(TAG, "Pantalla principal creada delegando en módulos.");
-}
-
-static void main_screen_event_cb(lv_event_t *e) {
-    lv_event_code_t code = lv_event_get_code(e);
-    lv_indev_t *indev = lv_indev_get_act();
-
-    switch(code) {
-        case LV_EVENT_PRESSED: {
-            if (s_resume_idle_timer) {
-                lv_timer_del(s_resume_idle_timer);
-                s_resume_idle_timer = NULL;
-            }
-
-            lv_point_t p;
-            lv_indev_get_point(indev, &p);
-            touch_start_x = p.x;
-            touch_start_y = p.y;
-            if (!screen_manager_is_off()) {
-                ui_idle_animation_pause();
-            }
-            break;
+// Función interna para obtener el nombre del directorio de evolución (ej: "1.1.1" -> "111")
+static void get_evolution_dir_name(char* dir_name_buffer, size_t buffer_size) {
+    const char* evo_code = diymon_get_current_code();
+    memset(dir_name_buffer, 0, buffer_size);
+    int j = 0;
+    for (int i = 0; evo_code[i] != '\0' && j < buffer_size - 1; i++) {
+        if (evo_code[i] != '.') {
+            dir_name_buffer[j++] = evo_code[i];
         }
-        case LV_EVENT_RELEASED: {
-            touch_start_x = -1;
-            touch_start_y = -1;
-            
-            if (!screen_manager_is_off() && s_resume_idle_timer == NULL) {
-                s_resume_idle_timer = lv_timer_create(resume_idle_timer_cb, 500, NULL);
-                lv_timer_set_repeat_count(s_resume_idle_timer, 1);
-            }
-            break;
-        }
-        case LV_EVENT_GESTURE: {
-            if (!screen_manager_is_off()) { 
-                lv_dir_t dir = lv_indev_get_gesture_dir(indev);
-                ui_actions_panel_handle_gesture(dir, touch_start_x, touch_start_y);
-            }
-            break;
-        }
-        case LV_EVENT_CLICKED: {
-            // Si la pantalla no está apagada, un clic en cualquier
-            // parte que no sea un botón, oculta los paneles de acción.
-            if (!screen_manager_is_off()) {
-                ESP_LOGD(TAG, "Click en la pantalla, ocultando paneles.");
-                ui_actions_panel_hide_all();
-            }
-            break;
-        }
-        default:
-            break;
     }
 }
 
-void delete_screen_main(void) {
-    if (g_main_screen_obj) {
-        lv_obj_del(g_main_screen_obj);
-        g_main_screen_obj = NULL;
-        g_idle_animation_obj = NULL;
-    }
-    ui_idle_animation_stop();
-    ui_action_animations_destroy();
-    ui_telemetry_destroy();
-    ui_assets_deinit();
+// Construye la ruta a un asset de animación en la SD.
+void ui_helpers_build_asset_path(char* buffer, size_t buffer_size, const char* asset_filename) {
+    char dir_name[9];
+    get_evolution_dir_name(dir_name, sizeof(dir_name));
+    snprintf(buffer, buffer_size, "S:/diymon/%s/%s/", dir_name, asset_filename);
 }
 
-void create_screens(void) {
-    create_screen_main();
+// Carga la imagen de fondo desde el firmware creando un objeto de imagen.
+void ui_helpers_load_background(lv_obj_t* parent) {
+    ESP_LOGI(TAG_HELPERS, "Creando objeto de imagen para el fondo desde firmware.");
+    lv_obj_t *bg_img = lv_image_create(parent);
+    lv_image_set_src(bg_img, &bg_0); // Usa el asset declarado en ui_assets.h
+    lv_obj_set_pos(bg_img, 0, 0); 
+    lv_obj_move_background(bg_img); 
 }
 
---- END OF FILE: .\components\ui\screens.c ---
+// La función para liberar el buffer de fondo ya no es necesaria.
+void ui_helpers_free_background_buffer(void) {
+    ESP_LOGD(TAG_HELPERS, "ui_helpers_free_background_buffer ya no es necesaria y ha sido ignorada.");
+}
 
---- START OF FILE: .\components\ui\screens.h ---
-/*
- * Fichero: ./components/diymon_ui/screens.h
- * Fecha: 13/08/2025 - 09:34 
- * Último cambio: Eliminado el puntero g_idle_animation_obj obsoleto.
- * Descripción: Se ha limpiado la cabecera eliminando la declaración del puntero g_idle_animation_obj, ya que la animación de reposo ahora utiliza el objeto de imagen compartido.
- */
-#ifndef SCREENS_H
-#define SCREENS_H
+// Implementaciones placeholder para que compile
+void ui_helpers_create_diymon_gif(lv_obj_t* parent) {}
+void ui_helpers_free_gif_buffer(void) {}
 
-#include "ui.h" 
-#include <lvgl.h>
+--- END OF FILE: .\components\ui\helpers.c ---
 
-// --- DECLARACIONES DE OBJETOS GLOBALES ---
-// Usamos 'extern' para decirle a otros archivos .c (como ui.c)
-// que estas variables existen y serán definidas en screens.c.
-extern lv_obj_t *g_main_screen_obj;
+--- START OF FILE: .\components\ui\helpers.h ---
+/* Fecha: 17/08/2025 - 10:18  */
+/* Fichero: components/ui/helpers.h */
+/* Último cambio: Renombrado de 'diymon_ui_helpers.h' para simplificar y estandarizar. */
+/* Descripción: Funciones de ayuda para la interfaz de usuario. Proporciona utilidades para construir rutas de assets y cargar elementos visuales como el fondo de pantalla. */
+#ifndef HELPERS_H
+#define HELPERS_H
 
+#include "lvgl.h"
 
-// --- DECLARACIONES DE FUNCIONES ---
-// Estas son las funciones definidas en screens.c que ui.c necesita llamar.
-void create_screen_main(void);
-void delete_screen_main(void);
-void create_screens(void);
+void ui_helpers_build_asset_path(char* buffer, size_t buffer_size, const char* asset_filename);
+void ui_helpers_load_background(lv_obj_t* parent);
+void ui_helpers_free_background_buffer(void);
+void ui_helpers_create_diymon_gif(lv_obj_t* parent);
+void ui_helpers_free_gif_buffer(void);
 
-#endif // SCREENS_H
+#endif // HELPERS_H
 
---- END OF FILE: .\components\ui\screens.h ---
+--- END OF FILE: .\components\ui\helpers.h ---
 
 --- START OF FILE: .\components\ui\styles.c ---
 /*
@@ -12025,128 +11797,15 @@ extern "C" {
 #endif /*EEZ_LVGL_UI_STYLES_H*/
 --- END OF FILE: .\components\ui\styles.h ---
 
---- START OF FILE: .\components\ui\telemetry_task.c ---
-/* Fecha: 17/08/2025 - 02:13  */
-/* Fichero: components/ui/telemetry_task.c */
-/* Último cambio: Creación de la tarea de telemetría para desacoplar la lectura de sensores de la UI. */
-/* Descripción: Implementa una tarea de FreeRTOS dedicada a leer sensores en segundo plano. Esta tarea gestiona la lectura periódica de la batería y el IMU, implementa la lógica de 'shake-to-wake' para despertar la pantalla, y empuja los datos actualizados a la UI. Esto mejora la reactividad y modularidad del sistema. */
-
-#include "telemetry_task.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "esp_log.h"
-#include "bsp_api.h"
-#include "screen_manager.h"
-#include "ui_telemetry.h"
-#include <math.h> // Para sqrtf
-
-static const char *TAG = "TELEMETRY_TASK";
-
-// --- Constantes de configuración de la tarea ---
-#define TELEMETRY_TASK_STACK_SIZE   4096
-#define TELEMETRY_TASK_PRIORITY     5
-#define TELEMETRY_TASK_DELAY_MS     200
-#define SHAKE_THRESHOLD_G           1.5f // Umbral de agitación en G's
-#define UI_UPDATE_INTERVAL_MS       5000 // Actualizar la UI cada 5 segundos
-
-/**
- * @brief Tarea principal que se ejecuta en segundo plano.
- */
-static void telemetry_task_main(void *pvParameters) {
-    ESP_LOGI(TAG, "Tarea de telemetría iniciada.");
-
-    uint32_t ui_update_counter = 0;
-    const uint32_t ui_update_ticks = UI_UPDATE_INTERVAL_MS / TELEMETRY_TASK_DELAY_MS;
-
-    while (1) {
-        vTaskDelay(pdMS_TO_TICKS(TELEMETRY_TASK_DELAY_MS));
-
-        // --- Lectura de Sensores ---
-        float acc[3], gyro[3];
-        bsp_imu_read(acc, gyro);
-
-        float voltage;
-        uint16_t adc_val;
-        bsp_battery_get_voltage(&voltage, &adc_val);
-        // Lógica simple para convertir voltaje a porcentaje (ajustar según la curva de la batería)
-        uint8_t battery_percentage = (uint8_t)fmax(0.0, fmin(100.0, (voltage - 3.2) / (4.2 - 3.2) * 100.0));
-
-
-        // --- Lógica de Shake-to-Wake ---
-        float acceleration_magnitude = sqrtf(acc[0] * acc[0] + acc[1] * acc[1] + acc[2] * acc[2]) / 9.81f;
-        if (acceleration_magnitude > SHAKE_THRESHOLD_G) {
-            if (screen_manager_is_off()) {
-                ESP_LOGI(TAG, "¡Agitación detectada! (Magnitud: %.2f G). Despertando pantalla.", acceleration_magnitude);
-                screen_manager_turn_on();
-            }
-        }
-        
-        // --- Actualización de la UI (periódica) ---
-        ui_update_counter++;
-        if (ui_update_counter >= ui_update_ticks) {
-            ui_update_counter = 0;
-            // Empujar los nuevos valores a la UI para que los muestre
-            ui_telemetry_update_values(battery_percentage);
-        }
-    }
-}
-
-/**
- * @brief Inicia la tarea de telemetría.
- */
-void telemetry_task_start(void) {
-    xTaskCreate(
-        telemetry_task_main,
-        "telemetry_task",
-        TELEMETRY_TASK_STACK_SIZE,
-        NULL,
-        TELEMETRY_TASK_PRIORITY,
-        NULL
-    );
-}
-
---- END OF FILE: .\components\ui\telemetry_task.c ---
-
---- START OF FILE: .\components\ui\telemetry_task.h ---
-/* Fecha: 17/08/2025 - 02:13  */
-/* Fichero: components/ui/telemetry_task.h */
-/* Último cambio: Creación del fichero para la tarea de telemetría y sensores. */
-/* Descripción: Interfaz pública para la tarea de telemetría. Esta tarea se ejecutará en segundo plano para leer sensores como la batería y el IMU, actualizar la UI y gestionar la lógica de 'shake-to-wake'. Expone una única función para iniciar la tarea. */
-
-#ifndef TELEMETRY_TASK_H
-#define TELEMETRY_TASK_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/**
- * @brief Inicia la tarea de telemetría en segundo plano.
- *
- * Crea y lanza una tarea de FreeRTOS que se encargará de leer periódicamente
- * los sensores del dispositivo (batería, IMU) y de actualizar la UI con
- * esta información. También implementa la lógica de 'shake-to-wake'.
- */
-void telemetry_task_start(void);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif // TELEMETRY_TASK_H
-
---- END OF FILE: .\components\ui\telemetry_task.h ---
-
 --- START OF FILE: .\components\ui\ui_action_animations.c ---
-/*
-# Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_action_animations.c
-# Fecha: $timestamp
-# Último cambio: Implementada la función de pre-reserva de buffer y refactorizada la creación.
-# Descripción: Se define la función `ui_action_animations_preinit_buffer` para reservar el buffer de animación compartido al inicio de la aplicación. La función `ui_action_animations_create` ahora solo crea el objeto de imagen LVGL, utilizando el buffer ya reservado. Esto soluciona el error de enlazado 'undefined reference' y previene la fragmentación del heap.
-*/
+/* Fecha: 17/08/2025 - 10:25  */
+/* Fichero: components/ui/ui_action_animations.c */
+/* Último cambio: Actualizada la inclusión de 'diymon_ui_helpers.h' a 'helpers.h' para corregir el error de compilación. */
+/* Descripción: Se ha corregido la directiva de inclusión para que apunte al fichero de cabecera renombrado 'helpers.h'. Esto resuelve el error 'No such file or directory' que impedía la compilación. */
+
 #include "ui_action_animations.h"
 #include "animation_loader.h"
-#include "diymon_ui_helpers.h"
+#include "helpers.h" // Corregido desde diymon_ui_helpers.h
 #include "ui_idle_animation.h"
 #include "esp_log.h"
 #include <stdio.h>
@@ -12754,153 +12413,16 @@ const lv_img_dsc_t* ui_assets_get_icon(ui_asset_id_t asset_id);
 
 --- END OF FILE: .\components\ui\ui_asset_loader.h ---
 
---- START OF FILE: .\components\ui\ui_assets.h ---
-/* Fecha: $timestamp */
-/* Fichero: components/ui/ui_assets.h */
-/* Último cambio: Centralizadas las declaraciones de TODOS los assets de imagen del firmware. */
-/* Descripción: Este fichero de cabecera ahora sirve como el único punto de declaración para todos los assets gráficos compilados en el firmware (fondos de pantalla e iconos). Al centralizar las declaraciones de 'bg_0', 'bg_config' y todos los 'asset_btn_*', se simplifica la gestión de recursos y se soluciona la fragmentación que causaba confusión y errores de compilación. Este es el primer paso para eliminar el cargador de assets indirecto y usar los recursos de forma directa. */
-
-#ifndef UI_ASSETS_H
-#define UI_ASSETS_H
-
-#include "lvgl.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-// --- Assets de Fondos de Pantalla ---
-extern const lv_img_dsc_t bg_0;      // Fondo principal de la aplicación.
-extern const lv_img_dsc_t bg_config; // Fondo para las pantallas de servicio/configuración.
-
-// --- Assets de Iconos de Botones (BTN) ---
-extern const lv_img_dsc_t asset_btn_1; // Comer
-extern const lv_img_dsc_t asset_btn_2; // Ejercicio
-extern const lv_img_dsc_t asset_btn_3; // Atacar
-extern const lv_img_dsc_t asset_btn_4; // Brillo
-extern const lv_img_dsc_t asset_btn_5; // Apagar Pantalla
-extern const lv_img_dsc_t asset_btn_6; // Placeholder Admin (antes Modo Config)
-extern const lv_img_dsc_t asset_btn_7; // Reset Total
-extern const lv_img_dsc_t asset_btn_8; // Servidor Ficheros
-extern const lv_img_dsc_t asset_btn_9; // Placeholder Config
-
-// --- Assets de Iconos de Evolución (EVO) ---
-extern const lv_img_dsc_t asset_evo_1; // Fuego
-extern const lv_img_dsc_t asset_evo_2; // Agua
-extern const lv_img_dsc_t asset_evo_3; // Tierra
-extern const lv_img_dsc_t asset_evo_4; // Viento
-extern const lv_img_dsc_t asset_evo_5; // Involucionar
-
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif // UI_ASSETS_H
-
---- END OF FILE: .\components\ui\ui_assets.h ---
-
---- START OF FILE: .\components\ui\ui_config_screen.c ---
-/*
-Fichero: ./components/diymon_ui/ui_config_screen.c
-Fecha: $timestamp
-Último cambio: Modificado para mostrar una imagen de fondo I8 estática (bg_config_img) y un único botón de reinicio, eliminando la visualización dinámica de datos de red.
-Descripción: Implementa la pantalla de servicio para los modos de configuración. Ahora muestra una imagen de fondo fija y un botón de reinicio, simplificando la interfaz para el usuario.
-*/
-#include "ui_config_screen.h"
-#include "esp_log.h"
-#include "esp_system.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-
-static const char *TAG = "UI_CONFIG_SCREEN";
-
-// Declaración externa del descriptor de la imagen de fondo compilada en el firmware.
-// Se espera que este símbolo esté definido en otro fichero .c (ej: BG_config.c).
-extern const lv_img_dsc_t bg_config;
-
-/**
- * @brief Callback que se ejecuta al presionar el botón de reinicio.
- */
-static void reset_button_event_cb(lv_event_t *e) {
-    lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_CLICKED) {
-        ESP_LOGW(TAG, "Botón de reinicio presionado. Reiniciando el dispositivo...");
-        vTaskDelay(pdMS_TO_TICKS(500)); // Pequeña pausa para que el log se envíe
-        esp_restart();
-    }
-}
-
-/**
- * @brief Crea y muestra la pantalla de configuración estática.
- */
-void ui_config_screen_show(void) {
-    // Crear una pantalla nueva y limpia
-    lv_obj_t *scr = lv_obj_create(NULL);
-    lv_obj_remove_style_all(scr); // Empezamos sin estilos por defecto
-    lv_obj_set_size(scr, 170, 320);
-
-    // Crear un objeto de imagen para el fondo de pantalla
-    lv_obj_t *bg_img = lv_image_create(scr);
-    lv_image_set_src(bg_img, &bg_config);
-    lv_obj_set_pos(bg_img, 0, 0);
-    lv_obj_add_flag(bg_img, LV_OBJ_FLAG_IGNORE_LAYOUT); // Asegura que no afecte a otros elementos
-
-    // Botón de Reinicio
-    lv_obj_t *btn_reset = lv_btn_create(scr);
-    lv_obj_add_event_cb(btn_reset, reset_button_event_cb, LV_EVENT_CLICKED, NULL);
-    lv_obj_align(btn_reset, LV_ALIGN_BOTTOM_MID, 0, -20); // Centrado abajo con padding
-
-    lv_obj_t *lbl_btn = lv_label_create(btn_reset);
-    lv_label_set_text(lbl_btn, "Reiniciar");
-    lv_obj_center(lbl_btn);
-
-    // Cargar la nueva pantalla
-    lv_screen_load(scr);
-    ESP_LOGI(TAG, "Pantalla de configuración estática con fondo I8 mostrada.");
-}
-
---- END OF FILE: .\components\ui\ui_config_screen.c ---
-
---- START OF FILE: .\components\ui\ui_config_screen.h ---
-/*
-Fichero: ./components/diymon_ui/ui_config_screen.h
-Fecha: $timestamp
-Último cambio: Modificada la firma de la función 'ui_config_screen_show' para que no acepte argumentos, reflejando su nueva implementación estática que muestra una imagen de fondo.
-Descripción: Interfaz pública para la pantalla de configuración. Muestra una pantalla estática con una imagen de fondo y un botón de reinicio.
-*/
-#ifndef UI_CONFIG_SCREEN_H
-#define UI_CONFIG_SCREEN_H
-
-#include "lvgl.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/**
- * @brief Crea y muestra la pantalla de configuración estática con una imagen de fondo y un botón de reinicio.
- */
-void ui_config_screen_show(void);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif // UI_CONFIG_SCREEN_H
-
---- END OF FILE: .\components\ui\ui_config_screen.h ---
-
 --- START OF FILE: .\components\ui\ui_idle_animation.c ---
-/* Fecha: 15/08/2025 - 04:04  */
-/* Fichero: Z:\DIYTOGETHER\DIYtogether\components\diymon_ui\ui_idle_animation.c */
-/* Último cambio: Añadido un repliegue para ocultar el personaje si no se encuentran las animaciones en la SD. */
-/* Descripción: Se ha mejorado la robustez del gestor de animación de reposo. Si no se encuentran los fotogramas de la animación en la tarjeta SD (un error común si la SD no está preparada), el objeto de imagen del personaje ahora se ocultará en lugar de mostrar una imagen corrupta. Esto evita un glitch visual y permite que el dispositivo siga siendo funcional. */
+/* Fecha: 17/08/2025 - 10:26  */
+/* Fichero: components/ui/ui_idle_animation.c */
+/* Último cambio: Corregida la declaración del buffer 'anim_path' de char a char[] para evitar corrupción de memoria. */
+/* Descripción: Se ha corregido un error crítico donde el buffer para la ruta de la animación se declaraba como un único carácter en lugar de un array. Esto causaba un desbordamiento de buffer y comportamiento indefinido al construir la ruta, impidiendo que la animación de reposo se cargara correctamente. */
 
 #include "ui_idle_animation.h"
 #include "ui_action_animations.h" 
 #include "animation_loader.h"
-#include "diymon_ui_helpers.h"
+#include "helpers.h"
 #include "esp_log.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -12938,7 +12460,7 @@ lv_obj_t* ui_idle_animation_start(lv_obj_t *parent) {
     // Copiar el descriptor, que incluye el puntero al búfer compartido.
     s_idle_animation_player.img_dsc = shared_player->img_dsc;
 
-    char anim_path[128];
+    char anim_path[128]; // [CORRECCIÓN] Declarado como un array de caracteres.
     ui_helpers_build_asset_path(anim_path, sizeof(anim_path), "");
     size_t len = strlen(anim_path);
     if (len > 0 && anim_path[len - 1] == '/') anim_path[len - 1] = '\0';
@@ -12951,7 +12473,6 @@ lv_obj_t* ui_idle_animation_start(lv_obj_t *parent) {
         free(s_idle_animation_player.base_path);
         s_idle_animation_player.base_path = NULL;
         
-        // [CORRECCIÓN] Ocultar el objeto de imagen si no hay animación para evitar glitches.
         if (g_animation_img_obj) {
             lv_obj_add_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
         }
@@ -12961,7 +12482,6 @@ lv_obj_t* ui_idle_animation_start(lv_obj_t *parent) {
     ESP_LOGI(TAG, "Detectados %d fotogramas para la animación de reposo.", frame_count);
     s_idle_animation_player.frame_count = frame_count;
 
-    // El objeto de imagen ya existe, nos aseguramos de que apunte a nuestros datos y sea visible.
     if(g_animation_img_obj) {
         lv_image_set_src(g_animation_img_obj, &s_idle_animation_player.img_dsc);
         lv_obj_clear_flag(g_animation_img_obj, LV_OBJ_FLAG_HIDDEN);
@@ -12982,7 +12502,6 @@ void ui_idle_animation_stop(void) {
         lv_timer_del(g_anim_timer);
         g_anim_timer = NULL;
     }
-    // Solo liberar la ruta, no el búfer de datos que es compartido.
     if (s_idle_animation_player.base_path) {
         free(s_idle_animation_player.base_path);
         s_idle_animation_player.base_path = NULL;
@@ -13000,14 +12519,12 @@ void ui_idle_animation_pause(void) {
 
 void ui_idle_animation_resume(void) {
     if (g_anim_timer && !g_is_idle_running) {
-        // Asegurarse de que el objeto de imagen apunta al descriptor de la animación de reposo
         if (g_animation_img_obj) {
              lv_image_set_src(g_animation_img_obj, &s_idle_animation_player.img_dsc);
         }
         
         g_is_idle_running = true;
         lv_timer_resume(g_anim_timer);
-        // Forzar una actualización inmediata para mostrar el idle en lugar del último frame de la acción
         idle_animation_timer_cb(g_anim_timer);
         ESP_LOGI(TAG, "Animación de Idle REANUDADA.");
     }
@@ -13307,128 +12824,6 @@ void ui_state_manager_init(void);
 
 --- END OF FILE: .\components\ui\ui_state_manager.h ---
 
---- START OF FILE: .\components\ui\ui_telemetry.c ---
-/* Fecha: 17/08/2025 - 02:15  */
-/* Fichero: components/ui/ui_telemetry.c */
-/* Último cambio: Refactorizado para ser un receptor pasivo de datos, eliminando su temporizador interno. */
-/* Descripción: Implementación del módulo de telemetría de la UI. Se ha eliminado el temporizador de LVGL y la lógica de sondeo de datos. Ahora, este módulo se limita a crear los labels y exponer una función ui_telemetry_update_values que es llamada por la telemetry_task externa para actualizar la pantalla. Esto completa el patrón de 'empujar' datos a la UI. */
-
-#include "ui_telemetry.h"
-#include "esp_log.h"
-#include "diymon_evolution.h"
-#include "esp_lvgl_port.h" // Necesario para el bloqueo thread-safe
-
-static const char *TAG = "UI_TELEMETRY";
-
-/* Variables estáticas para los objetos de la UI */
-static lv_obj_t *s_battery_label = NULL;
-static lv_obj_t *s_evo_label = NULL;
-
-/**
- * @brief Crea y configura los elementos de la UI para la telemetría.
- */
-void ui_telemetry_create(lv_obj_t *parent) {
-    if (!parent) {
-        ESP_LOGE(TAG, "El objeto padre es nulo. No se puede crear la telemetría.");
-        return;
-    }
-
-    // Contenedor para la telemetría en la esquina inferior derecha
-    lv_obj_t * telemetry_cont = lv_obj_create(parent);
-    lv_obj_remove_style_all(telemetry_cont);
-    lv_obj_set_size(telemetry_cont, 120, 50);
-    lv_obj_align(telemetry_cont, LV_ALIGN_BOTTOM_RIGHT, -5, -5);
-    lv_obj_set_flex_flow(telemetry_cont, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(telemetry_cont, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-
-    // Etiqueta para el nivel de batería
-    s_battery_label = lv_label_create(telemetry_cont);
-    lv_obj_set_style_text_color(s_battery_label, lv_color_white(), 0);
-    lv_label_set_text(s_battery_label, "Bateria...");
-
-    // Etiqueta para el código de evolución
-    s_evo_label = lv_label_create(telemetry_cont);
-    lv_obj_set_style_text_color(s_evo_label, lv_color_white(), 0);
-    lv_label_set_text(s_evo_label, "EVO: ...");
-    
-    // Forzar una actualización inicial con valores por defecto
-    ui_telemetry_update_values(100);
-    ESP_LOGI(TAG, "Módulo de telemetría creado.");
-}
-
-/**
- * @brief Destruye los recursos asociados al módulo de telemetría.
- */
-void ui_telemetry_destroy(void) {
-    // Ya no hay temporizador que borrar. LVGL se encarga de los objetos hijos.
-    s_battery_label = NULL;
-    s_evo_label = NULL;
-    ESP_LOGI(TAG, "Módulo de telemetría destruido.");
-}
-
-/**
- * @brief Actualiza los valores mostrados en los labels de telemetría.
- */
-void ui_telemetry_update_values(uint8_t battery_percentage) {
-    // Bloquear el mutex de LVGL ya que esta función será llamada desde otra tarea
-    if (lvgl_port_lock(0)) {
-        if (s_battery_label) {
-            lv_label_set_text_fmt(s_battery_label, "%s %d%%", LV_SYMBOL_BATTERY_FULL, battery_percentage);
-        }
-        if (s_evo_label) {
-            const char* evo_code = diymon_get_current_code();
-            lv_label_set_text_fmt(s_evo_label, "EVO: %s", evo_code ? evo_code : "N/A");
-        }
-        lvgl_port_unlock();
-    }
-}
-
---- END OF FILE: .\components\ui\ui_telemetry.c ---
-
---- START OF FILE: .\components\ui\ui_telemetry.h ---
-/* Fecha: 17/08/2025 - 02:14  */
-/* Fichero: components/ui/ui_telemetry.h */
-/* Último cambio: Refactorizado para recibir datos de la telemetry_task en lugar de usar un temporizador propio. */
-/* Descripción: Interfaz del módulo de telemetría de la UI. Se ha eliminado la lógica de temporizador interna y ahora expone una función ui_telemetry_update_values para que una tarea externa (telemetry_task) pueda empujar los datos del sensor para su visualización. */
-
-#ifndef UI_TELEMETRY_H
-#define UI_TELEMETRY_H
-
-#include <lvgl.h>
-#include <stdint.h> // for uint8_t
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/**
- * @brief Crea y configura los elementos de la UI para la telemetría.
- * 
- * @param parent El objeto padre sobre el cual se crearán los labels.
- */
-void ui_telemetry_create(lv_obj_t *parent);
-
-/**
- * @brief Destruye los recursos asociados al módulo de telemetría.
- */
-void ui_telemetry_destroy(void);
-
-/**
- * @brief Actualiza los valores mostrados en los labels de telemetría.
- *        Esta función es segura para ser llamada desde otras tareas (thread-safe).
- * 
- * @param battery_percentage El nivel de batería actual en porcentaje (0-100).
- */
-void ui_telemetry_update_values(uint8_t battery_percentage);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif // UI_TELEMETRY_H
-
---- END OF FILE: .\components\ui\ui_telemetry.h ---
-
 --- START OF FILE: .\components\ui\ui.c ---
 /* Fecha: 17/08/2025 - 01:31 
 # Fichero: components/ui/ui.c
@@ -13517,97 +12912,16 @@ void ui_init(void);
 
 --- END OF FILE: .\components\ui\ui.h ---
 
---- START OF FILE: .\components\ui\welcome_screen.c ---
-#include "welcome_screen.h"
-#include "esp_log.h"
-
-static const char *TAG = "WELCOME_SCREEN";
-
-// --- ANOTACIÓN: Puntero estático para almacenar el callback de inicio. ---
-// Guardamos la función que nos pasa 'main' para poder llamarla cuando se pulse el botón.
-static void (*g_on_start_callback)(void) = NULL;
-
-/**
- * @brief Callback del evento del botón "INICIAR".
- *        Llama a la función de callback registrada si existe.
- */
-static void start_button_event_cb(lv_event_t *e) {
-    lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_CLICKED) {
-        ESP_LOGI(TAG, "Botón 'INICIAR' presionado.");
-        if (g_on_start_callback) {
-            g_on_start_callback();
-        }
-    }
-}
-
-/**
- * @brief Implementación de la creación de la pantalla de bienvenida.
- */
-void welcome_screen_show(void (*on_start_cb)(void)) {
-    g_on_start_callback = on_start_cb;
-
-    // --- ANOTACIÓN: Creación de la pantalla y sus elementos. ---
-    // Se crea un nuevo screen para asegurar que no hay elementos previos.
-    lv_obj_t *scr = lv_obj_create(NULL);
-    lv_obj_set_style_bg_color(scr, lv_color_hex(0x000000), LV_PART_MAIN);
-    lv_obj_set_layout(scr, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(scr, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_row(scr, 20, LV_PART_MAIN);
-
-    const char *texts[] = {"SSID: DIYTogether", "PASS: MakeItYours", "192.168.4.1"};
-    for (int i = 0; i < 3; i++) {
-        lv_obj_t *label = lv_label_create(scr);
-        lv_label_set_text(label, texts[i]);
-        lv_obj_set_style_text_color(label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
-    }
-
-    lv_obj_t *btn = lv_btn_create(scr);
-    lv_obj_add_event_cb(btn, start_button_event_cb, LV_EVENT_CLICKED, NULL);
-
-    lv_obj_t *label_btn = lv_label_create(btn);
-    lv_label_set_text(label_btn, "INICIAR");
-    lv_obj_center(label_btn);
-
-    // --- ANOTACIÓN: Se carga la nueva pantalla. ---
-    // Esta llamada reemplaza la pantalla activa anterior y evita el crash.
-    lv_screen_load(scr);
-    ESP_LOGI(TAG, "Pantalla de bienvenida mostrada.");
-}
---- END OF FILE: .\components\ui\welcome_screen.c ---
-
---- START OF FILE: .\components\ui\welcome_screen.h ---
-#ifndef WELCOME_SCREEN_H
-#define WELCOME_SCREEN_H
-
-#include "lvgl.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/**
- * @brief Muestra la pantalla de bienvenida.
- *
- * @param on_start_cb Puntero a una función que se llamará cuando se pulse el botón "INICIAR".
- */
-void welcome_screen_show(void (*on_start_cb)(void));
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif // WELCOME_SCREEN_H
---- END OF FILE: .\components\ui\welcome_screen.h ---
-
 --- START OF FILE: .\components\web_server\CMakeLists.txt ---
-# Fecha: 16/08/2025 - 09:29 
+# Fecha: 18/08/2025 - 07:45 
 # Fichero: components/web_server/CMakeLists.txt
-# Último cambio: Actualizada la dependencia de 'diymon_bsp' a 'bsp' para resolver el error de compilación.
-# Descripción: Registro y dependencias para el componente del servidor web. Se ha corregido el nombre de la dependencia del BSP para que coincida con el nuevo nombre del directorio, solucionando el error 'Failed to resolve component'.
+# Último cambio: Corregido el estilo de comentarios de C-style (/*) a CMake-style (#) para resolver el error de parser.
+# Descripción: Registro del componente web_server. El error de compilación se debía a que se estaban usando comentarios de C en un fichero de CMake, lo cual es sintácticamente incorrecto. Se corrige el formato de los comentarios para que el sistema de build pueda procesar el fichero.
 
-idf_component_register(SRCS "web_server.c"
+idf_component_register(SRCS
+                        "web_server.c"
+                        "web_server_handlers.c"
+                        "web_server_helpers.c"
                     INCLUDE_DIRS "."
                     PRIV_INCLUDE_DIRS "."
                     REQUIRES
@@ -13623,141 +12937,43 @@ idf_component_register(SRCS "web_server.c"
 
 --- END OF FILE: .\components\web_server\CMakeLists.txt ---
 
---- START OF FILE: .\components\web_server\web_server_page.h ---
-/* Fecha: 15/08/2025 - 06:34  */
-/* Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server_page.h */
-/* Último cambio: Eliminado el contenido HTML incrustado. */
-/* Descripción: Fichero de cabecera del servidor web. Se ha eliminado el contenido HTML que estaba incrustado en el código, ya que las páginas ahora se sirven dinámicamente desde los ficheros 'index.html' y 'backup.html' en la tarjeta SD. */
+--- START OF FILE: .\components\web_server\web_server_handlers.c ---
+/* Fecha: 18/08/2025 - 07:48  */
+/* Fichero: components/web_server/web_server_handlers.c */
+/* Último cambio: Eliminado el calificador 'static' de las definiciones de los handlers para resolver un error de enlazado (linkage error). */
+/* Descripción: Se ha eliminado la palabra clave 'static' de la definición de todas las funciones handler. El error de compilación 'static declaration of '...' follows non-static declaration' ocurría porque las funciones se declaraban sin 'static' en la cabecera privada (web_server_priv.h) pero se definían con 'static' en este fichero, creando un conflicto de enlazado. Ahora las definiciones coinciden con las declaraciones, permitiendo que web_server.c las enlace correctamente. */
 
-#ifndef WEB_SERVER_PAGE_H
-#define WEB_SERVER_PAGE_H
-
-// El contenido HTML ha sido movido a los ficheros index.html y backup.html
-// en la tarjeta SD para permitir una fácil modificación sin necesidad de recompilar.
-// Este fichero se mantiene por si se necesitan futuras declaraciones, pero ya no exporta variables.
-
-#endif // WEB_SERVER_PAGE_H
-
---- END OF FILE: .\components\web_server\web_server_page.h ---
-
---- START OF FILE: .\components\web_server\web_server.c ---
-/* Fecha: 16/08/2025 - 09:55  */
-/* Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server.c */
-/* Último cambio: Añadido el manejador POST /create para la creación de directorios. */
-/* Descripción: Servidor web para la configuración del dispositivo. Se ha añadido un nuevo manejador de endpoint para la ruta '/create' que responde a peticiones POST. Este manejador extrae una ruta y un nombre de directorio del cuerpo de la petición, construye la ruta completa en la tarjeta SD y utiliza 'mkdir' para crear el nuevo directorio. Esto soluciona un error 404 (Not Found) que ocurría al intentar crear carpetas desde la interfaz web de gestión de archivos. */
-
-#include "web_server.h"
-#include "esp_http_server.h"
+#include "web_server_priv.h"
 #include "esp_log.h"
 #include "esp_vfs.h"
-#include "bsp_api.h"
+#include "nvs_flash.h"
+#include "nvs.h"
+#include "esp_system.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <fcntl.h>
 #include <dirent.h>
 #include <sys/stat.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include <ctype.h>
-#include "nvs_flash.h"
-#include "nvs.h"
-#include "esp_system.h"
-#include "web_server_page.h"
 
-static const char *TAG = "WEB_SERVER";
-#define WEB_MOUNT_POINT "/sdcard"
-#define UPLOAD_BUFFER_SIZE 2048
+static const char *TAG = "WEB_HANDLERS";
 
-// --- Helper para establecer el Content-Type basado en la extensión del fichero ---
-static esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filename) {
-    if (strstr(filename, ".html")) {
-        return httpd_resp_set_type(req, "text/html");
-    } else if (strstr(filename, ".css")) {
-        return httpd_resp_set_type(req, "text/css");
-    } else if (strstr(filename, ".js")) {
-        return httpd_resp_set_type(req, "application/javascript");
-    }
-    return httpd_resp_set_type(req, "text/plain");
+// --- Implementación de Handlers de Endpoints ---
+
+esp_err_t root_get_handler(httpd_req_t *req) {
+    ESP_LOGI(TAG, "Handler: GET /. Sirviendo página principal.");
+    return serve_file_from_sd(req, "/sdcard/config/Index.html");
 }
 
-// --- Helper genérico para servir un fichero estático desde el VFS ---
-static esp_err_t serve_file_from_sd(httpd_req_t *req, const char *filepath) {
-    ESP_LOGI(TAG, "Intentando servir fichero: %s", filepath);
-    FILE *f = fopen(filepath, "r");
-    if (f == NULL) {
-        ESP_LOGE(TAG, "Fallo al abrir el fichero para lectura: %s", filepath);
-        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "El fichero no existe en la SD.");
-        return ESP_FAIL;
-    }
-
-    set_content_type_from_file(req, filepath);
-
-    char chunk[1024];
-    size_t chunksize;
-    do {
-        chunksize = fread(chunk, 1, sizeof(chunk), f);
-        if (chunksize > 0) {
-            if (httpd_resp_send_chunk(req, chunk, chunksize) != ESP_OK) {
-                fclose(f);
-                ESP_LOGE(TAG, "Fallo en el envío del fichero.");
-                return ESP_FAIL;
-            }
-        }
-    } while (chunksize != 0);
-
-    fclose(f);
-    ESP_LOGI(TAG, "Envío de fichero completado.");
-    httpd_resp_send_chunk(req, NULL, 0); // Enviar chunk final
-    return ESP_OK;
+esp_err_t backup_get_handler(httpd_req_t *req) {
+    ESP_LOGI(TAG, "Handler: GET /backup. Sirviendo página de respaldo.");
+    return serve_file_from_sd(req, "/sdcard/config/backup.html");
 }
 
-// --- Función de decodificación de URL ---
-static void url_decode(char *dst, const char *src) {
-    char a, b;
-    while (*src) {
-        if ((*src == '%') && ((a = src[1]) && (b = src[2])) && (isxdigit(a) && isxdigit(b))) {
-            if (a >= 'a') a -= 'a'-'A';
-            if (a >= 'A') a -= ('A' - 10); else a -= '0';
-            if (b >= 'a') b -= 'a'-'A';
-            if (b >= 'A') b -= ('A' - 10); else b -= '0';
-            *dst++ = 16 * a + b;
-            src += 3;
-        } else if (*src == '+') {
-            *dst++ = ' ';
-            src++;
-        } else {
-            *dst++ = *src++;
-        }
-    }
-    *dst++ = '\0';
-}
-
-// --- Parser manual simple para extraer valores de multipart/form-data ---
-static bool get_multipart_value(const char* buf, const char* name, char* result, size_t max_len) {
-    char field_name[128];
-    snprintf(field_name, sizeof(field_name), "name=\"%s\"", name);
-    
-    char *val_start = strstr(buf, field_name);
-    if (!val_start) return false;
-
-    val_start = strstr(val_start, "\r\n\r\n");
-    if (!val_start) return false;
-    val_start += 4;
-
-    char *val_end = strstr(val_start, "\r\n--");
-    if (!val_end) return false;
-    
-    size_t len = val_end - val_start;
-    if (len >= max_len) return false;
-
-    strncpy(result, val_start, len);
-    result[len] = '\0';
-    return true;
-}
-
-// --- Manejador para listar archivos ---
-static esp_err_t list_files_handler(httpd_req_t *req) {
+esp_err_t list_files_handler(httpd_req_t *req) {
+    ESP_LOGI(TAG, "Handler: GET /listfiles. Listando contenido de directorio.");
     char query_buf[128];
     char path_decoded[128] = "/";
     char current_path[256] = "/";
@@ -13775,15 +12991,15 @@ static esp_err_t list_files_handler(httpd_req_t *req) {
     }
 
     if (strstr(current_path, "..")) {
+        ESP_LOGE(TAG, "Intento de path traversal detectado: %s", current_path);
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid path");
         return ESP_FAIL;
     }
 
     char full_path[512];
     snprintf(full_path, sizeof(full_path), "%s%s", WEB_MOUNT_POINT, strcmp(current_path, "/") == 0 ? "" : current_path);
+    ESP_LOGD(TAG, "Listando directorio VFS: %s", full_path);
     
-    ESP_LOGI(TAG, "Listando archivos en: %s", full_path);
-
     DIR *d = opendir(full_path);
     if (!d) {
         ESP_LOGE(TAG, "No se pudo abrir el directorio: %s", full_path);
@@ -13804,8 +13020,9 @@ static esp_err_t list_files_handler(httpd_req_t *req) {
         if (!first) strcat(json_buf, ",");
         
         char item_path[512];
-        if (snprintf(item_path, sizeof(item_path), "%s/%s", full_path, dir->d_name) >= sizeof(item_path)) {
-            ESP_LOGE(TAG, "Path too long, skipping: %s/%s", full_path, dir->d_name);
+        int written = snprintf(item_path, sizeof(item_path), "%s/%s", full_path, dir->d_name);
+        if (written < 0 || written >= sizeof(item_path)) {
+            ESP_LOGE(TAG, "Error de truncamiento de ruta para: %s/%s", full_path, dir->d_name);
             continue;
         }
         
@@ -13832,32 +13049,38 @@ static esp_err_t list_files_handler(httpd_req_t *req) {
     closedir(d);
 
     strcat(json_buf, "]");
+    ESP_LOGD(TAG, "JSON de ficheros generado: %s", json_buf);
     httpd_resp_send(req, json_buf, strlen(json_buf));
     free(json_buf);
     return ESP_OK;
 }
 
-// --- Manejador para subida de archivos ---
-static esp_err_t upload_post_handler(httpd_req_t *req) {
+esp_err_t upload_post_handler(httpd_req_t *req) {
+    ESP_LOGI(TAG, "Handler: POST /upload. Iniciando subida de fichero.");
     char buf[UPLOAD_BUFFER_SIZE];
     char filepath[256];
     FILE *fd = NULL;
     int received;
     int remaining = req->content_len;
+    ESP_LOGD(TAG, "Tamaño total del contenido: %d bytes.", remaining);
 
     received = httpd_req_recv(req, buf, MIN(remaining, sizeof(buf)));
-    if (received <= 0) return ESP_FAIL;
+    if (received <= 0) {
+        ESP_LOGE(TAG, "Fallo al recibir el primer chunk de datos.");
+        return ESP_FAIL;
+    }
     
     char path[128] = "/";
     char filename[64] = "";
     get_multipart_value(buf, "path", path, sizeof(path));
     char *filename_start = strstr(buf, "filename=\"");
-    if (!filename_start) return ESP_FAIL;
+    if (!filename_start) { ESP_LOGE(TAG, "No se encontró 'filename' en la cabecera multipart."); return ESP_FAIL; }
     filename_start += strlen("filename=\"");
     char *filename_end = strchr(filename_start, '\"');
-    if (!filename_end) return ESP_FAIL;
+    if (!filename_end) { ESP_LOGE(TAG, "Formato de 'filename' inválido."); return ESP_FAIL; }
     strncpy(filename, filename_start, filename_end - filename_start);
     filename[filename_end - filename_start] = '\0';
+    ESP_LOGD(TAG, "Path extraído: '%s', Filename: '%s'", path, filename);
 
     if (strlen(filename) == 0 || strstr(path, "..") || strstr(filename, "..")) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Ruta/fichero inválido.");
@@ -13865,11 +13088,12 @@ static esp_err_t upload_post_handler(httpd_req_t *req) {
     }
 
     snprintf(filepath, sizeof(filepath), "%s%s/%s", WEB_MOUNT_POINT, strcmp(path, "/") == 0 ? "" : path, filename);
+    ESP_LOGI(TAG, "Abriendo fichero para escritura: %s", filepath);
     fd = fopen(filepath, "wb");
-    if (!fd) { httpd_resp_send_500(req); return ESP_FAIL; }
+    if (!fd) { ESP_LOGE(TAG, "Fallo al abrir fichero."); httpd_resp_send_500(req); return ESP_FAIL; }
 
     char *data_start = strstr(filename_end, "\r\n\r\n");
-    if (!data_start) { fclose(fd); return ESP_FAIL; }
+    if (!data_start) { ESP_LOGE(TAG, "No se encontró el delimitador de datos."); fclose(fd); return ESP_FAIL; }
     
     data_start += 4;
     int header_len = data_start - buf;
@@ -13879,7 +13103,7 @@ static esp_err_t upload_post_handler(httpd_req_t *req) {
 
     while (remaining > 0) {
         received = httpd_req_recv(req, buf, MIN(remaining, sizeof(buf)));
-        if (received <= 0) { fclose(fd); return ESP_FAIL; }
+        if (received <= 0) { ESP_LOGE(TAG, "Error durante la recepción del stream."); fclose(fd); return ESP_FAIL; }
         
         char *boundary_start = strstr(buf, "\r\n--");
         if (boundary_start) {
@@ -13896,8 +13120,8 @@ static esp_err_t upload_post_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-// --- Manejador para borrar archivos ---
-static esp_err_t delete_file_handler(httpd_req_t *req) {
+esp_err_t delete_file_handler(httpd_req_t *req) {
+    ESP_LOGI(TAG, "Handler: POST /delete. Petición de borrado recibida.");
     char buf[512];
     int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
     if (ret <= 0) return ESP_FAIL;
@@ -13907,6 +13131,7 @@ static esp_err_t delete_file_handler(httpd_req_t *req) {
     char filename[64] = "";
     get_multipart_value(buf, "path", path, sizeof(path));
     get_multipart_value(buf, "filename", filename, sizeof(filename));
+    ESP_LOGD(TAG, "Petición de borrado: path='%s', filename='%s'", path, filename);
     
     if (strlen(filename) == 0 || strstr(path, "..") || strstr(filename, "..")) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Nombre de archivo o ruta inválidos.");
@@ -13926,24 +13151,18 @@ static esp_err_t delete_file_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-// --- Manejador para crear un nuevo directorio ---
-static esp_err_t create_dir_handler(httpd_req_t *req) {
+esp_err_t create_dir_handler(httpd_req_t *req) {
+    ESP_LOGI(TAG, "Handler: POST /create. Petición de creación de directorio.");
     char buf[512];
     int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
-    if (ret <= 0) {
-        if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
-            httpd_resp_send_408(req);
-        }
-        return ESP_FAIL;
-    }
+    if (ret <= 0) return ESP_FAIL;
     buf[ret] = '\0';
 
     char path[128] = "";
     char dirname[64] = "";
-
-    // Asumimos que el formulario envía 'path' para el directorio padre y 'dirname' para el nuevo.
     get_multipart_value(buf, "path", path, sizeof(path));
     get_multipart_value(buf, "dirname", dirname, sizeof(dirname));
+    ESP_LOGD(TAG, "Petición de creación de dir: path='%s', dirname='%s'", path, dirname);
     
     if (strlen(dirname) == 0 || strstr(path, "..") || strstr(dirname, "..")) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Nombre de directorio o ruta inválidos.");
@@ -13953,26 +13172,21 @@ static esp_err_t create_dir_handler(httpd_req_t *req) {
     char full_path[256];
     snprintf(full_path, sizeof(full_path), "%s%s/%s", WEB_MOUNT_POINT, strcmp(path, "/") == 0 ? "" : path, dirname);
 
-    // Intentar crear el directorio
     if (mkdir(full_path, 0755) == 0) {
         ESP_LOGI(TAG, "Directorio creado: %s", full_path);
-        httpd_resp_send(req, "Directorio creado con éxito.", HTTPD_RESP_USE_STRLEN);
+        httpd_resp_send(req, "Directorio creado.", HTTPD_RESP_USE_STRLEN);
     } else {
-        ESP_LOGE(TAG, "Fallo al crear el directorio: %s", full_path);
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "No se pudo crear el directorio. Puede que ya exista.");
+        ESP_LOGE(TAG, "Fallo al crear directorio: %s", full_path);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "No se pudo crear el directorio.");
     }
     return ESP_OK;
 }
 
-
-// --- Manejador para guardar credenciales WiFi ---
-static esp_err_t save_post_handler(httpd_req_t *req) {
+esp_err_t save_post_handler(httpd_req_t *req) {
+    ESP_LOGI(TAG, "Handler: POST /save. Guardando configuración WiFi.");
     char buf[256];
     int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
-    if (ret <= 0) {
-        if (ret == HTTPD_SOCK_ERR_TIMEOUT) httpd_resp_send_408(req);
-        return ESP_FAIL;
-    }
+    if (ret <= 0) return ESP_FAIL;
     buf[ret] = '\0';
 
     char ssid[32] = {0}, password_encoded[64] = {0}, password_decoded[64] = {0}, authmode_str[4] = {0};
@@ -13983,9 +13197,8 @@ static esp_err_t save_post_handler(httpd_req_t *req) {
     int32_t authmode = atoi(authmode_str);
 
     url_decode(password_decoded, password_encoded);
+    ESP_LOGI(TAG, "Guardando SSID: '%s'", ssid); // No loguear la contraseña por seguridad
     
-    ESP_LOGI(TAG, "Recibido para guardar - SSID: [%s], Authmode: [%ld]", ssid, authmode);
-
     nvs_handle_t nvs_handle;
     ESP_ERROR_CHECK(nvs_open("storage", NVS_READWRITE, &nvs_handle));
     ESP_ERROR_CHECK(nvs_set_str(nvs_handle, "wifi_ssid", ssid));
@@ -13993,7 +13206,7 @@ static esp_err_t save_post_handler(httpd_req_t *req) {
     ESP_ERROR_CHECK(nvs_set_i32(nvs_handle, "wifi_authmode", authmode));
     ESP_ERROR_CHECK(nvs_commit(nvs_handle));
     nvs_close(nvs_handle);
-    ESP_LOGI(TAG, "Credenciales guardadas en NVS.");
+    ESP_LOGI(TAG, "Credenciales guardadas en NVS. Dispositivo se reiniciará.");
 
     const char* resp_str = "<h1>Configuracion guardada!</h1><p>El dispositivo se reiniciara.</p>";
     httpd_resp_send(req, resp_str, HTTPD_RESP_USE_STRLEN);
@@ -14004,23 +13217,187 @@ static esp_err_t save_post_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-// --- Manejador para servir la página principal desde la SD ---
-static esp_err_t root_get_handler(httpd_req_t *req) {
-    return serve_file_from_sd(req, "/sdcard/config/Index.html");
+--- END OF FILE: .\components\web_server\web_server_handlers.c ---
+
+--- START OF FILE: .\components\web_server\web_server_helpers.c ---
+/* Fecha: 18/08/2025 - 07:43  */
+/* Fichero: components/web_server/web_server_helpers.c */
+/* Último cambio: Creado como parte de la refactorización para aislar las funciones de ayuda. */
+/* Descripción: Este fichero contiene funciones de utilidad utilizadas por los handlers del servidor web. Incluye la lógica para servir ficheros estáticos desde la tarjeta SD, decodificar URLs, parsear datos de formularios multipart y determinar el tipo de contenido de un fichero. Separar estas funciones mejora la legibilidad y permite reutilizarlas fácilmente. */
+
+#include "web_server_priv.h"
+#include "esp_log.h"
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+
+static const char *TAG = "WEB_HELPERS";
+
+// --- Implementación de Funciones de Ayuda ---
+
+esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filename) {
+    if (strstr(filename, ".html")) {
+        return httpd_resp_set_type(req, "text/html");
+    } else if (strstr(filename, ".css")) {
+        return httpd_resp_set_type(req, "text/css");
+    } else if (strstr(filename, ".js")) {
+        return httpd_resp_set_type(req, "application/javascript");
+    }
+    // Añadir más tipos MIME si es necesario (ej: .json, .png, etc.)
+    return httpd_resp_set_type(req, "text/plain");
 }
 
-// --- Manejador para servir la página de backup desde la SD ---
-static esp_err_t backup_get_handler(httpd_req_t *req) {
-    return serve_file_from_sd(req, "/sdcard/config/backup.html");
+esp_err_t serve_file_from_sd(httpd_req_t *req, const char *filepath) {
+    ESP_LOGI(TAG, "Helper: Sirviendo fichero estático: %s", filepath);
+    FILE *f = fopen(filepath, "r");
+    if (f == NULL) {
+        ESP_LOGE(TAG, "Helper: Fallo al abrir el fichero: %s", filepath);
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Fichero no encontrado.");
+        return ESP_FAIL;
+    }
+
+    set_content_type_from_file(req, filepath);
+
+    char chunk[1024];
+    size_t chunksize;
+    do {
+        chunksize = fread(chunk, 1, sizeof(chunk), f);
+        if (chunksize > 0) {
+            if (httpd_resp_send_chunk(req, chunk, chunksize) != ESP_OK) {
+                fclose(f);
+                ESP_LOGE(TAG, "Helper: Fallo al enviar chunk del fichero.");
+                // No se puede enviar un error aquí porque la respuesta ya ha comenzado.
+                return ESP_FAIL;
+            }
+        }
+    } while (chunksize != 0);
+
+    fclose(f);
+    ESP_LOGI(TAG, "Helper: Envío de fichero completado.");
+    httpd_resp_send_chunk(req, NULL, 0); // Señal de finalización
+    return ESP_OK;
 }
 
-static httpd_handle_t start_webserver(void) {
+void url_decode(char *dst, const char *src) {
+    char a, b;
+    while (*src) {
+        if ((*src == '%') && ((a = src[1]) && (b = src[2])) && (isxdigit(a) && isxdigit(b))) {
+            if (a >= 'a') a -= 'a'-'A';
+            if (a >= 'A') a -= ('A' - 10); else a -= '0';
+            if (b >= 'a') b -= 'a'-'A';
+            if (b >= 'A') b -= ('A' - 10); else b -= '0';
+            *dst++ = 16 * a + b;
+            src += 3;
+        } else if (*src == '+') {
+            *dst++ = ' ';
+            src++;
+        } else {
+            *dst++ = *src++;
+        }
+    }
+    *dst++ = '\0';
+}
+
+bool get_multipart_value(const char* buf, const char* name, char* result, size_t max_len) {
+    char field_name[128];
+    snprintf(field_name, sizeof(field_name), "name=\"%s\"", name);
+    
+    char *val_start = strstr(buf, field_name);
+    if (!val_start) return false;
+
+    // Avanzar hasta el final de la línea del content-disposition
+    val_start = strstr(val_start, "\r\n\r\n");
+    if (!val_start) return false;
+    val_start += 4; // Saltar el doble CRLF
+
+    // El final del valor es el siguiente boundary
+    char *val_end = strstr(val_start, "\r\n--");
+    if (!val_end) return false;
+    
+    size_t len = val_end - val_start;
+    if (len >= max_len) {
+        ESP_LOGW(TAG, "Valor multipart para '%s' es demasiado largo (%d vs max %d)", name, len, max_len);
+        return false;
+    }
+
+    strncpy(result, val_start, len);
+    result[len] = '\0';
+    return true;
+}
+
+--- END OF FILE: .\components\web_server\web_server_helpers.c ---
+
+--- START OF FILE: .\components\web_server\web_server_priv.h ---
+/* Fecha: 18/08/2025 - 07:41  */
+/* Fichero: components/web_server/web_server_priv.h */
+/* Último cambio: Creación del fichero como parte de la refactorización para declarar handlers y helpers internos. */
+/* Descripción: Cabecera privada para el componente web_server. Declara las funciones de los handlers y helpers que son compartidas internamente entre los ficheros del componente, pero no expuestas públicamente. Esto permite a web_server.c registrar los handlers mientras que sus implementaciones residen en web_server_handlers.c. */
+
+#ifndef WEB_SERVER_PRIV_H
+#define WEB_SERVER_PRIV_H
+
+#include "esp_http_server.h"
+#include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// --- Constantes internas del componente ---
+#define WEB_MOUNT_POINT "/sdcard"
+#define UPLOAD_BUFFER_SIZE 2048
+
+// --- Declaraciones de Handlers (implementados en web_server_handlers.c) ---
+esp_err_t root_get_handler(httpd_req_t *req);
+esp_err_t backup_get_handler(httpd_req_t *req);
+esp_err_t list_files_handler(httpd_req_t *req);
+esp_err_t upload_post_handler(httpd_req_t *req);
+esp_err_t delete_file_handler(httpd_req_t *req);
+esp_err_t create_dir_handler(httpd_req_t *req);
+esp_err_t save_post_handler(httpd_req_t *req);
+
+// --- Declaraciones de Helpers (implementados en web_server_helpers.c) ---
+esp_err_t serve_file_from_sd(httpd_req_t *req, const char *filepath);
+void url_decode(char *dst, const char *src);
+bool get_multipart_value(const char* buf, const char* name, char* result, size_t max_len);
+esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filename);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // WEB_SERVER_PRIV_H
+
+--- END OF FILE: .\components\web_server\web_server_priv.h ---
+
+--- START OF FILE: .\components\web_server\web_server.c ---
+/* Fecha: 18/08/2025 - 07:43  */
+/* Fichero: components/web_server/web_server.c */
+/* Último cambio: Aumentada la prioridad de la tarea del servidor HTTP a 3 para resolver el error de socket. */
+/* Descripción: Orquestador del servidor web. La prioridad de la tarea se ha elevado a 3, que es mayor que la de la tarea de LVGL (prioridad 4). Esto es crucial para asegurar que el servidor web tenga la CPU necesaria para gestionar el envío de datos a través del socket, evitando que el buffer TCP se llene y cause el error EAGAIN ('error in send : 11'), que es la causa raíz del fallo en la transferencia de ficheros. */
+
+#include "web_server.h"
+#include "web_server_priv.h" // Cabecera privada con las declaraciones de los handlers
+#include "esp_http_server.h"
+#include "esp_log.h"
+
+static const char *TAG = "WEB_SERVER";
+
+// --- Funciones Públicas ---
+
+httpd_handle_t web_server_start(void) {
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.stack_size = 8192;
+    config.task_priority = 3; // [CORRECCIÓN] Prioridad > LVGL (4) para evitar inanición de la red.
+
+    ESP_LOGI(TAG, "Iniciando servidor web de configuracion (Prioridad Tarea: %d).", config.task_priority);
 
     if (httpd_start(&server, &config) == ESP_OK) {
+        // --- Registro de URI Handlers ---
+        // Las implementaciones están en web_server_handlers.c
+        
         httpd_uri_t root_uri = { .uri = "/", .method = HTTP_GET, .handler = root_get_handler };
         httpd_register_uri_handler(server, &root_uri);
         
@@ -14041,36 +13418,49 @@ static httpd_handle_t start_webserver(void) {
 
         httpd_uri_t save_uri = { .uri = "/save", .method = HTTP_POST, .handler = save_post_handler };
         httpd_register_uri_handler(server, &save_uri);
+        
+        ESP_LOGI(TAG, "Todos los handlers del servidor web registrados correctamente.");
+        return server;
     }
-    return server;
+
+    ESP_LOGE(TAG, "Error al iniciar el servidor web.");
+    return NULL;
 }
 
-void web_server_start(void) {
-    ESP_LOGI(TAG, "Iniciando servidor web de configuracion.");
-    start_webserver();
+void web_server_stop(httpd_handle_t server) {
+    if (server) {
+        httpd_stop(server);
+        ESP_LOGI(TAG, "Servidor web detenido.");
+    }
 }
 
 --- END OF FILE: .\components\web_server\web_server.c ---
 
 --- START OF FILE: .\components\web_server\web_server.h ---
-/*
-# Fichero: Z:\DIYTOGETHER\DIYtogether\components\web_server\web_server.h
-# Fecha: `$timestamp
-# Último cambio: Corregido el fichero para que sea sintácticamente válido en C.
-# Descripción: Interfaz pública para el componente del servidor web, que expone la función de arranque del servicio.
-*/
+/* Fecha: 18/08/2025 - 07:05  */
+/* Fichero: components/web_server/web_server.h */
+/* Último cambio: Modificadas las funciones start/stop para gestionar el handle del servidor y evitar errores de socket. */
+/* Descripción: Interfaz pública para el componente del servidor web. La función 'web_server_start' ahora devuelve un handle al servidor iniciado. Se ha añadido 'web_server_stop' para permitir un apagado controlado del servidor, solucionando los errores de socket ('error in send : 11') que ocurrían al salir del modo de configuración. */
 #ifndef WEB_SERVER_H
 #define WEB_SERVER_H
+
+#include "esp_http_server.h" // Necesario para el tipo httpd_handle_t
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
- * @brief Inicia el modo de operación del servidor web.
- * @note  Esta es una función de bloqueo que no retorna.
+ * @brief Inicia el servidor web y devuelve su handle.
+ * @return El handle del servidor HTTPD si se inicia correctamente, NULL en caso de error.
  */
-void web_server_start(void);
+httpd_handle_t web_server_start(void);
+
+/**
+ * @brief Detiene el servidor web de forma controlada.
+ * @param server El handle del servidor a detener, obtenido de web_server_start.
+ */
+void web_server_stop(httpd_handle_t server);
 
 #ifdef __cplusplus
 }
@@ -14080,241 +13470,11 @@ void web_server_start(void);
 
 --- END OF FILE: .\components\web_server\web_server.h ---
 
---- START OF FILE: .\components\wifi_portal\CMakeLists.txt ---
-# Fecha: 16/08/2025 - 09:28 
-# Fichero: components/wifi_portal/CMakeLists.txt
-# Último cambio: Actualizada la dependencia de 'diymon_bsp' a 'bsp' para resolver el error de compilación.
-# Descripción: CMakeLists del portal WiFi. Se ha corregido el nombre de la dependencia del BSP para que coincida con el nuevo nombre del directorio ('bsp'), solucionando el error 'Failed to resolve component'.
-
-idf_component_register(SRCS "wifi_portal.c"
-                    INCLUDE_DIRS "."
-                    REQUIRES 
-                        driver
-                        esp_wifi
-                        esp_http_server
-                        nvs_flash
-                        esp_event
-                        bsp
-                        )
-
---- END OF FILE: .\components\wifi_portal\CMakeLists.txt ---
-
---- START OF FILE: .\components\wifi_portal\wifi_portal.c ---
-/*
-  Fichero: ./components/wifi_portal/wifi_portal.c
-  Fecha: 12/08/2025 - 05:10 pm
-  Último cambio: Implementada una función de decodificación de URL local.
-  Descripción: Se añade una función url_decode para reemplazar manualmente los caracteres codificados (como %24 por $) en la contraseña. Esto resuelve el error de compilación implicit declaration y asegura que los caracteres especiales se guarden correctamente en la NVS.
-*/
-#include "wifi_portal.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/event_groups.h"
-#include "esp_wifi.h"
-#include "esp_log.h"
-#include "esp_event.h"
-#include "esp_http_server.h"
-#include "nvs_flash.h"
-#include "nvs.h"
-#include "esp_system.h"
-#include "bsp_api.h"
-#include <stdlib.h>
-#include <ctype.h>
-
-static const char *TAG = "WIFI_PORTAL";
-static EventGroupHandle_t s_portal_event_group;
-const int CREDENTIALS_RECEIVED_BIT = BIT0;
-
-static const char* HTML_FORM =
-    "<!DOCTYPE html><html><head><title>Configuracion WiFi DIYMON</title><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head>"
-    "<body><h1>Configura el WiFi de tu DIYMON</h1>"
-    "<h2>Conectate a tu red local</h2>"
-    "<form method='post' action='/save'>"
-    "<p><label>SSID (Nombre de tu red):</label><br><input type='text' name='ssid'></p>"
-    "<p><label>Password:</label><br><input type='password' name='password'></p>"
-    "<p><label>Seguridad (si falla, prueba 'Forzar WPA2'):</label><br>"
-    "<select name='authmode'>"
-    "  <option value='0' selected>Automatico (WPA2/WPA3)</option>"
-    "  <option value='1'>Forzar WPA2 (Recomendado)</option>"
-    "  <option value='2'>Forzar WPA3</option>"
-    "</select></p>"
-    "<p><button type='submit'>Guardar y Reiniciar</button></p>"
-    "</form></body></html>";
-
-
-// --- [SOLUCIÓN DEFINITIVA] Función de decodificación de URL local ---
-static void url_decode(char *dst, const char *src) {
-    char a, b;
-    while (*src) {
-        if ((*src == '%') &&
-            ((a = src[1]) && (b = src[2])) &&
-            (isxdigit(a) && isxdigit(b))) {
-            if (a >= 'a') a -= 'a'-'A';
-            if (a >= 'A') a -= ('A' - 10);
-            else a -= '0';
-            if (b >= 'a') b -= 'a'-'A';
-            if (b >= 'A') b -= ('A' - 10);
-            else b -= '0';
-            *dst++ = 16*a + b;
-            src+=3;
-        } else if (*src == '+') {
-            *dst++ = ' ';
-            src++;
-        } else {
-            *dst++ = *src++;
-        }
-    }
-    *dst++ = '\0';
-}
-
-
-static esp_err_t root_get_handler(httpd_req_t *req) {
-    httpd_resp_send(req, HTML_FORM, HTTPD_RESP_USE_STRLEN);
-    return ESP_OK;
-}
-
-static esp_err_t save_post_handler(httpd_req_t *req) {
-    char buf[256];
-    int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
-    if (ret <= 0) return ESP_FAIL;
-    buf[ret] = '\0';
-
-    char ssid[32] = {0};
-    char password_encoded[64] = {0};
-    char password_decoded[64] = {0};
-    char authmode_str[4] = {0};
-    
-    httpd_query_key_value(buf, "ssid", ssid, sizeof(ssid));
-    httpd_query_key_value(buf, "password", password_encoded, sizeof(password_encoded));
-    httpd_query_key_value(buf, "authmode", authmode_str, sizeof(authmode_str));
-    int32_t authmode = atoi(authmode_str);
-
-    ESP_LOGI(TAG, "Contraseña recibida (codificada): %s", password_encoded);
-    url_decode(password_decoded, password_encoded);
-    ESP_LOGI(TAG, "Contraseña decodificada: %s", password_decoded);
-
-    nvs_handle_t nvs_handle;
-    ESP_ERROR_CHECK(nvs_open("storage", NVS_READWRITE, &nvs_handle));
-    ESP_ERROR_CHECK(nvs_set_str(nvs_handle, "wifi_ssid", ssid));
-    ESP_ERROR_CHECK(nvs_set_str(nvs_handle, "wifi_pass", password_decoded));
-    ESP_ERROR_CHECK(nvs_set_i32(nvs_handle, "wifi_authmode", authmode));
-    ESP_ERROR_CHECK(nvs_commit(nvs_handle));
-    nvs_close(nvs_handle);
-    ESP_LOGI(TAG, "Credenciales guardadas en NVS (SSID: %s, Authmode: %ld).", ssid, authmode);
-
-    httpd_resp_send(req, "<h1>Configuracion guardada!</h1><p>El dispositivo se reiniciara.</p>", HTTPD_RESP_USE_STRLEN);
-    
-    vTaskDelay(pdMS_TO_TICKS(1000));
-    xEventGroupSetBits(s_portal_event_group, CREDENTIALS_RECEIVED_BIT);
-    
-    return ESP_OK;
-}
-
-static httpd_handle_t start_webserver(void) {
-    httpd_handle_t server = NULL;
-    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.uri_match_fn = httpd_uri_match_wildcard;
-    if (httpd_start(&server, &config) == ESP_OK) {
-        httpd_uri_t root = {.uri = "/", .method = HTTP_GET, .handler = root_get_handler};
-        httpd_register_uri_handler(server, &root);
-        httpd_uri_t save = {.uri = "/save", .method = HTTP_POST, .handler = save_post_handler};
-        httpd_register_uri_handler(server, &save);
-    }
-    return server;
-}
-
-void wifi_portal_start(void) {
-    s_portal_event_group = xEventGroupCreate();
-    
-    bsp_wifi_start_ap();
-    
-    httpd_handle_t server = start_webserver();
-    if (server == NULL) {
-        ESP_LOGE(TAG, "Error al iniciar servidor, reiniciando...");
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        esp_restart();
-    }
-    
-    ESP_LOGI(TAG, "Portal en marcha. Esperando credenciales via web...");
-    xEventGroupWaitBits(s_portal_event_group, CREDENTIALS_RECEIVED_BIT, pdTRUE, pdFALSE, portMAX_DELAY);
-    
-    ESP_LOGI(TAG, "Credenciales recibidas. Deteniendo portal y reiniciando...");
-    httpd_stop(server);
-    esp_wifi_stop();
-    esp_wifi_deinit();
-    vEventGroupDelete(s_portal_event_group);
-    
-    vTaskDelay(pdMS_TO_TICKS(1000));
-    esp_restart();
-}
-
-bool wifi_portal_credentials_saved(void) {
-    nvs_handle_t nvs_handle;
-    esp_err_t err = nvs_open("storage", NVS_READONLY, &nvs_handle);
-    if (err != ESP_OK) return false;
-    size_t required_size = 0;
-    err = nvs_get_str(nvs_handle, "wifi_ssid", NULL, &required_size);
-    nvs_close(nvs_handle);
-    if (err == ESP_OK && required_size > 1) {
-        return true;
-    }
-    return false;
-}
-
-void wifi_portal_erase_credentials(void) {
-    nvs_handle_t nvs_handle;
-    esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
-    if (err != ESP_OK) return;
-    nvs_erase_key(nvs_handle, "wifi_ssid");
-    nvs_erase_key(nvs_handle, "wifi_pass");
-    nvs_erase_key(nvs_handle, "wifi_authmode");
-    nvs_commit(nvs_handle);
-    nvs_close(nvs_handle);
-    ESP_LOGI(TAG, "Credenciales WiFi completas borradas de NVS.");
-}
-
---- END OF FILE: .\components\wifi_portal\wifi_portal.c ---
-
---- START OF FILE: .\components\wifi_portal\wifi_portal.h ---
-#ifndef WIFI_PORTAL_H
-#define WIFI_PORTAL_H
-
-#include "esp_err.h"
-#include <stdbool.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/**
- * @brief Comprueba si ya existen credenciales WiFi guardadas en la NVS.
- * @return true si se encontraron credenciales, false en caso contrario.
- */
-bool wifi_portal_credentials_saved(void);
-
-/**
- * @brief Inicia el portal de configuración WiFi de forma bloqueante.
- * @note Esta función NUNCA retorna. Termina reiniciando el dispositivo.
- */
-void wifi_portal_start(void);
-
-/**
- * @brief Borra las credenciales WiFi (SSID y contraseña) de la NVS.
- */
-void wifi_portal_erase_credentials(void);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif // WIFI_PORTAL_H
---- END OF FILE: .\components\wifi_portal\wifi_portal.h ---
-
 --- START OF FILE: .\main\CMakeLists.txt ---
-# Fecha: 16/08/2025 - 09:38 
+# Fecha: 18/08/2025 - 06:56 
 # Fichero: main/CMakeLists.txt
-# Último cambio: Corregida la dependencia 'diymon_bsp' a 'bsp' para resolver el error de compilación.
-# Descripción: El sistema de compilación no encuentra el componente 'diymon_bsp' porque el directorio fue renombrado a 'bsp'. Esta corrección actualiza el nombre en la lista de dependencias de 'main', que es la causa raíz del error "Failed to resolve component 'diymon_bsp' required by component 'main'".
+# Último cambio: Eliminada la dependencia 'wifi_portal' al centralizar la configuración.
+# Descripción: Se ha eliminado 'wifi_portal' de la lista de dependencias de 'main'. Esta funcionalidad ha quedado obsoleta tras unificar el modo de configuración en un único servidor web accesible desde la UI, simplificando la estructura de dependencias del proyecto.
 
 idf_component_register(
     SRCS 
@@ -14323,11 +13483,10 @@ idf_component_register(
     INCLUDE_DIRS "."
     
     REQUIRES
-        # Componentes de la aplicación (con nombres actualizados)
+        # Componentes de la aplicación
         bsp
         core
         ui
-        wifi_portal
         web_server
         screen_manager
 
@@ -14553,10 +13712,10 @@ endmenu
 --- END OF FILE: .\main\Kconfig.projbuild ---
 
 --- START OF FILE: .\main\main.c ---
-/* Fecha: 17/08/2025 - 03:40  */
+/* Fecha: 18/08/2025 - 08:06  */
 /* Fichero: main/main.c */
-/* Último cambio: Corregida la llamada a la función de la pantalla de configuración para que coincida con la refactorización. */
-/* Descripción: Orquestador principal. Se ha reemplazado la llamada a la función obsoleta 'config_screen_show' por la nueva 'config_show' en los modos de servicio. Esto resuelve el error de compilación 'implicit declaration of function' que impedía que el proyecto compilara. */
+/* Último cambio: Integrado el intento de conexión WiFi (STA) en la secuencia de arranque. */
+/* Descripción: Se ha modificado `app_main` para que, después de inicializar NVS, intente conectarse a la red WiFi utilizando las credenciales guardadas. Esto soluciona el error por el cual el dispositivo volvía a modo AP después de guardar la configuración, ya que no estaba intentando usar las credenciales recién guardadas al reiniciar. */
 
 #include <stdio.h>
 #include <string.h>
@@ -14575,107 +13734,102 @@ endmenu
 #include "hardware_manager.h"
 #include "diymon_evolution.h"
 #include "core/ui.h"
-#include "wifi_portal.h"
 #include "web_server.h"
 #include "screen_manager.h"
-#include "screens/config.h"
 #include "ui_asset_loader.h" 
 #include "actions.h"
 #include "core/state_manager.h"
-#include "core/telemetry_task.h"
+#include "telemetry/telemetry_task.h"
 
 #include "esp_err.h"
 #include "esp_check.h"
 
 static const char *TAG = "DIYMON_MAIN";
 
-#define CONFIG_BUTTON_GPIO GPIO_NUM_9
-
 // --- Declaraciones de funciones ---
-static void run_file_server_mode(void);
-static void run_wifi_portal_mode(void);
-static void run_headless_wifi_portal_mode(void);
 static void run_main_application_mode(void);
-static bool check_file_server_mode_flag(void);
-static void erase_file_server_mode_flag(void);
-static void init_lvgl_for_service_screen(void);
-static void display_network_status_on_screen(bool is_connected, const char* ip_addr);
-static void display_waiting_for_network_on_screen(void);
 static bool verify_sdcard_contents(void);
 
-static lv_obj_t *s_status_line1 = NULL;
-static lv_obj_t *s_status_line2 = NULL;
-
 void app_main(void) {
+    // 1. Inicializar la memoria no volátil.
     nvs_flash_init();
-    ui_preinit();
 
-    gpio_config_t btn_conf = { .pin_bit_mask = (1ULL << CONFIG_BUTTON_GPIO), .mode = GPIO_MODE_INPUT, .pull_up_en = GPIO_PULLUP_ENABLE, };
-    gpio_config(&btn_conf);
-    vTaskDelay(pdMS_TO_TICKS(50)); 
-    if (gpio_get_level(CONFIG_BUTTON_GPIO) == 0) {
-        run_headless_wifi_portal_mode();
+    // [CORRECCIÓN] Intentar conectar a WiFi al arrancar usando credenciales guardadas.
+    // Esto es crucial para que el dispositivo no entre en modo AP si ya fue configurado.
+    ESP_LOGI(TAG, "Iniciando stack de red y comprobando credenciales WiFi guardadas...");
+    bsp_wifi_init_stack();
+    bsp_wifi_init_sta_from_nvs();
+    if (bsp_wifi_wait_for_ip(10000)) { // 10 segundos de timeout
+        ESP_LOGI(TAG, "Conexión WiFi establecida exitosamente.");
+    } else {
+        ESP_LOGW(TAG, "No se pudo conectar a WiFi (sin credenciales o red no disponible).");
     }
 
-    if (check_file_server_mode_flag()) { erase_file_server_mode_flag(); run_file_server_mode(); }
-    else if (!wifi_portal_credentials_saved()) { run_wifi_portal_mode(); }
-    else { run_main_application_mode(); }
-    while (1) { vTaskDelay(pdMS_TO_TICKS(10000)); }
+    // 2. Pre-reservar los buffers de memoria más grandes para la UI para evitar fragmentación.
+    ui_preinit();
+
+    // 3. El sistema ahora arranca directamente en el modo de aplicación principal.
+    run_main_application_mode();
+    
+    // Este bucle no debería alcanzarse, pero es una buena práctica tenerlo.
+    while (1) { 
+        vTaskDelay(pdMS_TO_TICKS(10000));
+    }
 }
 
 static bool verify_sdcard_contents(void) {
     const char* dir_path = "/sdcard/diymon";
     DIR* dir = opendir(dir_path);
     if (!dir) {
-        ESP_LOGE(TAG, "¡ERROR! No se pudo abrir el directorio '%s'. Arrancando en modo de funcionalidad limitada.", dir_path);
+        ESP_LOGE(TAG, "¡ERROR! No se pudo abrir el directorio '%s'. La funcionalidad de animación estará deshabilitada.", dir_path);
         return false;
     }
     closedir(dir);
-    ESP_LOGI(TAG, "Verificación de la SD completada.");
+    ESP_LOGI(TAG, "Verificación de la tarjeta SD completada. Directorio 'diymon' encontrado.");
     return true;
 }
 
 static void run_main_application_mode(void) {
     ESP_LOGI(TAG, "Cargando aplicación principal...");
+    
+    // 1. Inicializa todo el hardware y LVGL.
     hardware_manager_init();
     
+    // 2. Verifica la tarjeta SD.
     bool is_sd_ok = verify_sdcard_contents();
 
-    if (is_sd_ok) {
-        screen_manager_init();
-        hardware_manager_mount_lvgl_filesystem();
-        diymon_evolution_init();
-    } else {
-        diymon_evolution_init(); 
-    }
-    
+    // 3. Inicializa los sistemas de software (Evolución y Assets).
+    diymon_evolution_init();
     ui_assets_init();
 
+    // 4. Construye la UI completa.
     if (lvgl_port_lock(0)) {
-        ui_init();
-        state_manager_init(); 
+        // Monta el sistema de ficheros de la SD si está disponible.
+        if (is_sd_ok) {
+            hardware_manager_mount_lvgl_filesystem();
+        }
+        
+        ui_init(); // Crea todos los elementos.
+        state_manager_init(); // Inicia el gestor de inactividad.
         lvgl_port_unlock();
     }
     ESP_LOGI(TAG, "Interfaz de Usuario principal inicializada.");
 
+    // 5. Decide el siguiente paso basado en el estado de la SD.
     if (!is_sd_ok) {
+        // Si la SD falla, se invoca la acción de modo configuración.
+        // Esta acción se encargará de destruir la UI recién creada para
+        // liberar memoria y mostrar su propia pantalla. Este patrón
+        // (crear-destruir) mantiene la lógica de configuración encapsulada.
         ESP_LOGW(TAG, "Fallo en la SD. Entrando automáticamente en modo de configuración WiFi...");
-        vTaskDelay(pdMS_TO_TICKS(500));
+        vTaskDelay(pdMS_TO_TICKS(500)); // Pequeña pausa para que los logs salgan.
         execute_diymon_action(ACTION_ID_ACTIVATE_CONFIG_MODE);
     } else {
+        // Si todo está bien, inicia la tarea de telemetría en segundo plano.
         telemetry_task_start();
         ESP_LOGI(TAG, "¡Firmware DIYMON en marcha!");
     }
 }
-
-static void run_headless_wifi_portal_mode(void) { bsp_init_minimal_headless(); bsp_wifi_init_stack(); wifi_portal_start(); }
-static void run_file_server_mode(void) { bsp_init_service_mode(); init_lvgl_for_service_screen(); if (lvgl_port_lock(0)) { config_show(); state_manager_init(); lvgl_port_unlock(); } display_waiting_for_network_on_screen(); bsp_wifi_init_stack(); bsp_wifi_init_sta_from_nvs(); bool ip_ok = bsp_wifi_wait_for_ip(15000); char ip_addr_buffer[16] = "N/A"; if (ip_ok) { bsp_wifi_get_ip(ip_addr_buffer); } else { bsp_wifi_start_ap(); } display_network_status_on_screen(ip_ok, ip_addr_buffer); web_server_start(); }
-static void run_wifi_portal_mode(void) { bsp_init_service_mode(); init_lvgl_for_service_screen(); if (lvgl_port_lock(0)) { config_show(); state_manager_init(); lvgl_port_unlock(); } display_waiting_for_network_on_screen(); vTaskDelay(pdMS_TO_TICKS(1500)); display_network_status_on_screen(false, NULL); bsp_wifi_init_stack(); wifi_portal_start(); }
-static bool check_file_server_mode_flag(void) { nvs_handle_t nvs; esp_err_t err = nvs_open("storage", NVS_READONLY, &nvs); if (err != ESP_OK) return false; char flag[8] = {0}; size_t len = sizeof(flag); err = nvs_get_str(nvs, "file_server", flag, &len); nvs_close(nvs); return (err == ESP_OK && strcmp(flag, "1") == 0); }
-static void erase_file_server_mode_flag(void) { nvs_handle_t nvs; if (nvs_open("storage", NVS_READWRITE, &nvs) == ESP_OK) { nvs_erase_key(nvs, "file_server"); nvs_commit(nvs); nvs_close(nvs); } }
-static void init_lvgl_for_service_screen(void) { const lvgl_port_cfg_t c = ESP_LVGL_PORT_INIT_CONFIG(); lvgl_port_init(&c); const lvgl_port_display_cfg_t d = { .io_handle=bsp_get_panel_io_handle(), .panel_handle=bsp_get_display_handle(), .buffer_size=bsp_get_display_buffer_size(), .double_buffer=1, .hres=bsp_get_display_hres(), .vres=bsp_get_display_vres(), .flags={.swap_bytes=true}}; lv_disp_t* disp=lvgl_port_add_disp(&d); const lvgl_port_touch_cfg_t t = {.disp=disp, .handle=bsp_get_touch_handle()}; lvgl_port_add_touch(&t); }
-static void display_waiting_for_network_on_screen(void) { if(lvgl_port_lock(0)){lv_obj_t*s=lv_screen_active();if(s){if(!s_status_line1){static lv_style_t st;lv_style_init(&st);lv_style_set_text_color(&st,lv_color_white());lv_style_set_text_align(&st,LV_TEXT_ALIGN_CENTER);lv_style_set_text_font(&st,&lv_font_montserrat_14);s_status_line1=lv_label_create(s);s_status_line2=lv_label_create(s);lv_obj_add_style(s_status_line1,&st,0);lv_obj_add_style(s_status_line2,&st,0);lv_obj_set_width(s_status_line1,160);lv_obj_set_width(s_status_line2,160);}lv_label_set_text(s_status_line1,"Espera...");lv_label_set_text(s_status_line2,"Detectando redes");lv_obj_align(s_status_line1,LV_ALIGN_CENTER,0,-50);lv_obj_align(s_status_line2,LV_ALIGN_CENTER,0,-25);}lvgl_port_unlock();}}
-static void display_network_status_on_screen(bool is_connected, const char* ip_addr) { if(lvgl_port_lock(0)){lv_obj_t*s=lv_screen_active();if(s && s_status_line1 && s_status_line2){if(is_connected){char ssid[33]="N/A";size_t len=sizeof(ssid);nvs_handle_t nvs;if(nvs_open("storage",NVS_READONLY,&nvs)==ESP_OK){nvs_get_str(nvs,"wifi_ssid",ssid,&len);nvs_close(nvs);}lv_label_set_text_fmt(s_status_line1,"Conectado a:\n\"%s\"",ssid);lv_label_set_text_fmt(s_status_line2,"IP: %s",ip_addr);lv_obj_align(s_status_line1,LV_ALIGN_CENTER,0,-50);lv_obj_align(s_status_line2,LV_ALIGN_CENTER,0,-20);}else{lv_label_set_text(s_status_line1,"Modo AP Activo");lv_label_set_text(s_status_line2,"SSID: DIYTogether\nPass: MakeItYours");lv_obj_align(s_status_line1,LV_ALIGN_CENTER,0,-50);lv_obj_align(s_status_line2,LV_ALIGN_CENTER,0,-25);}}lvgl_port_unlock();}}
 
 --- END OF FILE: .\main\main.c ---
 

@@ -1,9 +1,12 @@
-# Fecha: 16/08/2025 - 09:29 
+# Fecha: 18/08/2025 - 07:45 
 # Fichero: components/web_server/CMakeLists.txt
-# Último cambio: Actualizada la dependencia de 'diymon_bsp' a 'bsp' para resolver el error de compilación.
-# Descripción: Registro y dependencias para el componente del servidor web. Se ha corregido el nombre de la dependencia del BSP para que coincida con el nuevo nombre del directorio, solucionando el error 'Failed to resolve component'.
+# Último cambio: Corregido el estilo de comentarios de C-style (/*) a CMake-style (#) para resolver el error de parser.
+# Descripción: Registro del componente web_server. El error de compilación se debía a que se estaban usando comentarios de C en un fichero de CMake, lo cual es sintácticamente incorrecto. Se corrige el formato de los comentarios para que el sistema de build pueda procesar el fichero.
 
-idf_component_register(SRCS "web_server.c"
+idf_component_register(SRCS
+                        "web_server.c"
+                        "web_server_handlers.c"
+                        "web_server_helpers.c"
                     INCLUDE_DIRS "."
                     PRIV_INCLUDE_DIRS "."
                     REQUIRES

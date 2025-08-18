@@ -1,7 +1,7 @@
-/* Fecha: 18/08/2025 - 07:08  */
+/* Fecha: 18/08/2025 - 08:01  */
 /* Fichero: components/ui/core/state_manager.c */
-/* Último cambio: Implementadas funciones para pausar y reanudar el gestor de estado. */
-/* Descripción: Se añade la lógica para pausar y reanudar los temporizadores de inactividad. Esto es crucial para modos de operación como el servidor web, donde no hay interacción táctil con la pantalla, evitando que se apague inesperadamente y cause errores en otras tareas. */
+/* Último cambio: Implementada la función state_manager_destroy para liberar los temporizadores. */
+/* Descripción: Se ha añadido la implementación de state_manager_destroy, que se encarga de eliminar de forma segura todos los temporizadores de LVGL que el gestor de estado crea. Esto permite liberar memoria y detener la lógica de inactividad cuando se entra en modos de operación donde no es necesaria, como el modo de configuración. */
 
 #include "state_manager.h"
 #include "screen_manager.h"
@@ -149,4 +149,22 @@ void state_manager_resume(void) {
         }
         ESP_LOGI(TAG, "Gestor de estado REANUDADO.");
     }
+}
+
+void state_manager_destroy(void) {
+    if (s_inactivity_timer) {
+        lv_timer_del(s_inactivity_timer);
+        s_inactivity_timer = NULL;
+    }
+    if (s_double_click_timer) {
+        lv_timer_del(s_double_click_timer);
+        s_double_click_timer = NULL;
+    }
+    if (s_wake_prime_timer) {
+        lv_timer_del(s_wake_prime_timer);
+        s_wake_prime_timer = NULL;
+    }
+    // No es necesario eliminar el screen_touch_event_cb, ya que la pantalla
+    // a la que está asociado será eliminada por el llamante.
+    ESP_LOGI(TAG, "Gestor de estado DESTRUIDO. Todos los temporizadores liberados.");
 }

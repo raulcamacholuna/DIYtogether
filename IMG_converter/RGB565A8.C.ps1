@@ -75,5 +75,3 @@ foreach ($file in $pngFiles) {
 # --- FINALIZACIÓN ---
 Write-Host "----------------------------------------------------" -ForegroundColor Green
 Write-Host "¡Conversión completada!" -ForegroundColor Green
-
-Read-Host "Presiona Enter para salir"
