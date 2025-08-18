@@ -1,7 +1,7 @@
-/* Fecha: 18/08/2025 - 09:27  */
+/* Fecha: 18/08/2025 - 10:00  */
 /* Fichero: components/ui/actions/action_config_mode.c */
-/* Último cambio: Corregida la cadena de texto 'Conectando a WiFi...' para eliminar un carácter no imprimible que se mostraba como un cuadrado. */
-/* Descripción: Se ha modificado el comportamiento del modo de configuración. El botón 'Volver' ahora es un botón 'Reiniciar' que reinicia el dispositivo. Se ha eliminado la función 'action_config_mode_stop' y su lógica de restauración de la UI, ya que el reinicio es ahora la única forma de salir de este modo, simplificando el ciclo de vida. */
+/* Último cambio: Añadido feedback visual al botón de reiniciar. */
+/* Descripción: Se ha añadido una llamada al módulo 'button_feedback' para que el botón 'REINICIAR' del modo de configuración proporcione una respuesta visual al ser presionado, mejorando la experiencia de usuario y manteniendo la coherencia con el resto de los botones de la aplicación. */
 
 #include "actions/action_config_mode.h"
 #include "esp_log.h"
@@ -14,7 +14,8 @@
 #include "web_server.h"
 #include "screens.h"
 #include "core/state_manager.h"
-#include "esp_system.h" // Necesario para esp_restart
+#include "esp_system.h"
+#include "buttons/button_feedback.h" // Incluir el nuevo módulo de feedback
 
 static const char *TAG = "ACTION_CONFIG_MODE";
 
@@ -36,7 +37,6 @@ static void wifi_config_task(void *param) {
     lvgl_port_lock(0);
     if (s_is_config_mode_active && s_config_screen) {
         lv_obj_t *label1 = lv_obj_get_child(s_config_screen, 0);
-        // [CORRECCIÓN] Se reescribe la cadena para eliminar caracteres invisibles.
         lv_label_set_text(label1, "Conectando a WiFi...");
         lv_obj_t *label2 = lv_obj_get_child(s_config_screen, 1);
         lv_label_set_text(label2, "Esperando IP...");
@@ -56,7 +56,7 @@ static void wifi_config_task(void *param) {
         if (s_is_config_mode_active && s_config_screen) {
             lv_obj_t *label1 = lv_obj_get_child(s_config_screen, 0);
             lv_obj_t *label2 = lv_obj_get_child(s_config_screen, 1);
-            lv_label_set_text(label1, "Conectado!");
+            lv_label_set_text(label1, "¡Conectado!");
             lv_label_set_text_fmt(label2, "IP: %s\nAccede desde tu navegador", ip_addr);
         }
         lvgl_port_unlock();
@@ -91,9 +91,12 @@ static void wifi_config_task(void *param) {
  * @brief Callback de evento para el botón 'Reiniciar' del modo de configuración.
  */
 static void restart_button_event_cb(lv_event_t *e) {
-    ESP_LOGW(TAG, "Botón 'Reiniciar' presionado. Reiniciando dispositivo...");
-    vTaskDelay(pdMS_TO_TICKS(500)); // Pequeña pausa para enviar el log
-    esp_restart();
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        ESP_LOGW(TAG, "Botón 'Reiniciar' presionado. Reiniciando dispositivo...");
+        vTaskDelay(pdMS_TO_TICKS(500)); // Pequeña pausa para enviar el log
+        esp_restart();
+    }
 }
 
 // --- Implementación de funciones públicas ---
@@ -132,6 +135,9 @@ void action_config_mode_start(void) {
     lv_obj_t* lbl = lv_label_create(restart_button);
     lv_label_set_text(lbl, "REINICIAR");
     lv_obj_center(lbl);
+
+    // Añadir feedback visual al botón de reiniciar
+    button_feedback_add(restart_button);
 
     lv_screen_load(s_config_screen);
     lvgl_port_unlock();
