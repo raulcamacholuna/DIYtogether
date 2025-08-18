@@ -1,7 +1,7 @@
-/* Fecha: 17/08/2025 - 05:12  */
+/* Fecha: 18/08/2025 - 10:15  */
 /* Fichero: components/ui/ui_actions_panel.c */
-/* Último cambio: Eliminada la bandera LV_OBJ_FLAG_CLICKABLE de los paneles contenedores para solucionar el problema de eventos no recibidos. */
-/* Descripción: Se ha corregido el error por el cual los botones no respondían a los clics. Los paneles contenedores, aunque transparentes, interceptaban los eventos de toque por defecto. Al hacerlos no-clicables con 'lv_obj_remove_flag', los eventos ahora se propagan correctamente a los botones hijos, que es el comportamiento esperado. Se han añadido logs para confirmar la creación y configuración de cada panel. */
+/* Último cambio: Añadido el flag LV_OBJ_FLAG_GESTURE_BUBBLE a todos los paneles para permitir la propagación de eventos de gesto. */
+/* Descripción: Se ha solucionado un error por el cual los gestos de swipe no funcionaban si se iniciaban sobre un panel ya visible. Al añadir el flag `LV_OBJ_FLAG_GESTURE_BUBBLE`, los paneles ahora permiten que los eventos de gesto "burbujeen" hasta la pantalla principal, que es la que contiene la lógica de transición, asegurando un comportamiento consistente. */
 
 #include "ui_actions_panel.h"
 #include "ui_idle_animation.h"
@@ -73,11 +73,12 @@ void ui_actions_panel_create(lv_obj_t *parent) {
     lv_obj_set_size(s_panel_player, TOP_PANEL_WIDTH, TOP_PANEL_HEIGHT);
     lv_obj_align(s_panel_player, LV_ALIGN_TOP_MID, 0, -TOP_PANEL_HEIGHT);
     lv_obj_add_flag(s_panel_player, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_remove_flag(s_panel_player, LV_OBJ_FLAG_CLICKABLE); // [CORRECCIÓN CLAVE]
+    lv_obj_remove_flag(s_panel_player, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(s_panel_player, LV_OBJ_FLAG_GESTURE_BUBBLE); // [CORRECCIÓN CLAVE]
     btn_1_create(s_panel_player);
     btn_2_create(s_panel_player);
     btn_3_create(s_panel_player);
-    ESP_LOGI(TAG, "Panel 'Player' creado y configurado para no interceptar clics.");
+    ESP_LOGI(TAG, "Panel 'Player' creado.");
 
     // --- Crear Contenedor Panel Admin ---
     s_panel_admin = lv_obj_create(parent);
@@ -85,12 +86,12 @@ void ui_actions_panel_create(lv_obj_t *parent) {
     lv_obj_set_size(s_panel_admin, TOP_PANEL_WIDTH, TOP_PANEL_HEIGHT);
     lv_obj_align(s_panel_admin, LV_ALIGN_TOP_MID, 0, -TOP_PANEL_HEIGHT);
     lv_obj_add_flag(s_panel_admin, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_remove_flag(s_panel_admin, LV_OBJ_FLAG_CLICKABLE); // [CORRECCIÓN CLAVE]
+    lv_obj_remove_flag(s_panel_admin, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(s_panel_admin, LV_OBJ_FLAG_GESTURE_BUBBLE); // [CORRECCIÓN CLAVE]
     btn_4_create(s_panel_admin);
     btn_5_create(s_panel_admin);
     btn_6_create(s_panel_admin);
-    ESP_LOGI(TAG, "Panel 'Admin' creado y configurado para no interceptar clics.");
-
+    ESP_LOGI(TAG, "Panel 'Admin' creado.");
 
     // --- Crear Contenedor Panel Config ---
     s_panel_config = lv_obj_create(parent);
@@ -98,12 +99,12 @@ void ui_actions_panel_create(lv_obj_t *parent) {
     lv_obj_set_size(s_panel_config, TOP_PANEL_WIDTH, TOP_PANEL_HEIGHT);
     lv_obj_align(s_panel_config, LV_ALIGN_TOP_MID, 0, -TOP_PANEL_HEIGHT);
     lv_obj_add_flag(s_panel_config, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_remove_flag(s_panel_config, LV_OBJ_FLAG_CLICKABLE); // [CORRECCIÓN CLAVE]
+    lv_obj_remove_flag(s_panel_config, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(s_panel_config, LV_OBJ_FLAG_GESTURE_BUBBLE); // [CORRECCIÓN CLAVE]
     btn_7_create(s_panel_config);
     btn_8_create(s_panel_config);
     btn_9_create(s_panel_config);
-    ESP_LOGI(TAG, "Panel 'Config' creado y configurado para no interceptar clics.");
-
+    ESP_LOGI(TAG, "Panel 'Config' creado.");
 
     // --- Crear Contenedor Panel Evolución ---
     s_panel_evo = lv_obj_create(parent);
@@ -111,14 +112,14 @@ void ui_actions_panel_create(lv_obj_t *parent) {
     lv_obj_set_size(s_panel_evo, SIDE_PANEL_WIDTH, SIDE_PANEL_HEIGHT);
     lv_obj_align(s_panel_evo, LV_ALIGN_LEFT_MID, -SIDE_PANEL_WIDTH, 0);
     lv_obj_add_flag(s_panel_evo, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_remove_flag(s_panel_evo, LV_OBJ_FLAG_CLICKABLE); // [CORRECCIÓN CLAVE]
+    lv_obj_remove_flag(s_panel_evo, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(s_panel_evo, LV_OBJ_FLAG_GESTURE_BUBBLE); // [CORRECCIÓN CLAVE]
     evo_1_create(s_panel_evo);
     evo_2_create(s_panel_evo);
     evo_3_create(s_panel_evo);
     evo_4_create(s_panel_evo);
     evo_5_create(s_panel_evo);
-    ESP_LOGI(TAG, "Panel 'Evo' creado y configurado para no interceptar clics.");
-
+    ESP_LOGI(TAG, "Panel 'Evo' creado.");
 }
 
 static void animation_finish_cb(lv_anim_t *a) { 
