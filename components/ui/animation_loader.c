@@ -1,7 +1,7 @@
-/* Fecha: 16/08/2025 - 07:14  */
-/* Fichero: components/diymon_ui/animation_loader.c */
-/* Último cambio: Eliminados los logs de depuración hexadecimal para optimizar el tiempo de carga de las animaciones. */
-/* Descripción: Se ha eliminado el log de diagnóstico que imprimía el contenido hexadecimal de los nombres de fichero, ya que causaba un retardo notable al iniciar las animaciones. Se mantiene la lógica de comparación esencial, mejorando el rendimiento. */
+/* Fecha: 18/08/2025 - 08:59  */
+/* Fichero: components/ui/animation_loader.c */
+/* Último cambio: Restaurado el formato de color a RGB565A8 y el tamaño del buffer a 3 bytes por píxel para corregir la pérdida de transparencias. */
+/* Descripción: Se ha revertido un cambio incorrecto que establecía el formato de color en RGB565 (2 bytes/píxel). El formato correcto para los assets de animación es RGB565A8 (3 bytes/píxel), que incluye un canal alfa de 8 bits. Esta corrección restaura la transparencia de las animaciones y asegura que el buffer de animación se reserve con el tamaño adecuado. */
 
 #include "animation_loader.h"
 #include "esp_log.h"
@@ -20,6 +20,7 @@ animation_t animation_loader_init(const char *path, uint16_t width, uint16_t hei
     anim.height = height;
     
     uint32_t rgb_stride = width * 2; 
+    // [CORRECCIÓN] Restaurado a 3 bytes por píxel para soportar el canal alfa (A8).
     size_t buffer_size = (size_t)width * height * 3;
 
     anim.img_dsc.data = (uint8_t *)malloc(buffer_size);
@@ -32,6 +33,7 @@ animation_t animation_loader_init(const char *path, uint16_t width, uint16_t hei
     anim.img_dsc.header.w = width;
     anim.img_dsc.header.h = height;
     anim.img_dsc.header.stride = rgb_stride;
+    // [CORRECCIÓN] Restaurado el formato de color que incluye el canal alfa.
     anim.img_dsc.header.cf = LV_COLOR_FORMAT_RGB565A8;
     anim.img_dsc.data_size = buffer_size;
     

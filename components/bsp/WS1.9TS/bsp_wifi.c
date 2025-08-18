@@ -1,7 +1,7 @@
-/* Fecha: 18/08/2025 - 08:26  */
+/* Fecha: 18/08/2025 - 09:01  */
 /* Fichero: components/bsp/WS1.9TS/bsp_wifi.c */
-/* Último cambio: Implementada la función bsp_wifi_deinit para apagar y limpiar completamente los recursos de WiFi. */
-/* Descripción: Se añade la lógica para desactivar WiFi. La función `bsp_wifi_deinit` ahora se encarga de detener el driver, desregistrar los manejadores de eventos y destruir las interfaces de red (netif). Esto permite que el WiFi se active y desactive bajo demanda, liberando memoria y evitando conflictos. */
+/* Último cambio: Añadida la función bsp_wifi_deinit para una limpieza completa de recursos. */
+/* Descripción: Se ha implementado `bsp_wifi_deinit` para desregistrar los manejadores de eventos y liberar la memoria del semáforo. Esto resuelve un problema de fuga de recursos que ocurría al salir del modo de configuración y asegura que el sistema WiFi pueda reinicializarse de forma limpia, evitando el fallo de asignación del buffer de animación. */
 
 #include "bsp_api.h"
 #include <string.h>
@@ -27,11 +27,8 @@
 static const char *TAG = "bsp_wifi";
 static SemaphoreHandle_t s_ip_acquired_sem = NULL;
 static bool g_network_stack_initialized = false;
-
-// --- Variables para gestionar el ciclo de vida de los handlers ---
-static esp_event_handler_instance_t s_wifi_event_instance = NULL;
-static esp_event_handler_instance_t s_ip_event_instance = NULL;
-static bool s_wifi_is_initialized = false;
+static esp_event_handler_instance_t s_wifi_event_instance;
+static esp_event_handler_instance_t s_ip_event_instance;
 
 static void event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data)
@@ -75,9 +72,9 @@ void bsp_wifi_init_stack(void) {
 
 void bsp_wifi_start_ap(void) {
     esp_netif_create_default_wifi_ap();
+
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-    s_wifi_is_initialized = true;
 
     wifi_config_t wifi_config = {
         .ap = {
@@ -99,12 +96,10 @@ void bsp_wifi_init_sta_from_nvs(void) {
     esp_netif_create_default_wifi_sta();
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-    s_wifi_is_initialized = true;
-
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL, &s_wifi_event_instance));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL, &s_ip_event_instance));
 
-    if(s_ip_acquired_sem == NULL) s_ip_acquired_sem = xSemaphoreCreateBinary();
+    s_ip_acquired_sem = xSemaphoreCreateBinary();
 
     char ssid[32] = {0}, pass[64] = {0};
     size_t len_ssid = sizeof(ssid), len_pass = sizeof(pass);
@@ -137,10 +132,67 @@ void bsp_wifi_get_ip(char *ip) {
     esp_netif_t* netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
     if(netif) {
         esp_netif_ip_info_t ip_info;
-        if(esp_netif_get_ip_info(netif, &ip_info) == ESP_OK){
-            sprintf(ip, IPSTR, IP2STR(&ip_info.ip));
-        }
+        esp_netif_get_ip_info(netif, &ip_info);
+        sprintf(ip, IPSTR, IP2STR(&ip_info.ip));
     }
+}
+
+void bsp_wifi_init_sta(const char *ssid, const char *pass) {
+    esp_netif_create_default_wifi_sta();
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL, &s_wifi_event_instance));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL, &s_ip_event_instance));
+
+    s_ip_acquired_sem = xSemaphoreCreateBinary();
+
+    if (ssid && strlen(ssid) > 0) {
+        wifi_config_t wifi_config = {0};
+        strcpy((char *)wifi_config.sta.ssid, ssid);
+        if (pass) { strcpy((char *)wifi_config.sta.password, pass); }
+        wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+
+        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+        ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+        ESP_ERROR_CHECK(esp_wifi_start());
+    }
+}
+
+void bsp_wifi_deinit(void) {
+    ESP_LOGI(TAG, "Desinicializando WiFi y liberando recursos...");
+    // Detener WiFi
+    esp_wifi_stop();
+    
+    // Desregistrar manejadores de eventos
+    if (s_wifi_event_instance) {
+        esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, s_wifi_event_instance);
+        s_wifi_event_instance = NULL;
+    }
+    if (s_ip_event_instance) {
+        esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, s_ip_event_instance);
+        s_ip_event_instance = NULL;
+    }
+    
+    // Liberar recursos de WiFi
+    esp_wifi_deinit();
+    
+    // Liberar semáforo
+    if (s_ip_acquired_sem) {
+        vSemaphoreDelete(s_ip_acquired_sem);
+        s_ip_acquired_sem = NULL;
+    }
+
+    // Destruir interfaces de red
+    esp_netif_t* sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if (sta_netif) {
+        esp_netif_destroy(sta_netif);
+    }
+    esp_netif_t* ap_netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
+    if (ap_netif) {
+        esp_netif_destroy(ap_netif);
+    }
+
+    ESP_LOGI(TAG, "WiFi desinicializado y recursos liberados.");
 }
 
 void bsp_wifi_erase_credentials(void) {
@@ -156,38 +208,4 @@ void bsp_wifi_erase_credentials(void) {
     nvs_commit(nvs_handle);
     nvs_close(nvs_handle);
     ESP_LOGI(TAG, "Credenciales WiFi borradas de NVS.");
-}
-
-void bsp_wifi_deinit(void) {
-    if (!s_wifi_is_initialized) {
-        ESP_LOGW(TAG, "El WiFi no está inicializado, no se hace nada.");
-        return;
-    }
-    ESP_LOGI(TAG, "Desinicializando WiFi...");
-
-    if (s_ip_event_instance) {
-        esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, s_ip_event_instance);
-        s_ip_event_instance = NULL;
-    }
-    if (s_wifi_event_instance) {
-        esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, s_wifi_event_instance);
-        s_wifi_event_instance = NULL;
-    }
-
-    esp_wifi_stop();
-    esp_wifi_deinit();
-
-    esp_netif_t* ap_netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
-    if (ap_netif) esp_netif_destroy(ap_netif);
-
-    esp_netif_t* sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-    if (sta_netif) esp_netif_destroy(sta_netif);
-
-    if (s_ip_acquired_sem) {
-        vSemaphoreDelete(s_ip_acquired_sem);
-        s_ip_acquired_sem = NULL;
-    }
-
-    s_wifi_is_initialized = false;
-    ESP_LOGI(TAG, "WiFi desinicializado y recursos liberados.");
 }
