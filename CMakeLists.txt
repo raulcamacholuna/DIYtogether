@@ -16,7 +16,10 @@ set(EXTRA_COMPONENT_DIRS components_dependencies)
 
 # Define una macro de preprocesador global para todo el proyecto.
 # En este caso, se usa para informar a los componentes que se está utilizando LVGL v9.
-add_compile_definitions(LVGL_VERSION_MAJOR=9)
+add_compile_definitions(
+    LVGL_VERSION_MAJOR=9
+    LV_LVGL_H_INCLUDE_SIMPLE
+)
 
 # Incluye el script principal de ESP-IDF que gestiona toda la lógica de compilación de proyectos.
 # Esta línea es fundamental y debe ir después de las configuraciones iniciales.

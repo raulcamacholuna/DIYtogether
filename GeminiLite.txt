@@ -8274,10 +8274,10 @@ void action_brightness_cycle(void);
 --- END OF FILE: .\components\ui\actions\action_brightness.h ---
 
 --- START OF FILE: .\components\ui\actions\action_config_mode.c ---
-/* Fecha: 18/08/2025 - 09:08  */
+/* Fecha: 18/08/2025 - 10:00  */
 /* Fichero: components/ui/actions/action_config_mode.c */
-/* Último cambio: Implementada la lógica para intentar conexión STA antes de iniciar el modo AP. */
-/* Descripción: Se ha corregido el comportamiento del modo de configuración. Ahora, al entrar, primero intenta conectarse a una red WiFi guardada. Si la conexión es exitosa, muestra la IP obtenida. Si falla o no hay credenciales, limpia el intento de conexión STA y luego inicia el modo Punto de Acceso (AP), resolviendo el problema de que siempre iniciaba en modo AP. */
+/* Último cambio: Añadido feedback visual al botón de reiniciar. */
+/* Descripción: Se ha añadido una llamada al módulo 'button_feedback' para que el botón 'REINICIAR' del modo de configuración proporcione una respuesta visual al ser presionado, mejorando la experiencia de usuario y manteniendo la coherencia con el resto de los botones de la aplicación. */
 
 #include "actions/action_config_mode.h"
 #include "esp_log.h"
@@ -8288,14 +8288,10 @@ void action_brightness_cycle(void);
 #include "esp_lvgl_port.h"
 #include "bsp_api.h"
 #include "web_server.h"
-#include "telemetry/telemetry_task.h"
-#include "telemetry/telemetry_manager.h"
 #include "screens.h"
-#include "ui_idle_animation.h"
-#include "ui_actions_panel.h"
-#include "ui_action_animations.h"
 #include "core/state_manager.h"
-#include "core/ui.h" // Necesario para ui_init y ui_preinit
+#include "esp_system.h"
+#include "buttons/button_feedback.h" // Incluir el nuevo módulo de feedback
 
 static const char *TAG = "ACTION_CONFIG_MODE";
 
@@ -8303,18 +8299,16 @@ static const char *TAG = "ACTION_CONFIG_MODE";
 static bool s_is_config_mode_active = false;
 static lv_obj_t *s_config_screen = NULL;
 static TaskHandle_t s_wifi_task_handle = NULL;
-static httpd_handle_t s_server_handle = NULL; // Handle para el servidor web
+static httpd_handle_t s_server_handle = NULL;
 
 // --- Funciones de ayuda privadas del módulo ---
 
 /**
  * @brief Tarea de FreeRTOS para gestionar el modo de configuración.
- *        Intenta conectar como STA si hay credenciales; si no, inicia un AP.
  */
 static void wifi_config_task(void *param) {
     bsp_wifi_init_stack();
 
-    // 1. Intentar conectar como estación (STA) usando credenciales guardadas.
     ESP_LOGI(TAG, "Intentando conectar a WiFi guardado...");
     lvgl_port_lock(0);
     if (s_is_config_mode_active && s_config_screen) {
@@ -8327,11 +8321,9 @@ static void wifi_config_task(void *param) {
 
     bsp_wifi_init_sta_from_nvs();
 
-    // 2. Esperar a obtener una IP.
-    bool connected = bsp_wifi_wait_for_ip(10000); // Timeout de 10 segundos
+    bool connected = bsp_wifi_wait_for_ip(10000);
 
     if (connected && s_is_config_mode_active) {
-        // 3a. Conexión exitosa: Mostrar IP y lanzar servidor.
         char ip_addr[16];
         bsp_wifi_get_ip(ip_addr);
         ESP_LOGI(TAG, "Conectado exitosamente. IP: %s", ip_addr);
@@ -8346,9 +8338,8 @@ static void wifi_config_task(void *param) {
         lvgl_port_unlock();
 
     } else if (s_is_config_mode_active) {
-        // 3b. Fallo en conexión o sin credenciales: Iniciar modo AP.
         ESP_LOGI(TAG, "No se pudo conectar como STA. Iniciando modo AP.");
-        bsp_wifi_deinit(); // Limpiar el intento de STA fallido.
+        bsp_wifi_deinit();
 
         lvgl_port_lock(0);
         if (s_is_config_mode_active && s_config_screen) {
@@ -8362,7 +8353,6 @@ static void wifi_config_task(void *param) {
         bsp_wifi_start_ap();
     }
 
-    // 4. Iniciar el servidor web en cualquier caso (STA o AP).
     if (s_is_config_mode_active) {
         ESP_LOGI(TAG, "Iniciando servidor web para gestión.");
         s_server_handle = web_server_start();
@@ -8374,10 +8364,15 @@ static void wifi_config_task(void *param) {
 
 
 /**
- * @brief Callback de evento para el botón 'Volver' del modo de configuración.
+ * @brief Callback de evento para el botón 'Reiniciar' del modo de configuración.
  */
-static void config_back_button_event_cb(lv_event_t *e) {
-    action_config_mode_stop();
+static void restart_button_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        ESP_LOGW(TAG, "Botón 'Reiniciar' presionado. Reiniciando dispositivo...");
+        vTaskDelay(pdMS_TO_TICKS(500)); // Pequeña pausa para enviar el log
+        esp_restart();
+    }
 }
 
 // --- Implementación de funciones públicas ---
@@ -8387,14 +8382,11 @@ void action_config_mode_start(void) {
     s_is_config_mode_active = true;
     ESP_LOGI(TAG, "Entrando en modo de configuración: Liberando recursos de la UI principal.");
 
-    // [OPTIMIZACIÓN] Destruir la UI principal para liberar memoria
-    // La tarea de telemetría se detendrá por sí misma al no poder actualizar la UI.
     lvgl_port_lock(0);
     state_manager_destroy();
     delete_screen_main();
     lvgl_port_unlock();
     
-    // Crear una pantalla simple para el modo config
     lvgl_port_lock(0);
     s_config_screen = lv_obj_create(NULL);
     lv_obj_set_style_bg_color(s_config_screen, lv_color_black(), 0);
@@ -8413,12 +8405,15 @@ void action_config_mode_start(void) {
     lv_obj_align(label2, LV_ALIGN_CENTER, 0, 0);
     lv_label_set_text(label2, "");
 
-    lv_obj_t* back_button = lv_btn_create(s_config_screen);
-    lv_obj_align(back_button, LV_ALIGN_BOTTOM_MID, 0, -20);
-    lv_obj_add_event_cb(back_button, config_back_button_event_cb, LV_EVENT_CLICKED, NULL);
-    lv_obj_t* lbl = lv_label_create(back_button);
-    lv_label_set_text(lbl, "VOLVER");
+    lv_obj_t* restart_button = lv_btn_create(s_config_screen);
+    lv_obj_align(restart_button, LV_ALIGN_BOTTOM_MID, 0, -20);
+    lv_obj_add_event_cb(restart_button, restart_button_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_t* lbl = lv_label_create(restart_button);
+    lv_label_set_text(lbl, "REINICIAR");
     lv_obj_center(lbl);
+
+    // Añadir feedback visual al botón de reiniciar
+    button_feedback_add(restart_button);
 
     lv_screen_load(s_config_screen);
     lvgl_port_unlock();
@@ -8426,49 +8421,13 @@ void action_config_mode_start(void) {
     xTaskCreate(wifi_config_task, "wifi_cfg_task", 4096, NULL, 5, &s_wifi_task_handle);
 }
 
-void action_config_mode_stop(void) {
-    if (!s_is_config_mode_active) return;
-    
-    ESP_LOGI(TAG, "Saliendo del modo de configuración y restaurando UI.");
-    s_is_config_mode_active = false;
-
-    // 1. Detener todos los servicios de red y liberar sus recursos.
-    web_server_stop(s_server_handle);
-    s_server_handle = NULL;
-    if (s_wifi_task_handle) { vTaskDelete(s_wifi_task_handle); s_wifi_task_handle = NULL; }
-    
-    // [CORRECCIÓN CRÍTICA] Llamar a la función de desinicialización completa del BSP.
-    bsp_wifi_deinit();
-    
-    ESP_LOGI(TAG, "Servicios de red detenidos y limpiados.");
-    
-    lvgl_port_lock(0);
-    // 2. Liberar la UI del modo configuración.
-    if (s_config_screen) {
-        lv_obj_del(s_config_screen);
-        s_config_screen = NULL;
-    }
-
-    // 3. Pre-alocar el buffer de animación AHORA, mientras la memoria está limpia.
-    ui_preinit();
-
-    // 4. Reconstruir la UI principal y sus gestores.
-    ui_init();
-    state_manager_init();
-    lvgl_port_unlock();
-
-    // 5. Reiniciar tareas de la aplicación.
-    telemetry_task_start();
-    ESP_LOGI(TAG, "UI principal restaurada. Sistema de vuelta a modo normal.");
-}
-
 --- END OF FILE: .\components\ui\actions\action_config_mode.c ---
 
 --- START OF FILE: .\components\ui\actions\action_config_mode.h ---
-/* Fecha: 17/08/2025 - 01:49  */
+/* Fecha: 18/08/2025 - 09:21  */
 /* Fichero: components/ui/actions/action_config_mode.h */
-/* Último cambio: Creación del módulo para la acción del modo de configuración. */
-/* Descripción: Interfaz pública para gestionar el ciclo de vida del modo de configuración. Expone funciones para iniciar y detener el modo, encapsulando su estado y la gestión de la tarea de red. */
+/* Último cambio: Eliminada la declaración de action_config_mode_stop al cambiar la lógica de salida a un reinicio. */
+/* Descripción: Interfaz pública para el modo de configuración. La función de detención se ha eliminado ya que la única salida del modo de configuración es ahora un reinicio del dispositivo, simplificando la API. */
 
 #ifndef ACTION_CONFIG_MODE_H
 #define ACTION_CONFIG_MODE_H
@@ -8483,13 +8442,6 @@ extern "C" {
  *        y lanza una tarea para gestionar la conexión y el servidor web.
  */
 void action_config_mode_start(void);
-
-/**
- * @brief Detiene el modo de configuración WiFi.
- *        Limpia los elementos de la UI de configuración, detiene la tarea
- *        de red y los servicios asociados, y restaura la UI principal.
- */
-void action_config_mode_stop(void);
 
 #ifdef __cplusplus
 }
@@ -8729,10 +8681,10 @@ void action_screen_toggle(void);
 --- END OF FILE: .\components\ui\actions\action_screen.h ---
 
 --- START OF FILE: .\components\ui\actions\action_system.c ---
-/* Fecha: 18/08/2025 - 07:00  */
+/* Fecha: 18/08/2025 - 09:23  */
 /* Fichero: components/ui/actions/action_system.c */
-/* Último cambio: Eliminada la inclusión de 'wifi_portal.h' para resolver el error de compilación. */
-/* Descripción: Se ha eliminado la directiva '#include "wifi_portal.h"' porque el componente 'wifi_portal' fue borrado del proyecto. Las funciones para borrar credenciales ahora residen en el BSP o en un nuevo módulo de gestión de NVS, pero por ahora se elimina la dependencia directa para permitir la compilación. */
+/* Último cambio: Eliminada la implementación de action_system_enable_file_server. */
+/* Descripción: Se ha eliminado la función para activar el modo de servidor de ficheros. Esta funcionalidad ahora está integrada en el modo de configuración principal, por lo que este módulo solo se encarga del reseteo total del dispositivo. */
 
 #include "actions/action_system.h"
 #include "nvs_flash.h"
@@ -8742,7 +8694,7 @@ void action_screen_toggle(void);
 #include "freertos/task.h"
 #include "diymon_evolution.h"
 #include "esp_log.h"
-#include "bsp_api.h" // Se asume que el borrado de credenciales estará aquí o en un gestor NVS
+#include "bsp_api.h"
 
 static const char *TAG = "ACTION_SYSTEM";
 
@@ -8764,8 +8716,6 @@ static void erase_nvs_key(const char* key) {
 
 /**
  * @brief Función interna para borrar credenciales WiFi.
- * @note Esto es una solución temporal. Idealmente, esta lógica debería estar
- *       en un módulo dedicado a la gestión de NVS o en el BSP.
  */
 static void erase_wifi_credentials_from_nvs(void) {
     nvs_handle_t nvs_handle;
@@ -8789,7 +8739,7 @@ void action_system_reset_all(void) {
     // Borra todas las configuraciones guardadas
     erase_wifi_credentials_from_nvs();
     diymon_evolution_reset_state();
-    erase_nvs_key("file_server"); // Se mantiene por si quedan restos de versiones anteriores
+    erase_nvs_key("file_server"); // Se mantiene para limpiar NVS de versiones anteriores
 
     ESP_LOGW(TAG, "Todas las configuraciones borradas. Reiniciando ahora.");
     vTaskDelay(pdMS_TO_TICKS(1000));
@@ -8799,10 +8749,10 @@ void action_system_reset_all(void) {
 --- END OF FILE: .\components\ui\actions\action_system.c ---
 
 --- START OF FILE: .\components\ui\actions\action_system.h ---
-/* Fecha: 17/08/2025 - 03:35  */
+/* Fecha: 18/08/2025 - 09:23  */
 /* Fichero: components/ui/actions/action_system.h */
-/* Último cambio: Creación del módulo para agrupar las acciones de sistema como primer paso de la refactorización de 'actions.c'. */
-/* Descripción: Interfaz pública para las acciones de sistema como 'activar servidor de ficheros' y 'reset total'. Este es el primer paso para descomponer el monolítico 'actions.c', siguiendo el Principio de Responsabilidad Única. */
+/* Último cambio: Eliminada la declaración de action_system_enable_file_server. */
+/* Descripción: Interfaz pública para las acciones de sistema. Se ha eliminado la acción del servidor de ficheros, ya que ahora está integrada en el modo de configuración principal, dejando solo la acción de reseteo total. */
 
 #ifndef ACTION_SYSTEM_H
 #define ACTION_SYSTEM_H
@@ -8812,16 +8762,9 @@ extern "C" {
 #endif
 
 /**
- * @brief Activa el modo de servidor de ficheros.
- *        Establece una bandera en NVS y reinicia el dispositivo para que
- *        app_main entre en el modo de servicio correspondiente.
- */
-void action_system_enable_file_server(void);
-
-/**
  * @brief Realiza un reseteo total del dispositivo.
- *        Borra las credenciales WiFi, el estado de evolución y la bandera
- *        del servidor de ficheros de la NVS, y luego reinicia.
+ *        Borra las credenciales WiFi y el estado de evolución de la NVS,
+ *        y luego reinicia.
  */
 void action_system_reset_all(void);
 
@@ -8834,14 +8777,16 @@ void action_system_reset_all(void);
 --- END OF FILE: .\components\ui\actions\action_system.h ---
 
 --- START OF FILE: .\components\ui\buttons\btn_1.c ---
-/* Fecha: 17/08/2025 - 07:11  */
+/* Fecha: 18/08/2025 - 09:49  */
 /* Fichero: components/ui/buttons/btn_1.c */
-/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
-/* Descripción: Se ha corregido un error de posicionamiento del botón que impedía su correcta visualización. Se ha reemplazado la lógica de posicionamiento absoluto (lv_obj_set_pos) y ocultación explícita por un alineamiento relativo (lv_obj_align) dentro de su panel padre. Esto soluciona el problema por el cual el botón no aparecía al desplegarse el panel de acciones. */
+/* Último cambio: Corregido el evento de acción a LV_EVENT_CLICKED para restaurar la funcionalidad. */
+/* Descripción: Implementación del botón 'Comer'. Se ha corregido el evento que dispara la acción de 'RELEASED' a 'CLICKED'. Este es el evento de alto nivel correcto para una pulsación, resolviendo el problema por el cual la acción no se registraba, mientras se mantiene el feedback visual en los eventos de 'press' y 'release'. */
+
 #include "btn_1.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
 #include "esp_log.h"
+#include "button_feedback.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
@@ -8853,13 +8798,13 @@ static lv_obj_t *s_btn_1_handle = NULL;
 
 /**
  * @brief Callback de evento específico para el botón 'Comer'.
- *        Ejecuta la acción de comer cuando se presiona el botón.
  * @param e Puntero al evento de LVGL.
  */
 static void btn_1_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_PRESSED) {
-        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de comer.");
+    // [CORRECCIÓN] La acción se debe ejecutar en el evento CLICKED.
+    if (code == LV_EVENT_CLICKED) {
+        ESP_LOGI(TAG, "¡Evento CLICKED recibido! Ejecutando acción de comer.");
         execute_diymon_action(ACTION_ID_COMER);
     }
 }
@@ -8888,13 +8833,16 @@ void btn_1_create(lv_obj_t *parent) {
     lv_obj_center(img);
 
     // --- Posición DENTRO de su panel padre ---
-    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
     lv_obj_align(s_btn_1_handle, LV_ALIGN_LEFT_MID, (BUTTON_SIZE + BUTTON_PADDING) * 0, 0);
 
-    // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_btn_1_handle, btn_1_event_cb, LV_EVENT_PRESSED, NULL);
+    // --- Conexión del evento de acción ---
+    // [CORRECCIÓN] Se registra el callback para el evento CLICKED.
+    lv_obj_add_event_cb(s_btn_1_handle, btn_1_event_cb, LV_EVENT_CLICKED, NULL);
+
+    // --- Añadir feedback visual ---
+    button_feedback_add(s_btn_1_handle);
     
-    ESP_LOGI(TAG, "Botón 'Comer' (BTN_1) creado y posicionado dentro de su panel.");
+    ESP_LOGI(TAG, "Botón 'Comer' (BTN_1) creado con feedback visual.");
 }
 
 /**
@@ -8944,15 +8892,16 @@ lv_obj_t* btn_1_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\btn_1.h ---
 
 --- START OF FILE: .\components\ui\buttons\btn_2.c ---
-/* Fecha: 17/08/2025 - 05:17  */
+/* Fecha: 18/08/2025 - 09:53  */
 /* Fichero: components/ui/buttons/btn_2.c */
-/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
-/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+/* Último cambio: Añadida llamada al módulo de feedback y ajustado el evento a LV_EVENT_CLICKED. */
+/* Descripción: Implementación del botón 'Ejercicio'. Se invoca a `button_feedback_add` para respuesta visual y se usa el evento 'CLICKED' para disparar la acción, asegurando que el feedback visual se complete antes de la ejecución de la acción. */
 
 #include "btn_2.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
 #include "esp_log.h"
+#include "button_feedback.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
@@ -8964,13 +8913,12 @@ static lv_obj_t *s_btn_2_handle = NULL;
 
 /**
  * @brief Callback de evento específico para el botón 'Ejercicio'.
- *        Ejecuta la acción de ejercicio cuando se presiona el botón.
  * @param e Puntero al evento de LVGL.
  */
 static void btn_2_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_PRESSED) {
-        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de ejercicio.");
+    if (code == LV_EVENT_CLICKED) {
+        ESP_LOGI(TAG, "¡Evento CLICKED recibido! Ejecutando acción de ejercicio.");
         execute_diymon_action(ACTION_ID_EJERCICIO);
     }
 }
@@ -8999,13 +8947,15 @@ void btn_2_create(lv_obj_t *parent) {
     lv_obj_center(img);
 
     // --- Posición DENTRO de su panel padre ---
-    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
     lv_obj_align(s_btn_2_handle, LV_ALIGN_LEFT_MID, (BUTTON_SIZE + BUTTON_PADDING) * 1, 0);
     
-    // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_btn_2_handle, btn_2_event_cb, LV_EVENT_PRESSED, NULL);
+    // --- Conexión del evento de acción ---
+    lv_obj_add_event_cb(s_btn_2_handle, btn_2_event_cb, LV_EVENT_CLICKED, NULL);
+
+    // --- Añadir feedback visual ---
+    button_feedback_add(s_btn_2_handle);
     
-    ESP_LOGI(TAG, "Botón 'Ejercicio' (BTN_2) creado y posicionado dentro de su panel.");
+    ESP_LOGI(TAG, "Botón 'Ejercicio' (BTN_2) creado con feedback visual.");
 }
 
 /**
@@ -9055,15 +9005,16 @@ lv_obj_t* btn_2_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\btn_2.h ---
 
 --- START OF FILE: .\components\ui\buttons\btn_3.c ---
-/* Fecha: 17/08/2025 - 05:18  */
+/* Fecha: 18/08/2025 - 09:53  */
 /* Fichero: components/ui/buttons/btn_3.c */
-/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
-/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+/* Último cambio: Añadida llamada al módulo de feedback y ajustado el evento a LV_EVENT_CLICKED. */
+/* Descripción: Implementación del botón 'Atacar'. Se invoca a `button_feedback_add` para respuesta visual y se usa el evento 'CLICKED' para disparar la acción, asegurando que el feedback visual se complete antes de la ejecución de la acción. */
 
 #include "btn_3.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
 #include "esp_log.h"
+#include "button_feedback.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
@@ -9075,13 +9026,12 @@ static lv_obj_t *s_btn_3_handle = NULL;
 
 /**
  * @brief Callback de evento específico para el botón 'Atacar'.
- *        Ejecuta la acción de atacar cuando se presiona el botón.
  * @param e Puntero al evento de LVGL.
  */
 static void btn_3_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_PRESSED) {
-        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de atacar.");
+    if (code == LV_EVENT_CLICKED) {
+        ESP_LOGI(TAG, "¡Evento CLICKED recibido! Ejecutando acción de atacar.");
         execute_diymon_action(ACTION_ID_ATACAR);
     }
 }
@@ -9110,13 +9060,15 @@ void btn_3_create(lv_obj_t *parent) {
     lv_obj_center(img);
 
     // --- Posición DENTRO de su panel padre ---
-    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
     lv_obj_align(s_btn_3_handle, LV_ALIGN_LEFT_MID, (BUTTON_SIZE + BUTTON_PADDING) * 2, 0);
     
-    // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_btn_3_handle, btn_3_event_cb, LV_EVENT_PRESSED, NULL);
+    // --- Conexión del evento de acción ---
+    lv_obj_add_event_cb(s_btn_3_handle, btn_3_event_cb, LV_EVENT_CLICKED, NULL);
     
-    ESP_LOGI(TAG, "Botón 'Atacar' (BTN_3) creado y posicionado dentro de su panel.");
+    // --- Añadir feedback visual ---
+    button_feedback_add(s_btn_3_handle);
+
+    ESP_LOGI(TAG, "Botón 'Atacar' (BTN_3) creado con feedback visual.");
 }
 
 /**
@@ -9166,15 +9118,16 @@ lv_obj_t* btn_3_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\btn_3.h ---
 
 --- START OF FILE: .\components\ui\buttons\btn_4.c ---
-/* Fecha: 17/08/2025 - 05:19  */
+/* Fecha: 18/08/2025 - 09:54  */
 /* Fichero: components/ui/buttons/btn_4.c */
-/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
-/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+/* Último cambio: Añadida llamada al módulo de feedback y ajustado el evento a LV_EVENT_CLICKED. */
+/* Descripción: Implementación del botón 'Brillo'. Se invoca a `button_feedback_add` para respuesta visual y se usa el evento 'CLICKED' para disparar la acción, asegurando que el feedback visual se complete antes de la ejecución de la acción. */
 
 #include "btn_4.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
 #include "esp_log.h"
+#include "button_feedback.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
@@ -9186,13 +9139,12 @@ static lv_obj_t *s_btn_4_handle = NULL;
 
 /**
  * @brief Callback de evento específico para el botón 'Brillo'.
- *        Ejecuta la acción de ciclar el brillo.
  * @param e Puntero al evento de LVGL.
  */
 static void btn_4_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_PRESSED) {
-        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de brillo.");
+    if (code == LV_EVENT_CLICKED) {
+        ESP_LOGI(TAG, "¡Evento CLICKED recibido! Ejecutando acción de brillo.");
         execute_diymon_action(ACTION_ID_BRIGHTNESS_CYCLE);
     }
 }
@@ -9221,13 +9173,15 @@ void btn_4_create(lv_obj_t *parent) {
     lv_obj_center(img);
 
     // --- Posición DENTRO de su panel padre ---
-    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
     lv_obj_align(s_btn_4_handle, LV_ALIGN_LEFT_MID, (BUTTON_SIZE + BUTTON_PADDING) * 0, 0);
 
-    // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_btn_4_handle, btn_4_event_cb, LV_EVENT_PRESSED, NULL);
+    // --- Conexión del evento de acción ---
+    lv_obj_add_event_cb(s_btn_4_handle, btn_4_event_cb, LV_EVENT_CLICKED, NULL);
 
-    ESP_LOGI(TAG, "Botón 'Brillo' (BTN_4) creado y posicionado dentro de su panel.");
+    // --- Añadir feedback visual ---
+    button_feedback_add(s_btn_4_handle);
+
+    ESP_LOGI(TAG, "Botón 'Brillo' (BTN_4) creado con feedback visual.");
 }
 
 /**
@@ -9277,15 +9231,16 @@ lv_obj_t* btn_4_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\btn_4.h ---
 
 --- START OF FILE: .\components\ui\buttons\btn_5.c ---
-/* Fecha: 17/08/2025 - 05:19  */
+/* Fecha: 18/08/2025 - 09:54  */
 /* Fichero: components/ui/buttons/btn_5.c */
-/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
-/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+/* Último cambio: Añadida llamada al módulo de feedback y ajustado el evento a LV_EVENT_CLICKED. */
+/* Descripción: Implementación del botón 'Apagar Pantalla'. Se invoca a `button_feedback_add` para respuesta visual y se usa el evento 'CLICKED' para disparar la acción, asegurando que el feedback visual se complete antes de la ejecución de la acción. */
 
 #include "btn_5.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
 #include "esp_log.h"
+#include "button_feedback.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
@@ -9297,13 +9252,12 @@ static lv_obj_t *s_btn_5_handle = NULL;
 
 /**
  * @brief Callback de evento específico para el botón 'Apagar Pantalla'.
- *        Ejecuta la acción de apagar/encender la pantalla.
  * @param e Puntero al evento de LVGL.
  */
 static void btn_5_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_PRESSED) {
-        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de apagar/encender pantalla.");
+    if (code == LV_EVENT_CLICKED) {
+        ESP_LOGI(TAG, "¡Evento CLICKED recibido! Ejecutando acción de apagar/encender pantalla.");
         execute_diymon_action(ACTION_ID_TOGGLE_SCREEN);
     }
 }
@@ -9332,13 +9286,15 @@ void btn_5_create(lv_obj_t *parent) {
     lv_obj_center(img);
 
     // --- Posición DENTRO de su panel padre ---
-    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
     lv_obj_align(s_btn_5_handle, LV_ALIGN_LEFT_MID, (BUTTON_SIZE + BUTTON_PADDING) * 1, 0);
 
-    // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_btn_5_handle, btn_5_event_cb, LV_EVENT_PRESSED, NULL);
+    // --- Conexión del evento de acción ---
+    lv_obj_add_event_cb(s_btn_5_handle, btn_5_event_cb, LV_EVENT_CLICKED, NULL);
 
-    ESP_LOGI(TAG, "Botón 'Apagar Pantalla' (BTN_5) creado y posicionado dentro de su panel.");
+    // --- Añadir feedback visual ---
+    button_feedback_add(s_btn_5_handle);
+
+    ESP_LOGI(TAG, "Botón 'Apagar Pantalla' (BTN_5) creado con feedback visual.");
 }
 
 /**
@@ -9388,15 +9344,16 @@ lv_obj_t* btn_5_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\btn_5.h ---
 
 --- START OF FILE: .\components\ui\buttons\btn_6.c ---
-/* Fecha: 17/08/2025 - 05:20  */
+/* Fecha: 18/08/2025 - 09:54  */
 /* Fichero: components/ui/buttons/btn_6.c */
-/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
-/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+/* Último cambio: Añadida llamada al módulo de feedback y ajustado el evento a LV_EVENT_CLICKED. */
+/* Descripción: Implementación del botón 'Modo Config'. Se invoca a `button_feedback_add` para respuesta visual y se usa el evento 'CLICKED' para disparar la acción, asegurando que el feedback visual se complete antes de la ejecución de la acción. */
 
 #include "btn_6.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
 #include "esp_log.h"
+#include "button_feedback.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
@@ -9408,13 +9365,12 @@ static lv_obj_t *s_btn_6_handle = NULL;
 
 /**
  * @brief Callback de evento específico para el botón 'Modo Config'.
- *        Ejecuta la acción de activar el modo de configuración.
  * @param e Puntero al evento de LVGL.
  */
 static void btn_6_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_PRESSED) {
-        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de modo config.");
+    if (code == LV_EVENT_CLICKED) {
+        ESP_LOGI(TAG, "¡Evento CLICKED recibido! Ejecutando acción de modo config.");
         execute_diymon_action(ACTION_ID_ACTIVATE_CONFIG_MODE);
     }
 }
@@ -9443,13 +9399,15 @@ void btn_6_create(lv_obj_t *parent) {
     lv_obj_center(img);
 
     // --- Posición DENTRO de su panel padre ---
-    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
     lv_obj_align(s_btn_6_handle, LV_ALIGN_LEFT_MID, (BUTTON_SIZE + BUTTON_PADDING) * 2, 0);
 
-    // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_btn_6_handle, btn_6_event_cb, LV_EVENT_PRESSED, NULL);
+    // --- Conexión del evento de acción ---
+    lv_obj_add_event_cb(s_btn_6_handle, btn_6_event_cb, LV_EVENT_CLICKED, NULL);
     
-    ESP_LOGI(TAG, "Botón 'Modo Config' (BTN_6) creado y posicionado dentro de su panel.");
+    // --- Añadir feedback visual ---
+    button_feedback_add(s_btn_6_handle);
+    
+    ESP_LOGI(TAG, "Botón 'Modo Config' (BTN_6) creado con feedback visual.");
 }
 
 /**
@@ -9499,15 +9457,16 @@ lv_obj_t* btn_6_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\btn_6.h ---
 
 --- START OF FILE: .\components\ui\buttons\btn_7.c ---
-/* Fecha: 17/08/2025 - 05:21  */
+/* Fecha: 18/08/2025 - 09:55  */
 /* Fichero: components/ui/buttons/btn_7.c */
-/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
-/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+/* Último cambio: Añadida llamada al módulo de feedback y ajustado el evento a LV_EVENT_CLICKED. */
+/* Descripción: Implementación del botón 'Reset Total'. Se invoca a `button_feedback_add` para respuesta visual y se usa el evento 'CLICKED' para disparar la acción, asegurando que el feedback visual se complete antes de la ejecución de la acción. */
 
 #include "btn_7.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
 #include "esp_log.h"
+#include "button_feedback.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
@@ -9519,13 +9478,12 @@ static lv_obj_t *s_btn_7_handle = NULL;
 
 /**
  * @brief Callback de evento específico para el botón 'Reset Total'.
- *        Ejecuta la acción de reseteo total.
  * @param e Puntero al evento de LVGL.
  */
 static void btn_7_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_PRESSED) {
-        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de reset total.");
+    if (code == LV_EVENT_CLICKED) {
+        ESP_LOGI(TAG, "¡Evento CLICKED recibido! Ejecutando acción de reset total.");
         execute_diymon_action(ACTION_ID_RESET_ALL);
     }
 }
@@ -9554,13 +9512,15 @@ void btn_7_create(lv_obj_t *parent) {
     lv_obj_center(img);
 
     // --- Posición DENTRO de su panel padre ---
-    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
     lv_obj_align(s_btn_7_handle, LV_ALIGN_LEFT_MID, (BUTTON_SIZE + BUTTON_PADDING) * 0, 0);
 
-    // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_btn_7_handle, btn_7_event_cb, LV_EVENT_PRESSED, NULL);
+    // --- Conexión del evento de acción ---
+    lv_obj_add_event_cb(s_btn_7_handle, btn_7_event_cb, LV_EVENT_CLICKED, NULL);
 
-    ESP_LOGI(TAG, "Botón 'Reset Total' (BTN_7) creado y posicionado dentro de su panel.");
+    // --- Añadir feedback visual ---
+    button_feedback_add(s_btn_7_handle);
+
+    ESP_LOGI(TAG, "Botón 'Reset Total' (BTN_7) creado con feedback visual.");
 }
 
 /**
@@ -9610,15 +9570,16 @@ lv_obj_t* btn_7_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\btn_7.h ---
 
 --- START OF FILE: .\components\ui\buttons\btn_8.c ---
-/* Fecha: 18/08/2025 - 06:55  */
+/* Fecha: 18/08/2025 - 09:55  */
 /* Fichero: components/ui/buttons/btn_8.c */
-/* Último cambio: Reasignada la acción del botón a ACTION_ID_CONFIG_PLACEHOLDER tras eliminar el modo de servidor de ficheros. */
-/* Descripción: Este botón activaba anteriormente el modo de servidor de ficheros. Como esa funcionalidad ahora está integrada en el modo de configuración principal, el botón se ha convertido en un placeholder. Ahora dispara una acción genérica que no realiza ninguna operación, manteniendo la consistencia de la UI mientras se rediseña su función. */
+/* Último cambio: Añadida llamada al módulo de feedback y ajustado el evento a LV_EVENT_CLICKED. */
+/* Descripción: Implementación del botón placeholder (antes Servidor Ficheros). Se invoca a `button_feedback_add` para respuesta visual y se usa el evento 'CLICKED' para disparar la acción. */
 
 #include "btn_8.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
 #include "esp_log.h"
+#include "button_feedback.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
@@ -9633,10 +9594,8 @@ static lv_obj_t *s_btn_8_handle = NULL;
  */
 static void btn_8_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_PRESSED) {
+    if (code == LV_EVENT_CLICKED) {
         ESP_LOGI(TAG, "Botón 8 (placeholder) presionado.");
-        // [CORRECCIÓN] La acción del servidor de ficheros ha sido eliminada.
-        // Ahora se dispara una acción placeholder que no hace nada.
         execute_diymon_action(ACTION_ID_CONFIG_PLACEHOLDER);
     }
 }
@@ -9656,7 +9615,6 @@ void btn_8_create(lv_obj_t *parent) {
 
     // --- Icono del botón ---
     lv_obj_t *img = lv_img_create(s_btn_8_handle);
-    // [CORRECCIÓN] Se mantiene el icono original por ahora, pero la acción ha cambiado.
     const lv_img_dsc_t* icon_src = ui_assets_get_icon(ASSET_ICON_ENABLE_FILE_SERVER);
     if (icon_src) {
         lv_img_set_src(img, icon_src);
@@ -9668,10 +9626,13 @@ void btn_8_create(lv_obj_t *parent) {
     // --- Posición DENTRO de su panel padre ---
     lv_obj_align(s_btn_8_handle, LV_ALIGN_LEFT_MID, (BUTTON_SIZE + BUTTON_PADDING) * 1, 0);
 
-    // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_btn_8_handle, btn_8_event_cb, LV_EVENT_PRESSED, NULL);
+    // --- Conexión del evento de acción ---
+    lv_obj_add_event_cb(s_btn_8_handle, btn_8_event_cb, LV_EVENT_CLICKED, NULL);
     
-    ESP_LOGI(TAG, "Botón 8 (placeholder) creado y posicionado.");
+    // --- Añadir feedback visual ---
+    button_feedback_add(s_btn_8_handle);
+    
+    ESP_LOGI(TAG, "Botón 8 (placeholder) creado con feedback visual.");
 }
 
 /**
@@ -9721,15 +9682,16 @@ lv_obj_t* btn_8_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\btn_8.h ---
 
 --- START OF FILE: .\components\ui\buttons\btn_9.c ---
-/* Fecha: 17/08/2025 - 05:21  */
+/* Fecha: 18/08/2025 - 09:56  */
 /* Fichero: components/ui/buttons/btn_9.c */
-/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
-/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+/* Último cambio: Añadida llamada al módulo de feedback y ajustado el evento a LV_EVENT_CLICKED. */
+/* Descripción: Implementación del botón placeholder de configuración. Se invoca a `button_feedback_add` para respuesta visual y se usa el evento 'CLICKED' para disparar la acción. */
 
 #include "btn_9.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
 #include "esp_log.h"
+#include "button_feedback.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
@@ -9741,13 +9703,12 @@ static lv_obj_t *s_btn_9_handle = NULL;
 
 /**
  * @brief Callback de evento específico para el botón 'Placeholder de Config'.
- *        Ejecuta la acción de placeholder.
  * @param e Puntero al evento de LVGL.
  */
 static void btn_9_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_PRESSED) {
-        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de placeholder.");
+    if (code == LV_EVENT_CLICKED) {
+        ESP_LOGI(TAG, "¡Evento CLICKED recibido! Ejecutando acción de placeholder.");
         execute_diymon_action(ACTION_ID_CONFIG_PLACEHOLDER);
     }
 }
@@ -9776,13 +9737,15 @@ void btn_9_create(lv_obj_t *parent) {
     lv_obj_center(img);
 
     // --- Posición DENTRO de su panel padre ---
-    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
     lv_obj_align(s_btn_9_handle, LV_ALIGN_LEFT_MID, (BUTTON_SIZE + BUTTON_PADDING) * 2, 0);
 
-    // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_btn_9_handle, btn_9_event_cb, LV_EVENT_PRESSED, NULL);
+    // --- Conexión del evento de acción ---
+    lv_obj_add_event_cb(s_btn_9_handle, btn_9_event_cb, LV_EVENT_CLICKED, NULL);
     
-    ESP_LOGI(TAG, "Botón 'Placeholder Config' (BTN_9) creado y posicionado dentro de su panel.");
+    // --- Añadir feedback visual ---
+    button_feedback_add(s_btn_9_handle);
+    
+    ESP_LOGI(TAG, "Botón 'Placeholder Config' (BTN_9) creado con feedback visual.");
 }
 
 /**
@@ -9830,6 +9793,85 @@ lv_obj_t* btn_9_get_handle(void);
 #endif // BTN_9_H
 
 --- END OF FILE: .\components\ui\buttons\btn_9.h ---
+
+--- START OF FILE: .\components\ui\buttons\button_feedback.c ---
+/* Fecha: 18/08/2025 - 10:18  */
+/* Fichero: components/ui/buttons/button_feedback.c */
+/* Último cambio: Simplificada la lógica para gestionar únicamente el feedback visual en PRESS y RELEASE. */
+/* Descripción: Se ha revertido el módulo a su responsabilidad única. El filtrado de gestos se ha movido directamente a los callbacks de acción de cada botón para una mayor fiabilidad, eliminando la lógica de `CLICKED` y de detención de eventos de este fichero central. */
+
+#include "button_feedback.h"
+
+/**
+ * @brief Callback de evento que gestiona únicamente el feedback visual del botón.
+ *
+ * @param e Puntero al evento de LVGL.
+ */
+static void feedback_visual_event_cb(lv_event_t * e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    lv_obj_t *btn = lv_event_get_target(e);
+    lv_obj_t *icon = lv_obj_get_child(btn, 0);
+
+    if (!icon) {
+        return;
+    }
+
+    if (code == LV_EVENT_PRESSED) {
+        // Mover el icono 2px hacia abajo y a la derecha
+        lv_obj_set_pos(icon, 2, 2);
+    } else if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
+        // Devolver el icono a su posición centrada original
+        lv_obj_center(icon);
+    }
+}
+
+/**
+ * @brief Añade el comportamiento de feedback visual a un botón.
+ */
+void button_feedback_add(lv_obj_t *btn) {
+    if (btn) {
+        // Registrar el callback para los eventos de presión y liberación.
+        lv_obj_add_event_cb(btn, feedback_visual_event_cb, LV_EVENT_PRESSED, NULL);
+        lv_obj_add_event_cb(btn, feedback_visual_event_cb, LV_EVENT_RELEASED, NULL);
+        lv_obj_add_event_cb(btn, feedback_visual_event_cb, LV_EVENT_PRESS_LOST, NULL);
+    }
+}
+
+--- END OF FILE: .\components\ui\buttons\button_feedback.c ---
+
+--- START OF FILE: .\components\ui\buttons\button_feedback.h ---
+/* Fecha: 18/08/2025 - 09:34  */
+/* Fichero: components/ui/buttons/button_feedback.h */
+/* Último cambio: Creación del módulo de feedback visual para botones. */
+/* Descripción: Interfaz pública del nuevo módulo de feedback. Proporciona una única función para añadir una respuesta visual estándar (un ligero desplazamiento) a cualquier objeto LVGL clicable, mejorando la experiencia de usuario de forma centralizada y de bajo coste. */
+
+#ifndef BUTTON_FEEDBACK_H
+#define BUTTON_FEEDBACK_H
+
+#include "lvgl.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Añade un comportamiento de feedback visual a un botón u objeto clicable.
+ *
+ * Registra los callbacks de eventos necesarios para que el objeto se desplace
+ * ligeramente hacia abajo al ser presionado y vuelva a su posición original
+ * al ser liberado, proporcionando una respuesta visual simple y de bajo coste.
+ *
+ * @param btn Puntero al objeto lv_obj_t al que se le aplicará el feedback.
+ */
+void button_feedback_add(lv_obj_t *btn);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // BUTTON_FEEDBACK_H
+
+--- END OF FILE: .\components\ui\buttons\button_feedback.h ---
 
 --- START OF FILE: .\components\ui\buttons\buttons_manager.c ---
 /* Fecha: 17/08/2025 - 01:29 
@@ -9951,15 +9993,16 @@ lv_obj_t* ui_buttons_get_evo_5(void); // Involucionar
 --- END OF FILE: .\components\ui\buttons\buttons_manager.h ---
 
 --- START OF FILE: .\components\ui\buttons\evo_1.c ---
-/* Fecha: 17/08/2025 - 05:22  */
+/* Fecha: 18/08/2025 - 09:56  */
 /* Fichero: components/ui/buttons/evo_1.c */
-/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
-/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+/* Último cambio: Añadida llamada al módulo de feedback y ajustado el evento a LV_EVENT_CLICKED. */
+/* Descripción: Implementación del botón 'Evo Fuego'. Se invoca a `button_feedback_add` para respuesta visual y se usa el evento 'CLICKED' para disparar la acción, asegurando que el feedback visual se complete antes de la ejecución de la acción. */
 
 #include "evo_1.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
 #include "esp_log.h"
+#include "button_feedback.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
@@ -9971,13 +10014,12 @@ static lv_obj_t *s_evo_1_handle = NULL;
 
 /**
  * @brief Callback de evento específico para el botón 'Evo Fuego'.
- *        Ejecuta la acción de evolucionar a Fuego.
  * @param e Puntero al evento de LVGL.
  */
 static void evo_1_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_PRESSED) {
-        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de evo fuego.");
+    if (code == LV_EVENT_CLICKED) {
+        ESP_LOGI(TAG, "¡Evento CLICKED recibido! Ejecutando acción de evo fuego.");
         execute_diymon_action(ACTION_ID_EVO_FIRE);
     }
 }
@@ -10006,13 +10048,15 @@ void evo_1_create(lv_obj_t *parent) {
     lv_obj_center(img);
 
     // --- Posición DENTRO de su panel padre ---
-    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
     lv_obj_align(s_evo_1_handle, LV_ALIGN_TOP_MID, 0, (BUTTON_SIZE + BUTTON_PADDING) * 0);
 
-    // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_evo_1_handle, evo_1_event_cb, LV_EVENT_PRESSED, NULL);
+    // --- Conexión del evento de acción ---
+    lv_obj_add_event_cb(s_evo_1_handle, evo_1_event_cb, LV_EVENT_CLICKED, NULL);
 
-    ESP_LOGI(TAG, "Botón 'Evo Fuego' (EVO_1) creado y posicionado dentro de su panel.");
+    // --- Añadir feedback visual ---
+    button_feedback_add(s_evo_1_handle);
+
+    ESP_LOGI(TAG, "Botón 'Evo Fuego' (EVO_1) creado con feedback visual.");
 }
 
 /**
@@ -10062,15 +10106,16 @@ lv_obj_t* evo_1_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\evo_1.h ---
 
 --- START OF FILE: .\components\ui\buttons\evo_2.c ---
-/* Fecha: 17/08/2025 - 05:22  */
+/* Fecha: 18/08/2025 - 09:57  */
 /* Fichero: components/ui/buttons/evo_2.c */
-/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
-/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+/* Último cambio: Añadida llamada al módulo de feedback y ajustado el evento a LV_EVENT_CLICKED. */
+/* Descripción: Implementación del botón 'Evo Agua'. Se invoca a `button_feedback_add` para respuesta visual y se usa el evento 'CLICKED' para disparar la acción, asegurando que el feedback visual se complete antes de la ejecución de la acción. */
 
 #include "evo_2.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
 #include "esp_log.h"
+#include "button_feedback.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
@@ -10082,13 +10127,12 @@ static lv_obj_t *s_evo_2_handle = NULL;
 
 /**
  * @brief Callback de evento específico para el botón 'Evo Agua'.
- *        Ejecuta la acción de evolucionar a Agua.
  * @param e Puntero al evento de LVGL.
  */
 static void evo_2_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_PRESSED) {
-        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de evo agua.");
+    if (code == LV_EVENT_CLICKED) {
+        ESP_LOGI(TAG, "¡Evento CLICKED recibido! Ejecutando acción de evo agua.");
         execute_diymon_action(ACTION_ID_EVO_WATER);
     }
 }
@@ -10117,13 +10161,15 @@ void evo_2_create(lv_obj_t *parent) {
     lv_obj_center(img);
 
     // --- Posición DENTRO de su panel padre ---
-    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
     lv_obj_align(s_evo_2_handle, LV_ALIGN_TOP_MID, 0, (BUTTON_SIZE + BUTTON_PADDING) * 1);
 
-    // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_evo_2_handle, evo_2_event_cb, LV_EVENT_PRESSED, NULL);
+    // --- Conexión del evento de acción ---
+    lv_obj_add_event_cb(s_evo_2_handle, evo_2_event_cb, LV_EVENT_CLICKED, NULL);
 
-    ESP_LOGI(TAG, "Botón 'Evo Agua' (EVO_2) creado y posicionado dentro de su panel.");
+    // --- Añadir feedback visual ---
+    button_feedback_add(s_evo_2_handle);
+
+    ESP_LOGI(TAG, "Botón 'Evo Agua' (EVO_2) creado con feedback visual.");
 }
 
 /**
@@ -10173,15 +10219,16 @@ lv_obj_t* evo_2_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\evo_2.h ---
 
 --- START OF FILE: .\components\ui\buttons\evo_3.c ---
-/* Fecha: 17/08/2025 - 05:23  */
+/* Fecha: 18/08/2025 - 09:57  */
 /* Fichero: components/ui/buttons/evo_3.c */
-/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
-/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+/* Último cambio: Añadida llamada al módulo de feedback y ajustado el evento a LV_EVENT_CLICKED. */
+/* Descripción: Implementación del botón 'Evo Tierra'. Se invoca a `button_feedback_add` para respuesta visual y se usa el evento 'CLICKED' para disparar la acción, asegurando que el feedback visual se complete antes de la ejecución de la acción. */
 
 #include "evo_3.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
 #include "esp_log.h"
+#include "button_feedback.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
@@ -10193,13 +10240,12 @@ static lv_obj_t *s_evo_3_handle = NULL;
 
 /**
  * @brief Callback de evento específico para el botón 'Evo Tierra'.
- *        Ejecuta la acción de evolucionar a Tierra.
  * @param e Puntero al evento de LVGL.
  */
 static void evo_3_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_PRESSED) {
-        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de evo tierra.");
+    if (code == LV_EVENT_CLICKED) {
+        ESP_LOGI(TAG, "¡Evento CLICKED recibido! Ejecutando acción de evo tierra.");
         execute_diymon_action(ACTION_ID_EVO_EARTH);
     }
 }
@@ -10228,13 +10274,15 @@ void evo_3_create(lv_obj_t *parent) {
     lv_obj_center(img);
 
     // --- Posición DENTRO de su panel padre ---
-    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
     lv_obj_align(s_evo_3_handle, LV_ALIGN_TOP_MID, 0, (BUTTON_SIZE + BUTTON_PADDING) * 2);
 
-    // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_evo_3_handle, evo_3_event_cb, LV_EVENT_PRESSED, NULL);
+    // --- Conexión del evento de acción ---
+    lv_obj_add_event_cb(s_evo_3_handle, evo_3_event_cb, LV_EVENT_CLICKED, NULL);
 
-    ESP_LOGI(TAG, "Botón 'Evo Tierra' (EVO_3) creado y posicionado dentro de su panel.");
+    // --- Añadir feedback visual ---
+    button_feedback_add(s_evo_3_handle);
+
+    ESP_LOGI(TAG, "Botón 'Evo Tierra' (EVO_3) creado con feedback visual.");
 }
 
 /**
@@ -10284,15 +10332,16 @@ lv_obj_t* evo_3_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\evo_3.h ---
 
 --- START OF FILE: .\components\ui\buttons\evo_4.c ---
-/* Fecha: 17/08/2025 - 05:24  */
+/* Fecha: 18/08/2025 - 09:58  */
 /* Fichero: components/ui/buttons/evo_4.c */
-/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
-/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+/* Último cambio: Añadida llamada al módulo de feedback y ajustado el evento a LV_EVENT_CLICKED. */
+/* Descripción: Implementación del botón 'Evo Viento'. Se invoca a `button_feedback_add` para respuesta visual y se usa el evento 'CLICKED' para disparar la acción, asegurando que el feedback visual se complete antes de la ejecución de la acción. */
 
 #include "evo_4.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
 #include "esp_log.h"
+#include "button_feedback.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
@@ -10304,13 +10353,12 @@ static lv_obj_t *s_evo_4_handle = NULL;
 
 /**
  * @brief Callback de evento específico para el botón 'Evo Viento'.
- *        Ejecuta la acción de evolucionar a Viento.
  * @param e Puntero al evento de LVGL.
  */
 static void evo_4_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_PRESSED) {
-        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de evo viento.");
+    if (code == LV_EVENT_CLICKED) {
+        ESP_LOGI(TAG, "¡Evento CLICKED recibido! Ejecutando acción de evo viento.");
         execute_diymon_action(ACTION_ID_EVO_WIND);
     }
 }
@@ -10339,13 +10387,15 @@ void evo_4_create(lv_obj_t *parent) {
     lv_obj_center(img);
 
     // --- Posición DENTRO de su panel padre ---
-    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
     lv_obj_align(s_evo_4_handle, LV_ALIGN_TOP_MID, 0, (BUTTON_SIZE + BUTTON_PADDING) * 3);
 
-    // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_evo_4_handle, evo_4_event_cb, LV_EVENT_PRESSED, NULL);
+    // --- Conexión del evento de acción ---
+    lv_obj_add_event_cb(s_evo_4_handle, evo_4_event_cb, LV_EVENT_CLICKED, NULL);
 
-    ESP_LOGI(TAG, "Botón 'Evo Viento' (EVO_4) creado y posicionado dentro de su panel.");
+    // --- Añadir feedback visual ---
+    button_feedback_add(s_evo_4_handle);
+
+    ESP_LOGI(TAG, "Botón 'Evo Viento' (EVO_4) creado con feedback visual.");
 }
 
 /**
@@ -10395,15 +10445,16 @@ lv_obj_t* evo_4_get_handle(void);
 --- END OF FILE: .\components\ui\buttons\evo_4.h ---
 
 --- START OF FILE: .\components\ui\buttons\evo_5.c ---
-/* Fecha: 17/08/2025 - 05:24  */
+/* Fecha: 18/08/2025 - 09:58  */
 /* Fichero: components/ui/buttons/evo_5.c */
-/* Último cambio: Corregido el posicionamiento del botón para que se mueva con su panel padre. */
-/* Descripción: Se ha corregido el error de posicionamiento del botón. En lugar de tener su propia lógica de ocultación y posición fuera de pantalla, ahora se alinea estáticamente dentro de su panel padre usando 'lv_obj_align'. Esto asegura que cuando el panel se anima para mostrarse, el botón aparece correctamente en su interior, resolviendo el problema de que los paneles no se desplegaban visualmente. */
+/* Último cambio: Añadida llamada al módulo de feedback y ajustado el evento a LV_EVENT_CLICKED. */
+/* Descripción: Implementación del botón 'Involucionar'. Se invoca a `button_feedback_add` para respuesta visual y se usa el evento 'CLICKED' para disparar la acción, asegurando que el feedback visual se complete antes de la ejecución de la acción. */
 
 #include "evo_5.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
 #include "esp_log.h"
+#include "button_feedback.h"
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
@@ -10415,13 +10466,12 @@ static lv_obj_t *s_evo_5_handle = NULL;
 
 /**
  * @brief Callback de evento específico para el botón 'Involucionar'.
- *        Ejecuta la acción de involucionar.
  * @param e Puntero al evento de LVGL.
  */
 static void evo_5_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_PRESSED) {
-        ESP_LOGI(TAG, "¡Evento CLICK recibido! Ejecutando acción de involucionar.");
+    if (code == LV_EVENT_CLICKED) {
+        ESP_LOGI(TAG, "¡Evento CLICKED recibido! Ejecutando acción de involucionar.");
         execute_diymon_action(ACTION_ID_EVO_BACK);
     }
 }
@@ -10450,13 +10500,15 @@ void evo_5_create(lv_obj_t *parent) {
     lv_obj_center(img);
 
     // --- Posición DENTRO de su panel padre ---
-    // [CORRECCIÓN] Se alinea el botón dentro del panel. El panel es el que se anima.
     lv_obj_align(s_evo_5_handle, LV_ALIGN_TOP_MID, 0, (BUTTON_SIZE + BUTTON_PADDING) * 4);
 
-    // --- Conexión del evento ---
-    lv_obj_add_event_cb(s_evo_5_handle, evo_5_event_cb, LV_EVENT_PRESSED, NULL);
+    // --- Conexión del evento de acción ---
+    lv_obj_add_event_cb(s_evo_5_handle, evo_5_event_cb, LV_EVENT_CLICKED, NULL);
 
-    ESP_LOGI(TAG, "Botón 'Involucionar' (EVO_5) creado y posicionado dentro de su panel.");
+    // --- Añadir feedback visual ---
+    button_feedback_add(s_evo_5_handle);
+
+    ESP_LOGI(TAG, "Botón 'Involucionar' (EVO_5) creado con feedback visual.");
 }
 
 /**
@@ -12077,10 +12129,10 @@ animation_t* ui_action_animations_get_player(void);
 --- END OF FILE: .\components\ui\ui_action_animations.h ---
 
 --- START OF FILE: .\components\ui\ui_actions_panel.c ---
-/* Fecha: 17/08/2025 - 05:12  */
+/* Fecha: 18/08/2025 - 10:30  */
 /* Fichero: components/ui/ui_actions_panel.c */
-/* Último cambio: Eliminada la bandera LV_OBJ_FLAG_CLICKABLE de los paneles contenedores para solucionar el problema de eventos no recibidos. */
-/* Descripción: Se ha corregido el error por el cual los botones no respondían a los clics. Los paneles contenedores, aunque transparentes, interceptaban los eventos de toque por defecto. Al hacerlos no-clicables con 'lv_obj_remove_flag', los eventos ahora se propagan correctamente a los botones hijos, que es el comportamiento esperado. Se han añadido logs para confirmar la creación y configuración de cada panel. */
+/* Último cambio: Eliminadas las restricciones de borde (`EDGE_SWIPE_THRESHOLD`) para la detección de gestos. */
+/* Descripción: Se ha corregido el comportamiento del swipe. Ahora, los gestos para mostrar los paneles de acciones se detectan desde cualquier parte de la pantalla, no solo desde los bordes. Esto soluciona el problema por el cual el usuario tenía que iniciar el deslizamiento en una zona muy específica, mejorando la usabilidad de la interfaz. */
 
 #include "ui_actions_panel.h"
 #include "ui_idle_animation.h"
@@ -12152,11 +12204,12 @@ void ui_actions_panel_create(lv_obj_t *parent) {
     lv_obj_set_size(s_panel_player, TOP_PANEL_WIDTH, TOP_PANEL_HEIGHT);
     lv_obj_align(s_panel_player, LV_ALIGN_TOP_MID, 0, -TOP_PANEL_HEIGHT);
     lv_obj_add_flag(s_panel_player, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_remove_flag(s_panel_player, LV_OBJ_FLAG_CLICKABLE); // [CORRECCIÓN CLAVE]
+    lv_obj_remove_flag(s_panel_player, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(s_panel_player, LV_OBJ_FLAG_GESTURE_BUBBLE);
     btn_1_create(s_panel_player);
     btn_2_create(s_panel_player);
     btn_3_create(s_panel_player);
-    ESP_LOGI(TAG, "Panel 'Player' creado y configurado para no interceptar clics.");
+    ESP_LOGI(TAG, "Panel 'Player' creado.");
 
     // --- Crear Contenedor Panel Admin ---
     s_panel_admin = lv_obj_create(parent);
@@ -12164,12 +12217,12 @@ void ui_actions_panel_create(lv_obj_t *parent) {
     lv_obj_set_size(s_panel_admin, TOP_PANEL_WIDTH, TOP_PANEL_HEIGHT);
     lv_obj_align(s_panel_admin, LV_ALIGN_TOP_MID, 0, -TOP_PANEL_HEIGHT);
     lv_obj_add_flag(s_panel_admin, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_remove_flag(s_panel_admin, LV_OBJ_FLAG_CLICKABLE); // [CORRECCIÓN CLAVE]
+    lv_obj_remove_flag(s_panel_admin, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(s_panel_admin, LV_OBJ_FLAG_GESTURE_BUBBLE);
     btn_4_create(s_panel_admin);
     btn_5_create(s_panel_admin);
     btn_6_create(s_panel_admin);
-    ESP_LOGI(TAG, "Panel 'Admin' creado y configurado para no interceptar clics.");
-
+    ESP_LOGI(TAG, "Panel 'Admin' creado.");
 
     // --- Crear Contenedor Panel Config ---
     s_panel_config = lv_obj_create(parent);
@@ -12177,12 +12230,12 @@ void ui_actions_panel_create(lv_obj_t *parent) {
     lv_obj_set_size(s_panel_config, TOP_PANEL_WIDTH, TOP_PANEL_HEIGHT);
     lv_obj_align(s_panel_config, LV_ALIGN_TOP_MID, 0, -TOP_PANEL_HEIGHT);
     lv_obj_add_flag(s_panel_config, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_remove_flag(s_panel_config, LV_OBJ_FLAG_CLICKABLE); // [CORRECCIÓN CLAVE]
+    lv_obj_remove_flag(s_panel_config, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(s_panel_config, LV_OBJ_FLAG_GESTURE_BUBBLE);
     btn_7_create(s_panel_config);
     btn_8_create(s_panel_config);
     btn_9_create(s_panel_config);
-    ESP_LOGI(TAG, "Panel 'Config' creado y configurado para no interceptar clics.");
-
+    ESP_LOGI(TAG, "Panel 'Config' creado.");
 
     // --- Crear Contenedor Panel Evolución ---
     s_panel_evo = lv_obj_create(parent);
@@ -12190,14 +12243,14 @@ void ui_actions_panel_create(lv_obj_t *parent) {
     lv_obj_set_size(s_panel_evo, SIDE_PANEL_WIDTH, SIDE_PANEL_HEIGHT);
     lv_obj_align(s_panel_evo, LV_ALIGN_LEFT_MID, -SIDE_PANEL_WIDTH, 0);
     lv_obj_add_flag(s_panel_evo, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_remove_flag(s_panel_evo, LV_OBJ_FLAG_CLICKABLE); // [CORRECCIÓN CLAVE]
+    lv_obj_remove_flag(s_panel_evo, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(s_panel_evo, LV_OBJ_FLAG_GESTURE_BUBBLE);
     evo_1_create(s_panel_evo);
     evo_2_create(s_panel_evo);
     evo_3_create(s_panel_evo);
     evo_4_create(s_panel_evo);
     evo_5_create(s_panel_evo);
-    ESP_LOGI(TAG, "Panel 'Evo' creado y configurado para no interceptar clics.");
-
+    ESP_LOGI(TAG, "Panel 'Evo' creado.");
 }
 
 static void animation_finish_cb(lv_anim_t *a) { 
@@ -12286,10 +12339,11 @@ void ui_actions_panel_handle_gesture(lv_dir_t dir, lv_coord_t start_x, lv_coord_
 
     switch(s_panel_state) {
         case PANEL_STATE_HIDDEN:
-            if (dir == LV_DIR_BOTTOM && start_y < EDGE_SWIPE_THRESHOLD) {
+            // [CORRECCIÓN] Se elimina la comprobación de la posición inicial del swipe.
+            if (dir == LV_DIR_BOTTOM) {
                 animate_panel_in_top(s_panel_player);
                 s_panel_state = PANEL_STATE_PLAYER_VISIBLE;
-            } else if (dir == LV_DIR_RIGHT && start_x < EDGE_SWIPE_THRESHOLD) {
+            } else if (dir == LV_DIR_RIGHT) {
                 animate_panel_in_side(s_panel_evo);
                 s_panel_state = PANEL_STATE_SIDE_VISIBLE;
             } else {

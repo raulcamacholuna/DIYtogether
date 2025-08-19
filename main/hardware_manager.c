@@ -8,6 +8,7 @@
 #include "bsp_api.h"
 #include "esp_lvgl_port.h"
 #include "lvgl.h"
+#include "sdkconfig.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -100,7 +101,13 @@ esp_err_t hardware_manager_init(void) {
     bsp_init(); 
 
     ESP_LOGI(TAG, "Initializing LVGL port...");
-    const lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
+    const lvgl_port_cfg_t lvgl_cfg = {
+        .task_priority = 4,                       // Prioridad por defecto
+        .task_stack = CONFIG_LV_TASK_STACK_SIZE,  // ¡USAMOS NUESTRO VALOR!
+        .task_affinity = -1,                      // Sin afinidad de núcleo
+        .timer_period_ms = 5,                     // Período del temporizador
+        .task_max_sleep_ms = 500
+    };
     ESP_ERROR_CHECK(lvgl_port_init(&lvgl_cfg));
     
     const lvgl_port_display_cfg_t disp_cfg = {
