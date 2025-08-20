@@ -1,8 +1,7 @@
-/* Fecha: 18/08/2025 - 09:01  */
-/* Fichero: components/bsp/WS1.9TS/bsp_wifi.c */
-/* Último cambio: Añadida la función bsp_wifi_deinit para una limpieza completa de recursos. */
-/* Descripción: Se ha implementado `bsp_wifi_deinit` para desregistrar los manejadores de eventos y liberar la memoria del semáforo. Esto resuelve un problema de fuga de recursos que ocurría al salir del modo de configuración y asegura que el sistema WiFi pueda reinicializarse de forma limpia, evitando el fallo de asignación del buffer de animación. */
-
+/* Fichero: components/bsp/bsp_wifi.c */
+/* Último cambio: Creado como fichero unificado para el driver WiFi, resolviendo el error 'Cannot find source file'. */
+/* Descripción: Este fichero contiene la lógica de gestión de WiFi, que es común a todas las placas. Su creación en la raíz del componente 'bsp' satisface la referencia en 'CMakeLists.txt', permitiendo que el proyecto compile y enlace correctamente. La funcionalidad (init stack, AP/STA, deinit) se ha consolidado aquí desde los antiguos ficheros específicos de placa. */
+/* Último cambio: 20/08/2025 - 05:19 */
 #include "bsp_api.h"
 #include <string.h>
 #include "freertos/FreeRTOS.h"
@@ -160,10 +159,9 @@ void bsp_wifi_init_sta(const char *ssid, const char *pass) {
 
 void bsp_wifi_deinit(void) {
     ESP_LOGI(TAG, "Desinicializando WiFi y liberando recursos...");
-    // Detener WiFi
+    
     esp_wifi_stop();
     
-    // Desregistrar manejadores de eventos
     if (s_wifi_event_instance) {
         esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, s_wifi_event_instance);
         s_wifi_event_instance = NULL;
@@ -173,16 +171,13 @@ void bsp_wifi_deinit(void) {
         s_ip_event_instance = NULL;
     }
     
-    // Liberar recursos de WiFi
     esp_wifi_deinit();
     
-    // Liberar semáforo
     if (s_ip_acquired_sem) {
         vSemaphoreDelete(s_ip_acquired_sem);
         s_ip_acquired_sem = NULL;
     }
 
-    // Destruir interfaces de red
     esp_netif_t* sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
     if (sta_netif) {
         esp_netif_destroy(sta_netif);

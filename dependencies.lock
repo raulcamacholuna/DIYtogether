@@ -11,24 +11,32 @@ dependencies:
       path: Z:\DIYTOGETHER\DIYtogether\components\core
       type: local
     version: '*'
-  esp_lcd_touch:
-    dependencies: []
-    source:
-      path: Z:\DIYTOGETHER\DIYtogether\components_dependencies\esp_lcd_touch
-      type: local
-    version: 1.1.2
-  esp_lvgl_port:
-    dependencies: []
-    source:
-      path: Z:\DIYTOGETHER\DIYtogether\components_dependencies\esp_lvgl_port
-      type: local
-    version: 2.6.0
   espressif/cmake_utilities:
     dependencies: []
     source:
       path: Z:\DIYTOGETHER\DIYtogether\components_dependencies\espressif__cmake_utilities
       type: local
     version: 1.1.1
+  espressif/esp_lcd_jd9853:
+    dependencies: []
+    source:
+      path: Z:\DIYTOGETHER\DIYtogether\components_dependencies\esp_lcd_jd9853
+      type: local
+    version: '*'
+  espressif/esp_lcd_touch:
+    dependencies:
+    - name: idf
+      version: '>=4.4.2'
+    source:
+      path: Z:\DIYTOGETHER\DIYtogether\components_dependencies\esp_lcd_touch
+      type: local
+    version: 1.1.2
+  espressif/esp_lcd_touch_axs5106:
+    dependencies: []
+    source:
+      path: Z:\DIYTOGETHER\DIYtogether\components_dependencies\esp_lcd_touch_axs5106
+      type: local
+    version: '*'
   espressif/esp_lcd_touch_cst816s:
     dependencies:
     - name: espressif/esp_lcd_touch
@@ -37,13 +45,30 @@ dependencies:
     - name: idf
       version: '>=4.4.2'
     source:
-      path: Z:\DIYTOGETHER\DIYtogether\components\bsp\WS1.9TS\esp_lcd_touch_cst816s
+      path: Z:\DIYTOGETHER\DIYtogether\components\esp_lcd_touch_cst816s
       type: local
     version: 1.1.0
+  espressif/esp_lvgl_port:
+    dependencies:
+    - name: idf
+      version: '>=4.4'
+    - name: lvgl/lvgl
+      public: true
+      version: '>=8,<10'
+    source:
+      path: Z:\DIYTOGETHER\DIYtogether\components_dependencies\esp_lvgl_port
+      type: local
+    version: 2.6.0
   idf:
     source:
       type: idf
     version: 5.3.2
+  iot_button:
+    dependencies: []
+    source:
+      path: Z:\DIYTOGETHER\DIYtogether\components\iot_button
+      type: local
+    version: '*'
   lvgl/lvgl:
     component_hash: b702d642e03e95928046d5c6726558e6444e112420c77efa5fdb6650b0a13c5d
     dependencies: []
@@ -51,10 +76,28 @@ dependencies:
       registry_url: https://components.espressif.com/
       type: service
     version: 9.3.0
+  screen_manager:
+    dependencies: []
+    source:
+      path: Z:\DIYTOGETHER\DIYtogether\components\screen_manager
+      type: local
+    version: '*'
+  service_screen:
+    dependencies: []
+    source:
+      path: Z:\DIYTOGETHER\DIYtogether\components\service_screen
+      type: local
+    version: '*'
   ui:
     dependencies: []
     source:
       path: Z:\DIYTOGETHER\DIYtogether\components\ui
+      type: local
+    version: '*'
+  web_server:
+    dependencies: []
+    source:
+      path: Z:\DIYTOGETHER\DIYtogether\components\web_server
       type: local
     version: '*'
   zlib:
@@ -67,12 +110,19 @@ direct_dependencies:
 - bsp
 - core
 - espressif/cmake_utilities
+- espressif/esp_lcd_jd9853
+- espressif/esp_lcd_touch
+- espressif/esp_lcd_touch_axs5106
 - espressif/esp_lcd_touch_cst816s
 - espressif/esp_lvgl_port
 - espressif/zlib
 - idf
+- iot_button
 - lvgl/lvgl
+- screen_manager
+- service_screen
 - ui
-manifest_hash: e68f5ad00884824b67d14894a6d1cf780f6b849211dd289383ea371a009413fd
+- web_server
+manifest_hash: 754fb63d505c1648db66c1cc58e3fe334798898679bc5fb78c9a76c9ac5b6c73
 target: esp32c6
 version: 2.0.0

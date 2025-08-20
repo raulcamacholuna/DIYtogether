@@ -1,21 +1,26 @@
-# Fecha: 17/08/2025 - 02:55 
 # Fichero: components/bsp/CMakeLists.txt
-# Último cambio: Eliminada la dependencia explícita de 'esp_driver_i2c' para resolver un conflicto de compilación.
-# Descripción: Se ha eliminado la dependencia 'esp_driver_i2c' de la lista REQUIRES. Requerir sub-componentes de 'driver' individualmente es una práctica no estándar que puede corromper el árbol de dependencias del build system. El componente 'driver' ya se incluye y proporciona acceso a todas las APIs de controladores necesarias (I2C, SPI, etc.), solucionando el fallo de compilación en el componente 'esp_twai'.
-
-set(BOARD_SUBDIR "WS1.9TS")
-
-file(GLOB component_sources "${BOARD_SUBDIR}/*.c")
-
+# Último cambio: Añadida la dependencia 'esp_lcd_jd9853' para que el sistema de build reconozca el driver de display correcto.
+# Descripción: Diagnóstico: Para que el fichero 'bsp_display.c' pueda incluir la cabecera 'esp_lcd_jd9853.h' y utilizar el driver correcto para la placa de 1.47", este CMakeLists.txt debe declarar explícitamente esa dependencia. Solución: Se añade 'esp_lcd_jd9853' a la lista 'REQUIRES'. Esto propaga las rutas de inclusión necesarias, permitiendo que el código C se compile correctamente contra el nuevo driver, que es el paso previo a la selección condicional en 'bsp_display.c'.
+# Último cambio: 20/08/2025 - 06:45
 idf_component_register(
-    SRCS ${component_sources}
-    
+    SRCS
+        "bsp.c"
+        "bsp_battery.c"
+        "bsp_display.c"
+        "bsp_i2c.c"
+        "bsp_qmi8658.c"
+        "bsp_sdcard.c"
+        "bsp_spi.c"
+        "bsp_touch.c"
+        "bsp_wifi.c"
+
     INCLUDE_DIRS "include"
-    PRIV_INCLUDE_DIRS "${BOARD_SUBDIR}"
-    
-    REQUIRES 
+    PRIV_INCLUDE_DIRS "."
+
+    REQUIRES
         driver
         esp_lcd
+        esp_lcd_touch
         sdmmc
         fatfs
         esp_adc
@@ -23,6 +28,8 @@ idf_component_register(
         nvs_flash
         lvgl
         esp_lvgl_port
+        esp_lcd_gc9a01
         esp_lcd_touch_cst816s
-        esp_lcd_sh8601
+        esp_lcd_touch_axs5106
+        esp_lcd_jd9853 # [CORRECCIÓN] Dependencia añadida para el nuevo driver de display.
 )

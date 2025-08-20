@@ -8,4 +8,9 @@ idf_component_register(SRCS "service_screen.c"
                     REQUIRES
                         log
                         bsp
+                        esp_lcd
+                        esp_lcd_touch
+                        esp_wifi
+                        lvgl
+                        esp_lvgl_port
 )

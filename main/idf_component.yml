@@ -1,27 +1,44 @@
-## idf_component.yml for main component
-
+# Fichero: main/idf_component.yml
+# Último cambio: Añadido el 'override_path' para el driver de display 'esp_lcd_jd9853' para resolver el problema de la pantalla en negro.
+# Descripción: Diagnóstico de Causa Raíz: La pantalla en negro, a pesar de un arranque exitoso, se debe a que se estaba utilizando un driver de controlador de display incorrecto (GC9A01). El código de ejemplo funcional del fabricante para la placa de 1.47" revela que el controlador correcto es el JD9853.
+# Solución Definitiva: Se ha añadido a este manifiesto la dependencia 'espressif/esp_lcd_jd9853' con una directiva 'override_path' apuntando a su copia local en 'components_dependencies'. Este es el primer paso para hacer que el driver correcto esté disponible para el sistema de compilación, permitiendo que el componente 'bsp' lo enlace y lo utilice condicionalmente.
+# Último cambio: 20/08/2025 - 06:44
+## IDF Component Manager Manifest File
 dependencies:
-  # El cerebro de la lógica
-  core:
-    path: ../components/core
-  
-  # La cara y los músculos
-  ui:
-    path: ../components/ui
-  
-  # El sistema nervioso y los huesos
+  # --- Componentes Locales ---
   bsp:
-    path: ../components/bsp
-
-  # Versión mínima requerida del ESP-IDF
-  idf: ">=5.1"
-
-  # Librería principal para la interfaz de usuario (UI)
-  lvgl/lvgl: "^9.3.0"
-
-  # Componente "puente" oficial de Espressif que conecta LVGL con los drivers de ESP-IDF
-  espressif/esp_lvgl_port: "^2.6.0"
-
-  # Driver específico para el controlador táctil CST816S, identificado en la documentación
+    path: "../components/bsp"
+  core:
+    path: "../components/core"
+  ui:
+    path: "../components/ui"
+  web_server:
+    path: "../components/web_server"
+  screen_manager:
+    path: "../components/screen_manager"
+  service_screen:
+    path: "../components/service_screen"
+  iot_button:
+    path: "../components/iot_button"
+  
+  # --- Dependencias Sobrescritas ---
+  espressif/esp_lvgl_port:
+    version: "*"
+    override_path: "../components_dependencies/esp_lvgl_port"
+  
   espressif/esp_lcd_touch_cst816s:
-    path: ../components/bsp/ws1.9ts/esp_lcd_touch_cst816s
+    version: "*"
+    override_path: "../components/esp_lcd_touch_cst816s" 
+  
+  espressif/esp_lcd_touch_axs5106:
+    version: "*"
+    override_path: "../components_dependencies/esp_lcd_touch_axs5106"
+
+  # [CORRECCIÓN] Se añade el driver de display correcto para la placa 1.47"
+  espressif/esp_lcd_jd9853:
+    version: "*"
+    override_path: "../components_dependencies/esp_lcd_jd9853"
+
+  espressif/esp_lcd_touch:
+    version: "*"
+    override_path: "../components_dependencies/esp_lcd_touch"

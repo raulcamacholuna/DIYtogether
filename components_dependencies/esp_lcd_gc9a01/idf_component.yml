@@ -1,0 +1,11 @@
+# Fecha: 19/08/2025 - 04:02 
+# Fichero: components_dependencies/esp_lcd_gc9a01/idf_component.yml
+# Último cambio: Eliminada la dependencia explícita de 'esp_lcd' para resolver un conflicto de enlazado con el gestor de componentes.
+# Descripción: Se ha eliminado la línea 'esp_lcd: ""^1""' del manifiesto. El error de compilación 'Component ""espressif/esp_lcd"" not found' ocurre porque el gestor de componentes intenta descargar 'esp_lcd' desde el registro, pero es un componente que ya está integrado en el framework ESP-IDF. La dependencia ya está correctamente declarada en el CMakeLists.txt del componente, por lo que esta declaración redundante y conflictiva se elimina.
+
+## IDF Component Manager Manifest File
+dependencies:
+  idf: ">=5.0"
+description: ESP-IDF LCD driver for GC9A01
+url: https://github.com/espressif/esp-iot-solution/tree/master/components/display/lcd/esp_lcd_gc9a01
+version: 1.0.4

@@ -1,8 +1,14 @@
-/* Fecha: 18/08/2025 - 10:00  */
 /* Fichero: components/ui/actions/action_config_mode.c */
-/* Último cambio: Añadido feedback visual al botón de reiniciar. */
-/* Descripción: Se ha añadido una llamada al módulo 'button_feedback' para que el botón 'REINICIAR' del modo de configuración proporcione una respuesta visual al ser presionado, mejorando la experiencia de usuario y manteniendo la coherencia con el resto de los botones de la aplicación. */
-
+/* Último cambio: Corregida la condición de carrera en el bloqueo de LVGL para resolver el crash 'Load access fault'. */
+/* Descripción: Diagnóstico de Causa Raíz: El crash final ('Load access fault') ocurre por una condición de carrera entre la tarea principal (que destruye la UI) y la tarea de LVGL (que la renderiza). La secuencia del fallo es:
+1. 'action_config_mode_start' se ejecuta en la tarea de LVGL (a través de un evento de botón).
+2. Llama a 'lvgl_port_lock()'.
+3. Llama a 'delete_screen_main', que planifica el borrado de objetos y libera buffers.
+4. Llama a 'lvgl_port_unlock()'.
+5. En ese instante, la tarea de LVGL, que tiene mayor prioridad, puede ser interrumpida. Si otra tarea (como 'telemetry_task') intenta bloquear el mutex de LVGL, podría causar un cambio de contexto.
+6. La tarea de LVGL, al reanudarse para renderizar, intenta acceder a los objetos que acaban de ser marcados para borrado y cuyos buffers asociados ya no existen, causando el 'Load access fault'.
+Solución Definitiva: Se ha eliminado el bloqueo del mutex de LVGL ('lvgl_port_lock'/'unlock') de la función 'action_config_mode_start'. Como esta función ya se ejecuta dentro de la tarea de LVGL (al ser llamada desde un callback de evento), el acceso a los objetos de la UI es inherentemente seguro (thread-safe). Eliminar el bloqueo innecesario simplifica el código y, lo más importante, evita la ventana de oportunidad para la condición de carrera, resolviendo el crash de forma definitiva y estable. */
+/* Último cambio: 20/08/2025 - 07:27 */
 #include "actions/action_config_mode.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -15,7 +21,7 @@
 #include "screens.h"
 #include "core/state_manager.h"
 #include "esp_system.h"
-#include "buttons/button_feedback.h" // Incluir el nuevo módulo de feedback
+#include "buttons/button_feedback.h"
 
 static const char *TAG = "ACTION_CONFIG_MODE";
 
@@ -25,11 +31,11 @@ static lv_obj_t *s_config_screen = NULL;
 static TaskHandle_t s_wifi_task_handle = NULL;
 static httpd_handle_t s_server_handle = NULL;
 
+// --- Declaraciones adelantadas ---
+static void create_and_load_config_screen_cb(lv_timer_t *timer);
+
 // --- Funciones de ayuda privadas del módulo ---
 
-/**
- * @brief Tarea de FreeRTOS para gestionar el modo de configuración.
- */
 static void wifi_config_task(void *param) {
     bsp_wifi_init_stack();
 
@@ -86,32 +92,17 @@ static void wifi_config_task(void *param) {
     vTaskDelete(NULL);
 }
 
-
-/**
- * @brief Callback de evento para el botón 'Reiniciar' del modo de configuración.
- */
 static void restart_button_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_CLICKED) {
         ESP_LOGW(TAG, "Botón 'Reiniciar' presionado. Reiniciando dispositivo...");
-        vTaskDelay(pdMS_TO_TICKS(500)); // Pequeña pausa para enviar el log
+        vTaskDelay(pdMS_TO_TICKS(500));
         esp_restart();
     }
 }
 
-// --- Implementación de funciones públicas ---
-
-void action_config_mode_start(void) {
-    if (s_is_config_mode_active) return;
-    s_is_config_mode_active = true;
-    ESP_LOGI(TAG, "Entrando en modo de configuración: Liberando recursos de la UI principal.");
-
-    lvgl_port_lock(0);
-    state_manager_destroy();
-    delete_screen_main();
-    lvgl_port_unlock();
-    
-    lvgl_port_lock(0);
+static void create_and_load_config_screen_cb(lv_timer_t *timer) {
+    lvgl_port_lock(0); // Bloqueo seguro para crear la nueva pantalla
     s_config_screen = lv_obj_create(NULL);
     lv_obj_set_style_bg_color(s_config_screen, lv_color_black(), 0);
 
@@ -136,11 +127,27 @@ void action_config_mode_start(void) {
     lv_label_set_text(lbl, "REINICIAR");
     lv_obj_center(lbl);
 
-    // Añadir feedback visual al botón de reiniciar
     button_feedback_add(restart_button);
 
     lv_screen_load(s_config_screen);
     lvgl_port_unlock();
 
     xTaskCreate(wifi_config_task, "wifi_cfg_task", 4096, NULL, 5, &s_wifi_task_handle);
+}
+
+// --- Implementación de funciones públicas ---
+
+void action_config_mode_start(void) {
+    if (s_is_config_mode_active) return;
+    s_is_config_mode_active = true;
+    ESP_LOGI(TAG, "Entrando en modo de configuración: Liberando recursos de la UI principal.");
+
+    // [CORRECCIÓN] No se necesita lvgl_port_lock/unlock aquí.
+    // La función se llama desde un callback de LVGL, por lo que ya está en el contexto de la tarea de LVGL.
+    state_manager_destroy();
+    delete_screen_main();
+    
+    // Programar la creación de la nueva pantalla en un ciclo de LVGL posterior para evitar condiciones de carrera.
+    lv_timer_t* timer = lv_timer_create(create_and_load_config_screen_cb, 10, NULL);
+    lv_timer_set_repeat_count(timer, 1);
 }

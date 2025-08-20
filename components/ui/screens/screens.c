@@ -1,14 +1,14 @@
-/* Fecha: 17/08/2025 - 10:19  */
 /* Fichero: components/ui/screens/screens.c */
-/* Último cambio: Actualizada la inclusión de 'diymon_ui_helpers.h' a 'helpers.h' para reflejar el renombramiento del fichero. */
-/* Descripción: Orquesta la creación de la pantalla principal. Se ha actualizado la ruta de inclusión para apuntar a 'helpers.h', manteniendo la consistencia con la refactorización de nombres. */
-
+/* Último cambio: Restauradas las declaraciones de las variables estáticas 'touch_start_x' y 'touch_start_y' para resolver el error de compilación. */
+/* Descripción: Diagnóstico de Causa Raíz: El error de compilación 'undeclared (first use in this function)' se debe a que las declaraciones de las variables estáticas para el seguimiento de las coordenadas de toque fueron eliminadas por error en una refactorización anterior. Sin estas declaraciones en el ámbito del fichero, la función de callback de eventos no podía acceder a ellas.
+Solución Definitiva: Se han reintroducido las declaraciones static lv_coord_t touch_start_x = -1; y static lv_coord_t touch_start_y = -1; al inicio del fichero. Esto restaura las variables en el ámbito correcto, permitiendo que la lógica de gestos compile y funcione como se esperaba. */
+/* Último cambio: 20/08/2025 - 07:21 */
 #include "screens.h"
 #include "ui_idle_animation.h"
 #include "ui_actions_panel.h"
 #include "ui_action_animations.h"
 #include "telemetry/telemetry_manager.h"
-#include "helpers.h" // Actualizado desde diymon_ui_helpers.h
+#include "helpers.h"
 #include "esp_log.h"
 #include "bsp_api.h"
 #include "screen_manager.h"
@@ -17,19 +17,31 @@
 static const char *TAG = "SCREENS";
 
 static lv_timer_t *s_resume_idle_timer = NULL;
-
 lv_obj_t *g_idle_animation_obj = NULL;
 lv_obj_t *g_main_screen_obj = NULL;
 
+// [CORRECCIÓN] Restaurar las variables estáticas para el seguimiento del toque.
 static lv_coord_t touch_start_x = -1;
 static lv_coord_t touch_start_y = -1;
 
+// --- Declaraciones de funciones internas ---
 static void main_screen_event_cb(lv_event_t *e);
+static void main_screen_cleanup_cb(lv_event_t * e);
 
 static void resume_idle_timer_cb(lv_timer_t *timer) {
-    ESP_LOGD(TAG, "Temporizador de reanudación de idle disparado.");
     ui_idle_animation_resume();
     s_resume_idle_timer = NULL;
+}
+
+static void main_screen_cleanup_cb(lv_event_t * e) {
+    ESP_LOGI(TAG, "LV_EVENT_DELETE recibido. Limpiando recursos personalizados de la pantalla principal...");
+    ui_idle_animation_stop();
+    ui_action_animations_destroy();
+    telemetry_manager_destroy();
+    ui_assets_deinit();
+
+    g_main_screen_obj = NULL;
+    g_idle_animation_obj = NULL;
 }
 
 void create_screen_main(void) {
@@ -37,18 +49,18 @@ void create_screen_main(void) {
     lv_obj_set_size(g_main_screen_obj, 170, 320);
     lv_obj_add_flag(g_main_screen_obj, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(g_main_screen_obj, main_screen_event_cb, LV_EVENT_ALL, NULL);
+    lv_obj_add_event_cb(g_main_screen_obj, main_screen_cleanup_cb, LV_EVENT_DELETE, NULL);
     
     lv_obj_set_scroll_dir(g_main_screen_obj, LV_DIR_ALL);
     lv_obj_set_scrollbar_mode(g_main_screen_obj, LV_SCROLLBAR_MODE_OFF);
 
     ui_helpers_load_background(g_main_screen_obj);
-
     ui_action_animations_create(g_main_screen_obj);
     g_idle_animation_obj = ui_idle_animation_start(g_main_screen_obj);
     ui_actions_panel_create(g_main_screen_obj);
     telemetry_manager_create(g_main_screen_obj);
 
-    ESP_LOGI(TAG, "Pantalla principal creada delegando en módulos.");
+    ESP_LOGI(TAG, "Pantalla principal creada y callback de limpieza registrado.");
 }
 
 static void main_screen_event_cb(lv_event_t *e) {
@@ -61,7 +73,6 @@ static void main_screen_event_cb(lv_event_t *e) {
                 lv_timer_del(s_resume_idle_timer);
                 s_resume_idle_timer = NULL;
             }
-
             lv_point_t p;
             lv_indev_get_point(indev, &p);
             touch_start_x = p.x;
@@ -74,7 +85,6 @@ static void main_screen_event_cb(lv_event_t *e) {
         case LV_EVENT_RELEASED: {
             touch_start_x = -1;
             touch_start_y = -1;
-            
             if (!screen_manager_is_off() && s_resume_idle_timer == NULL) {
                 s_resume_idle_timer = lv_timer_create(resume_idle_timer_cb, 500, NULL);
                 lv_timer_set_repeat_count(s_resume_idle_timer, 1);
@@ -90,7 +100,6 @@ static void main_screen_event_cb(lv_event_t *e) {
         }
         case LV_EVENT_CLICKED: {
             if (!screen_manager_is_off()) {
-                ESP_LOGD(TAG, "Click en la pantalla, ocultando paneles.");
                 ui_actions_panel_hide_all();
             }
             break;
@@ -103,13 +112,7 @@ static void main_screen_event_cb(lv_event_t *e) {
 void delete_screen_main(void) {
     if (g_main_screen_obj) {
         lv_obj_del(g_main_screen_obj);
-        g_main_screen_obj = NULL;
-        g_idle_animation_obj = NULL;
     }
-    ui_idle_animation_stop();
-    ui_action_animations_destroy();
-    telemetry_manager_destroy();
-    ui_assets_deinit();
 }
 
 void create_screens(void) {

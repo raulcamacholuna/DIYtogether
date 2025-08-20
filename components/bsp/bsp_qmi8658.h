@@ -1,12 +1,7 @@
-/*
- * Fichero: ./diymon_bsp/WS1.9TS/bsp_qmi8658.h
- * Fecha: 12/08/2025 - 09:25 pm
- * Último cambio: Corregidos los valores de los registros y añadidos los de calibración.
- * Descripción: Cabecera privada para el sensor QMI8658. Se han corregido las direcciones
- *              de los registros de datos (temperatura, acelerómetro, etc.) para que coincidan
- *              con la hoja de datos oficial y se han añadido los registros y comandos
- *              necesarios para la calibración y configuración avanzada del sensor.
- */
+/* Fichero: components/bsp/bsp_qmi8658.h */
+/* Último cambio: Creado como fichero de cabecera unificado para el sensor QMI8658. */
+/* Descripción: Cabecera privada para el sensor IMU QMI8658. Define los registros del sensor y los comandos de calibración. Al ser el mismo chip en ambas placas, este fichero es común y no requiere directivas de preprocesador. */
+/* Último cambio: 20/08/2025 - 05:05 */
 #ifndef BSP_QMI8658_H
 #define BSP_QMI8658_H
 
