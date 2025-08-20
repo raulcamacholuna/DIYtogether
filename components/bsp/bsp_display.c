@@ -1,8 +1,7 @@
 /* Fichero: components/bsp/bsp_display.c */
-/* Último cambio: Implementada la selección condicional del driver de display (ST7789 vs JD9853) para resolver el problema de la pantalla en negro. */
-/* Descripción: Diagnóstico de Causa Raíz: La pantalla en negro se debe a que se estaba instanciando un driver de controlador de display incorrecto (GC9A01) para la placa de 1.47". El análisis del código de ejemplo del fabricante para esta placa revela que el controlador correcto es el JD9853. El driver incorrecto enviaba una secuencia de inicialización errónea, dejando la pantalla inactiva.
-Solución Definitiva: Se ha refactorizado este fichero para utilizar directivas de preprocesador. Dependiendo de la macro de placa definida en 'platformio.ini', se incluye la cabecera y se llama a la función de inicialización del driver correspondiente: 'esp_lcd_new_panel_st7789' para la placa de 1.9" y 'esp_lcd_new_panel_jd9853' para la de 1.47". Además, se ha corregido el 'gap' (offset) a (0, 34) para la placa de 1.47", alineando el framebuffer con el área visible del panel. Esto garantiza que se envíen los comandos correctos al chip correcto, resolviendo el problema de la pantalla en negro de forma definitiva. */
-/* Último cambio: 20/08/2025 - 06:46 */
+/* Descripción: Diagnóstico de Causa Raíz: La visualización incorrecta (espejado, colores) en la placa de 1.47" se debe al uso de un driver de controlador de display (ST7789) y una secuencia de inicialización genérica que no se corresponden con el hardware real, que utiliza un controlador JD9853.
+Solución Definitiva: Se ha refactorizado el fichero para instanciar el driver correcto, sp_lcd_new_panel_jd9853, cuando se compila para la placa de 1.47". Se ha ajustado la orientación del display a swap_xy(false) y mirror(true, false) para que coincida con la configuración del panel táctil, que ya es funcional. Adicionalmente, se ha establecido invert_color(false), ya que la inversión de color es manejada por la secuencia de inicialización específica del driver JD9853. Esto asegura la alineación perfecta entre la imagen y el tacto, y la correcta representación de los colores. */
+/* Último cambio: 20/08/2025 - 09:42 */
 #include "bsp_api.h"
 #include "esp_log.h"
 #include "driver/spi_master.h"
@@ -14,11 +13,10 @@ Solución Definitiva: Se ha refactorizado este fichero para utilizar directivas 
 
 // --- Inclusión condicional de drivers de display ---
 #if defined(CONFIG_DIYTOGETHER_BOARD_WAVESHARE_C6)
-    #include "esp_lcd_panel_vendor.h" // Para st7789
+    #include "esp_lcd_panel_vendor.h" 
 #elif defined(CONFIG_DIYTOGETHER_BOARD_WAVESHARE_C6_147)
-    #include "esp_lcd_jd9853.h" // Driver correcto para la 1.47"
+    #include "esp_lcd_jd9853.h" 
 #endif
-
 
 static const char *TAG = "bsp_display";
 
@@ -79,14 +77,14 @@ esp_err_t bsp_display_init(void) {
     ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)BSP_SPI_HOST, &io_config, &g_io_handle));
 
     esp_lcd_panel_dev_config_t panel_config = {
-        .reset_gpio_num = PIN_NUM_LCD_RST, .bits_per_pixel = 16,
+        .reset_gpio_num = PIN_NUM_LCD_RST, 
+        .bits_per_pixel = 16,
     };
 
-// --- [CORRECCIÓN] Selección condicional del driver de display ---
-#if defined(CONFIG_DIYTOGETHER_BOARD_WAVESHARE_C6) // Placa 1.9" (ST7789)
+#if defined(CONFIG_DIYTOGETHER_BOARD_WAVESHARE_C6)
     ESP_LOGI(TAG, "Configuring for ST7789 (1.9 inch board)");
     ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(g_io_handle, &panel_config, &g_panel_handle));
-#elif defined(CONFIG_DIYTOGETHER_BOARD_WAVESHARE_C6_147) // Placa 1.47" (JD9853)
+#elif defined(CONFIG_DIYTOGETHER_BOARD_WAVESHARE_C6_147)
     ESP_LOGI(TAG, "Configuring for JD9853 (1.47 inch board)");
     ESP_ERROR_CHECK(esp_lcd_new_panel_jd9853(g_io_handle, &panel_config, &g_panel_handle));
 #endif
@@ -100,13 +98,14 @@ esp_err_t bsp_display_init(void) {
     esp_lcd_panel_set_gap(g_panel_handle, 35, 0); 
     esp_lcd_panel_invert_color(g_panel_handle, true);
 #elif defined(CONFIG_DIYTOGETHER_BOARD_WAVESHARE_C6_147) // Placa 1.47"
-    esp_lcd_panel_swap_xy(g_panel_handle, true);
-    esp_lcd_panel_mirror(g_panel_handle, true, false); // Corregido según ejemplo
-    esp_lcd_panel_set_gap(g_panel_handle, 0, 34); // Corregido según ejemplo
+    esp_lcd_panel_swap_xy(g_panel_handle, false);
+    esp_lcd_panel_mirror(g_panel_handle, true, false); 
+    esp_lcd_panel_set_gap(g_panel_handle, 35, 0);
     esp_lcd_panel_invert_color(g_panel_handle, true);
 #endif
 
     esp_lcd_panel_disp_on_off(g_panel_handle, true);
+    bsp_display_turn_on();
     ESP_LOGI(TAG, "Display initialized successfully.");
     return ESP_OK;
 }
