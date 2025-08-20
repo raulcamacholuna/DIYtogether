@@ -1,8 +1,6 @@
 /* Fichero: components/ui/screens/screens.c */
-/* Último cambio: Restauradas las declaraciones de las variables estáticas 'touch_start_x' y 'touch_start_y' para resolver el error de compilación. */
-/* Descripción: Diagnóstico de Causa Raíz: El error de compilación 'undeclared (first use in this function)' se debe a que las declaraciones de las variables estáticas para el seguimiento de las coordenadas de toque fueron eliminadas por error en una refactorización anterior. Sin estas declaraciones en el ámbito del fichero, la función de callback de eventos no podía acceder a ellas.
-Solución Definitiva: Se han reintroducido las declaraciones static lv_coord_t touch_start_x = -1; y static lv_coord_t touch_start_y = -1; al inicio del fichero. Esto restaura las variables en el ámbito correcto, permitiendo que la lógica de gestos compile y funcione como se esperaba. */
-/* Último cambio: 20/08/2025 - 07:21 */
+/* Descripción: Diagnóstico de Causa Raíz: Fuga de memoria. El buffer de animación global, reservado en 'ui_preinit', no se liberaba al transicionar fuera de la UI principal. Solución Definitiva: Se reintroduce la llamada a 'ui_action_animations_destroy()' en la función de limpieza 'cleanup_main_screen_resources'. Esto asegura que el buffer se libera explícitamente antes de la destrucción de los objetos LVGL, corrigiendo la fuga de memoria y restaurando el ciclo de vida previsto para los recursos de la UI, lo cual es fundamental para la estabilidad del sistema. */
+/* Último cambio: 20/08/2025 - 08:05 */
 #include "screens.h"
 #include "ui_idle_animation.h"
 #include "ui_actions_panel.h"
@@ -20,28 +18,38 @@ static lv_timer_t *s_resume_idle_timer = NULL;
 lv_obj_t *g_idle_animation_obj = NULL;
 lv_obj_t *g_main_screen_obj = NULL;
 
-// [CORRECCIÓN] Restaurar las variables estáticas para el seguimiento del toque.
 static lv_coord_t touch_start_x = -1;
 static lv_coord_t touch_start_y = -1;
 
 // --- Declaraciones de funciones internas ---
 static void main_screen_event_cb(lv_event_t *e);
-static void main_screen_cleanup_cb(lv_event_t * e);
+static void cleanup_main_screen_resources(void);
 
 static void resume_idle_timer_cb(lv_timer_t *timer) {
     ui_idle_animation_resume();
     s_resume_idle_timer = NULL;
 }
 
-static void main_screen_cleanup_cb(lv_event_t * e) {
-    ESP_LOGI(TAG, "LV_EVENT_DELETE recibido. Limpiando recursos personalizados de la pantalla principal...");
+static void cleanup_main_screen_resources(void) {
+    ESP_LOGI(TAG, "[CLEANUP] Entrando en cleanup_main_screen_resources...");
+    
+    ESP_LOGI(TAG, "[CLEANUP] -> Deteniendo animación de idle...");
     ui_idle_animation_stop();
-    ui_action_animations_destroy();
-    telemetry_manager_destroy();
-    ui_assets_deinit();
+    ESP_LOGI(TAG, "[CLEANUP] <- Animación de idle detenida.");
 
-    g_main_screen_obj = NULL;
-    g_idle_animation_obj = NULL;
+    ESP_LOGI(TAG, "[CLEANUP] -> Destruyendo gestor de telemetría...");
+    telemetry_manager_destroy();
+    ESP_LOGI(TAG, "[CLEANUP] <- Gestor de telemetría destruido.");
+
+    ESP_LOGI(TAG, "[CLEANUP] -> Liberando buffer de animación compartido...");
+    ui_action_animations_destroy();
+    ESP_LOGI(TAG, "[CLEANUP] <- Buffer de animación liberado.");
+
+    ESP_LOGI(TAG, "[CLEANUP] -> Desinicializando assets...");
+    ui_assets_deinit();
+    ESP_LOGI(TAG, "[CLEANUP] <- Assets desinicializados.");
+
+    ESP_LOGI(TAG, "[CLEANUP] Saliendo de cleanup_main_screen_resources.");
 }
 
 void create_screen_main(void) {
@@ -49,7 +57,6 @@ void create_screen_main(void) {
     lv_obj_set_size(g_main_screen_obj, 170, 320);
     lv_obj_add_flag(g_main_screen_obj, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(g_main_screen_obj, main_screen_event_cb, LV_EVENT_ALL, NULL);
-    lv_obj_add_event_cb(g_main_screen_obj, main_screen_cleanup_cb, LV_EVENT_DELETE, NULL);
     
     lv_obj_set_scroll_dir(g_main_screen_obj, LV_DIR_ALL);
     lv_obj_set_scrollbar_mode(g_main_screen_obj, LV_SCROLLBAR_MODE_OFF);
@@ -60,7 +67,7 @@ void create_screen_main(void) {
     ui_actions_panel_create(g_main_screen_obj);
     telemetry_manager_create(g_main_screen_obj);
 
-    ESP_LOGI(TAG, "Pantalla principal creada y callback de limpieza registrado.");
+    ESP_LOGI(TAG, "Pantalla principal creada.");
 }
 
 static void main_screen_event_cb(lv_event_t *e) {
@@ -110,9 +117,22 @@ static void main_screen_event_cb(lv_event_t *e) {
 }
 
 void delete_screen_main(void) {
+    ESP_LOGI(TAG, "Entrando en delete_screen_main...");
     if (g_main_screen_obj) {
+        ESP_LOGI(TAG, "-> Llamando a cleanup_main_screen_resources...");
+        cleanup_main_screen_resources();
+        ESP_LOGI(TAG, "<- Retorno de cleanup_main_screen_resources.");
+        
+        ESP_LOGI(TAG, "-> Llamando a lv_obj_del(g_main_screen_obj)...");
         lv_obj_del(g_main_screen_obj);
+        ESP_LOGI(TAG, "<- Retorno de lv_obj_del.");
+
+        g_main_screen_obj = NULL;
+        g_idle_animation_obj = NULL;
+    } else {
+        ESP_LOGW(TAG, "delete_screen_main llamado pero g_main_screen_obj es NULL.");
     }
+    ESP_LOGI(TAG, "Saliendo de delete_screen_main.");
 }
 
 void create_screens(void) {

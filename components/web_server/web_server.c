@@ -1,8 +1,7 @@
-/* Fecha: 18/08/2025 - 07:43  */
 /* Fichero: components/web_server/web_server.c */
-/* Último cambio: Aumentada la prioridad de la tarea del servidor HTTP a 3 para resolver el error de socket. */
-/* Descripción: Orquestador del servidor web. La prioridad de la tarea se ha elevado a 3, que es mayor que la de la tarea de LVGL (prioridad 4). Esto es crucial para asegurar que el servidor web tenga la CPU necesaria para gestionar el envío de datos a través del socket, evitando que el buffer TCP se llene y cause el error EAGAIN ('error in send : 11'), que es la causa raíz del fallo en la transferencia de ficheros. */
-
+/* Descripción: Diagnóstico de Causa Raíz: El error de socket 'error in send : 11' (EAGAIN) indica que el buffer de envío TCP se está llenando. Esto ocurre porque la tarea del servidor web no obtiene suficiente tiempo de CPU para enviar datos a la red, siendo interrumpida por otras tareas de menor prioridad pero de ejecución más frecuente, como la tarea de LVGL.
+Solución Definitiva: Se ha elevado la prioridad de la tarea del servidor HTTP de 3 a 2. Al ser una prioridad numéricamente más baja (y por tanto, mayor), se garantiza que el planificador de FreeRTOS le dará preferencia sobre la tarea de LVGL (prioridad 4), permitiéndole vaciar el buffer de envío de la red de manera más eficiente y evitando el desbordamiento que causa el error. */
+/* Último cambio: 20/08/2025 - 08:00 */
 #include "web_server.h"
 #include "web_server_priv.h" // Cabecera privada con las declaraciones de los handlers
 #include "esp_http_server.h"
@@ -17,7 +16,7 @@ httpd_handle_t web_server_start(void) {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.stack_size = 8192;
-    config.task_priority = 3; // [CORRECCIÓN] Prioridad > LVGL (4) para evitar inanición de la red.
+    config.task_priority = 2; // Prioridad elevada para garantizar el rendimiento de la red sobre la UI.
 
     ESP_LOGI(TAG, "Iniciando servidor web de configuracion (Prioridad Tarea: %d).", config.task_priority);
 
