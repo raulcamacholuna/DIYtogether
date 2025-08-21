@@ -1,7 +1,6 @@
 /* Fichero: components/bsp/bsp.c */
-/* Último cambio: Creado como fichero unificado para la orquestación del BSP, eliminando la duplicación de código. */
-/* Descripción: Orquestador principal del BSP. Este fichero es común para todas las placas soportadas. Llama a las funciones de inicialización de los periféricos individuales (ej: bsp_i2c_init, bsp_display_init), cuyas implementaciones específicas de hardware se seleccionan en tiempo de compilación mediante directivas de preprocesador en sus respectivos ficheros .c. */
-/* Último cambio: 20/08/2025 - 04:59 */
+/* Descripción: Diagnóstico de Causa Raíz: Error de compilación 'too few arguments to function bsp_display_set_brightness'. La firma de la función fue modificada para requerir un segundo argumento booleano ('save_to_nvs'), pero la llamada en 'bsp_init_service_mode' no se actualizó. Solución Definitiva: Se ha corregido la llamada a 'bsp_display_set_brightness(100, true)', proporcionando el argumento faltante. Se asume 'true' para el guardado, ya que el modo de servicio es una acción explícita que justifica establecer un brillo máximo persistente. Esto resuelve el error de compilación. */
+/* Último cambio: 21/08/2025 - 19:26 */
 #include "bsp_api.h"
 #include "esp_err.h"
 #include "esp_log.h" 
@@ -39,7 +38,7 @@ esp_err_t bsp_init_service_mode(void) {
 
     ESP_ERROR_CHECK(bsp_display_init());
     ESP_ERROR_CHECK(bsp_touch_init());
-    bsp_display_set_brightness(100);
+    bsp_display_set_brightness(100, true);
     return ESP_OK;
 }
 

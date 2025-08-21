@@ -1,3 +1,6 @@
+/* Fichero: components/screen_manager/screen_manager.h */
+/* Descripción: Se actualiza la cabecera del gestor de pantalla para reflejar la nueva firma de la función de brillo, propagando la capacidad de controlar el guardado en NVS a las capas superiores de la aplicación. */
+/* Último cambio: 21/08/2025 - 19:23 */
 #ifndef SCREEN_MANAGER_H
 #define SCREEN_MANAGER_H
 
@@ -29,8 +32,9 @@ void screen_manager_turn_off(void);
  * @brief Establece el nivel de brillo de la pantalla.
  * 
  * @param percentage Brillo en porcentaje (0-100).
+ * @param save_to_nvs Si es true, el valor se guardará en la NVS como preferencia del usuario.
  */
-void screen_manager_set_brightness(int percentage);
+void screen_manager_set_brightness(int percentage, bool save_to_nvs);
 
 /**
  * @brief Devuelve si la pantalla está actualmente apagada.

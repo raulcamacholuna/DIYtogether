@@ -1,7 +1,6 @@
 /* Fichero: components/bsp/bsp_display.c */
-/* Descripción: Diagnóstico de Causa Raíz: La visualización incorrecta (espejado, colores) en la placa de 1.47" se debe al uso de un driver de controlador de display (ST7789) y una secuencia de inicialización genérica que no se corresponden con el hardware real, que utiliza un controlador JD9853.
-Solución Definitiva: Se ha refactorizado el fichero para instanciar el driver correcto, sp_lcd_new_panel_jd9853, cuando se compila para la placa de 1.47". Se ha ajustado la orientación del display a swap_xy(false) y mirror(true, false) para que coincida con la configuración del panel táctil, que ya es funcional. Adicionalmente, se ha establecido invert_color(false), ya que la inversión de color es manejada por la secuencia de inicialización específica del driver JD9853. Esto asegura la alineación perfecta entre la imagen y el tacto, y la correcta representación de los colores. */
-/* Último cambio: 20/08/2025 - 09:42 */
+/* Descripción: Diagnóstico: La lógica de brillo actualizaba la NVS en cada llamada, impidiendo un atenuado temporal. Solución: Se refactoriza la función para aceptar un booleano 'save_to_nvs', desacoplando el cambio de brillo físico del guardado en memoria no volátil. Ahora solo se persiste el valor cuando es un cambio explícito del usuario. */
+/* Último cambio: 21/08/2025 - 19:23 */
 #include "bsp_api.h"
 #include "esp_log.h"
 #include "driver/spi_master.h"
@@ -67,7 +66,7 @@ esp_err_t bsp_display_init(void) {
         if (nvs_get_i32(nvs_handle, "brightness", &saved_brightness) != ESP_OK) saved_brightness = 100;
         nvs_close(nvs_handle);
     }
-    bsp_display_set_brightness((int)saved_brightness);
+    bsp_display_set_brightness((int)saved_brightness, true);
 
     esp_lcd_panel_io_spi_config_t io_config = {
         .cs_gpio_num = PIN_NUM_LCD_CS, .dc_gpio_num = PIN_NUM_LCD_DC,
@@ -100,7 +99,7 @@ esp_err_t bsp_display_init(void) {
 #elif defined(CONFIG_DIYTOGETHER_BOARD_WAVESHARE_C6_147) // Placa 1.47"
     esp_lcd_panel_swap_xy(g_panel_handle, false);
     esp_lcd_panel_mirror(g_panel_handle, true, false); 
-    esp_lcd_panel_set_gap(g_panel_handle, 35, 0);
+    esp_lcd_panel_set_gap(g_panel_handle, 34, 0);
     esp_lcd_panel_invert_color(g_panel_handle, true);
 #endif
 
@@ -110,19 +109,22 @@ esp_err_t bsp_display_init(void) {
     return ESP_OK;
 }
 
-void bsp_display_set_brightness(int percentage) {
+void bsp_display_set_brightness(int percentage, bool save_to_nvs) {
     if (percentage > 100) percentage = 100;
     if (percentage < 0) percentage = 0;
+    
     uint32_t duty = 255 - ((255 * percentage) / 100);
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
-    if (percentage == 10) return;
-    if (percentage > 0) s_last_brightness_percentage = percentage;
-    nvs_handle_t nvs_handle;
-    if (nvs_open("storage", NVS_READWRITE, &nvs_handle) == ESP_OK) {
-        nvs_set_i32(nvs_handle, "brightness", (int32_t)percentage);
-        nvs_commit(nvs_handle);
-        nvs_close(nvs_handle);
+
+    if (save_to_nvs) {
+        s_last_brightness_percentage = percentage;
+        nvs_handle_t nvs_handle;
+        if (nvs_open("storage", NVS_READWRITE, &nvs_handle) == ESP_OK) {
+            nvs_set_i32(nvs_handle, "brightness", (int32_t)percentage);
+            nvs_commit(nvs_handle);
+            nvs_close(nvs_handle);
+        }
     }
 }
 

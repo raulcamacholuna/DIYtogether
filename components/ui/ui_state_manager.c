@@ -1,8 +1,6 @@
-/* Fecha: 17/08/2025 - 02:11  */
 /* Fichero: components/ui/ui_state_manager.c */
-/* Último cambio: Movida toda la lógica de gestión de estado de la pantalla (inactividad, atenuado, despertar) desde main.c a este nuevo módulo dedicado. */
-/* Descripción: Implementación del gestor de estado de la UI. Este fichero ahora contiene todas las variables y funciones que manejan el comportamiento de la pantalla en respuesta a la inactividad del usuario. Centraliza la lógica de atenuado, apagado automático y el patrón de toques para despertar, limpiando significativamente la lógica de main.c. */
-
+/* Descripción: Diagnóstico: Error de compilación 'too few arguments' en las llamadas a 'screen_manager_set_brightness'. Causa Raíz: La firma de la función fue actualizada para requerir un segundo argumento booleano ('save_to_nvs'), pero las llamadas dentro de este fichero no se actualizaron. Solución: Se han corregido ambas llamadas para pasar 'false' como segundo argumento, ya que tanto el atenuado temporal como la restauración del brillo no deben modificar la preferencia guardada por el usuario, resolviendo así el error de compilación y asegurando la lógica correcta. */
+/* Último cambio: 21/08/2025 - 19:29 */
 #include "ui_state_manager.h"
 #include "screen_manager.h"
 #include "nvs_flash.h"
@@ -57,7 +55,7 @@ static void screen_touch_event_cb(lv_event_t * e) {
 
     if (code == LV_EVENT_PRESSED && s_is_dimmed && !screen_manager_is_off()) {
         read_user_brightness_from_nvs();
-        screen_manager_set_brightness(s_user_brightness);
+        screen_manager_set_brightness(s_user_brightness, false);
         s_is_dimmed = false;
         return;
     }
@@ -111,7 +109,7 @@ static void inactivity_timer_cb(lv_timer_t * timer) {
         s_is_dimmed = false;
     } else if (!is_off && !s_is_dimmed && inactivity_ms > 30000) {
         read_user_brightness_from_nvs();
-        screen_manager_set_brightness(10);
+        screen_manager_set_brightness(10, false);
         s_is_dimmed = true;
     }
 }

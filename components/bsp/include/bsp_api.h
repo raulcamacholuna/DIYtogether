@@ -1,8 +1,6 @@
-/* Fecha: 18/08/2025 - 09:01  */
 /* Fichero: components/bsp/include/bsp_api.h */
-/* Último cambio: Añadida la declaración de bsp_wifi_deinit para la limpieza de recursos. */
-/* Descripción: Interfaz pública del BSP. Se añade la función `bsp_wifi_deinit` para permitir una desinicialización completa y segura del stack WiFi. Esto es crucial para liberar memoria y recursos al salir de modos de operación que usan la red, como el modo de configuración, evitando así fugas y fallos de asignación al reiniciar servicios. */
-
+/* Descripción: Se ha modificado la firma de 'bsp_display_set_brightness' para aceptar un booleano 'save_to_nvs'. Este cambio es fundamental para la nueva lógica de atenuado, ya que permite al 'state_manager' reducir el brillo temporalmente sin sobrescribir el valor preferido por el usuario en la NVS. */
+/* Último cambio: 21/08/2025 - 19:23 */
 #ifndef BSP_API_H
 #define BSP_API_H
 
@@ -13,6 +11,7 @@
 #include "driver/gpio.h"
 #include "esp_wifi.h"
 #include <stdint.h> // Para uint16_t
+#include <stdbool.h> // Para bool
 
 // --- INICIALIZADORES DE HARDWARE ---
 esp_err_t bsp_init(void);
@@ -39,7 +38,7 @@ void bsp_wifi_get_ip(char *ip);
 void bsp_wifi_erase_credentials(void);
 
 // --- FUNCIONES DE CONTROL ---
-void bsp_display_set_brightness(int percentage);
+void bsp_display_set_brightness(int percentage, bool save_to_nvs);
 void bsp_display_turn_on(void);
 void bsp_display_turn_off(void);
 

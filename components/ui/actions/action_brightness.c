@@ -1,8 +1,6 @@
-/* Fecha: 17/08/2025 - 01:47  */
 /* Fichero: components/ui/actions/action_brightness.c */
-/* Último cambio: Implementación de la lógica de brillo, extraída del antiguo 'actions.c'. */
-/* Descripción: Implementa la acción de ciclar el brillo. Contiene las variables estáticas para los niveles de brillo y el índice actual, manteniendo este estado aislado del resto del sistema. */
-
+/* Descripción: Se actualiza la llamada a 'screen_manager_set_brightness' para pasar 'true' al parámetro 'save_to_nvs'. Esto asegura que cuando el usuario cicla el brillo, su selección se guarde explícitamente como la nueva preferencia. */
+/* Último cambio: 21/08/2025 - 19:23 */
 #include "actions/action_brightness.h"
 #include "screen_manager.h" // Necesario para llamar a screen_manager_set_brightness
 
@@ -17,6 +15,6 @@ void action_brightness_cycle(void) {
     // Avanza al siguiente nivel de brillo, volviendo al principio si es necesario (ciclo)
     s_current_brightness_idx = (s_current_brightness_idx + 1) % 4;
     
-    // Llama al gestor de pantalla para aplicar el nuevo nivel de brillo
-    screen_manager_set_brightness(s_brightness_levels[s_current_brightness_idx]);
+    // Llama al gestor de pantalla para aplicar el nuevo nivel de brillo y guardarlo.
+    screen_manager_set_brightness(s_brightness_levels[s_current_brightness_idx], true);
 }

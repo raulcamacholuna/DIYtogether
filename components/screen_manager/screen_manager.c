@@ -1,12 +1,6 @@
-/*
-  Fichero: ./components/screen_manager/screen_manager.c
-  Fecha: 13/08/2025 - 12:03 
-  Último cambio: Eliminada completamente la lógica de 'shake-to-wake'.
-  Descripción: Se ha eliminado toda la funcionalidad de shake-to-wake, incluyendo la tarea,
-               el semáforo y la inicialización de la interrupción del BSP. Esta funcionalidad
-               será re-implementada dentro de la nueva tarea de telemetría en la capa de la UI
-               para consolidar la lógica y resolver conflictos de I2C.
-*/
+/* Fichero: components/screen_manager/screen_manager.c */
+/* Descripción: Este módulo ahora propaga el nuevo parámetro 'save_to_nvs' a la capa inferior del BSP. Esto permite a los módulos de UI de más alto nivel, como el 'state_manager', controlar no solo el nivel de brillo sino también su persistencia. */
+/* Último cambio: 21/08/2025 - 19:23 */
 #include "screen_manager.h"
 #include "bsp_api.h"
 #include "esp_log.h"
@@ -31,8 +25,8 @@ void screen_manager_turn_off(void) {
     ESP_LOGI(TAG, "Petición para apagar pantalla ejecutada.");
 }
 
-void screen_manager_set_brightness(int percentage) {
-    bsp_display_set_brightness(percentage);
+void screen_manager_set_brightness(int percentage, bool save_to_nvs) {
+    bsp_display_set_brightness(percentage, save_to_nvs);
 }
 
 bool screen_manager_is_off(void) {

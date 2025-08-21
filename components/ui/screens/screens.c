@@ -1,6 +1,6 @@
 /* Fichero: components/ui/screens/screens.c */
-/* Descripción: Diagnóstico de Causa Raíz: Fuga de memoria. El buffer de animación global, reservado en 'ui_preinit', no se liberaba al transicionar fuera de la UI principal. Solución Definitiva: Se reintroduce la llamada a 'ui_action_animations_destroy()' en la función de limpieza 'cleanup_main_screen_resources'. Esto asegura que el buffer se libera explícitamente antes de la destrucción de los objetos LVGL, corrigiendo la fuga de memoria y restaurando el ciclo de vida previsto para los recursos de la UI, lo cual es fundamental para la estabilidad del sistema. */
-/* Último cambio: 20/08/2025 - 08:05 */
+/* Descripción: Diagnóstico de Causa Raíz: La pantalla de 1.47" tiene una resolución física ligeramente mayor que su resolución lógica de 172px, lo que provoca que se muestren píxeles no inicializados (ruido visual) en los bordes laterales. Solución Definitiva: Se ha modificado la creación de la pantalla principal ('g_main_screen_obj') para que tenga un fondo negro sólido y opaco, sin bordes ni padding. Al establecer explícitamente el color de fondo de todo el objeto de la pantalla, se asegura que LVGL limpie todo el framebuffer a negro en cada ciclo de renderizado, eliminando eficazmente el ruido visual y creando bordes negros limpios en los laterales. */
+/* Último cambio: 21/08/2025 - 19:09 */
 #include "screens.h"
 #include "ui_idle_animation.h"
 #include "ui_actions_panel.h"
@@ -54,6 +54,12 @@ static void cleanup_main_screen_resources(void) {
 
 void create_screen_main(void) {
     g_main_screen_obj = lv_obj_create(NULL);
+    lv_obj_remove_style_all(g_main_screen_obj);
+    lv_obj_set_style_bg_color(g_main_screen_obj, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(g_main_screen_obj, LV_OPA_COVER, 0);
+    lv_obj_set_style_pad_all(g_main_screen_obj, 0, 0);
+    lv_obj_set_style_border_width(g_main_screen_obj, 0, 0);
+    
     lv_obj_set_size(g_main_screen_obj, 170, 320);
     lv_obj_add_flag(g_main_screen_obj, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(g_main_screen_obj, main_screen_event_cb, LV_EVENT_ALL, NULL);

@@ -1,8 +1,6 @@
-/* Fecha: 18/08/2025 - 08:01  */
 /* Fichero: components/ui/core/state_manager.c */
-/* Último cambio: Implementada la función state_manager_destroy para liberar los temporizadores. */
-/* Descripción: Se ha añadido la implementación de state_manager_destroy, que se encarga de eliminar de forma segura todos los temporizadores de LVGL que el gestor de estado crea. Esto permite liberar memoria y detener la lógica de inactividad cuando se entra en modos de operación donde no es necesaria, como el modo de configuración. */
-
+/* Descripción: Diagnóstico: La lógica de inactividad era monolítica. Solución: Se implementa la nueva lógica de inactividad de tres fases. A los 30s, atenúa la pantalla al 5% sin guardar en NVS. Al recibir un toque en estado atenuado, restaura el brillo guardado por el usuario (leído de NVS). A los 60s, apaga completamente la pantalla. Esto crea un sistema de ahorro de energía modular y robusto. */
+/* Último cambio: 21/08/2025 - 19:23 */
 #include "state_manager.h"
 #include "screen_manager.h"
 #include "nvs_flash.h"
@@ -33,9 +31,14 @@ static void read_user_brightness_from_nvs(void) {
     if (s_user_brightness_known) return;
     nvs_handle_t nvs_handle;
     if (nvs_open("storage", NVS_READONLY, &nvs_handle) == ESP_OK) {
-        nvs_get_i32(nvs_handle, "brightness", (int32_t*)&s_user_brightness);
+        if (nvs_get_i32(nvs_handle, "brightness", (int32_t*)&s_user_brightness) == ESP_OK) {
+            ESP_LOGI(TAG, "Brillo de usuario cargado desde NVS: %d%%", s_user_brightness);
+            s_user_brightness_known = true;
+        } else {
+            ESP_LOGW(TAG, "No se encontró brillo en NVS, usando 100%% por defecto.");
+            s_user_brightness = 100;
+        }
         nvs_close(nvs_handle);
-        s_user_brightness_known = true;
     }
 }
 
@@ -59,8 +62,8 @@ static void screen_touch_event_cb(lv_event_t * e) {
     lv_display_trigger_activity(disp);
 
     if (code == LV_EVENT_PRESSED && s_is_dimmed && !screen_manager_is_off()) {
-        read_user_brightness_from_nvs();
-        screen_manager_set_brightness(s_user_brightness);
+        ESP_LOGD(TAG, "Toque en pantalla atenuada. Restaurando brillo a %d%%", s_user_brightness);
+        screen_manager_set_brightness(s_user_brightness, false); // No guardar, es solo restauración
         s_is_dimmed = false;
         return;
     }
@@ -99,7 +102,7 @@ static void screen_touch_event_cb(lv_event_t * e) {
 }
 
 static void inactivity_timer_cb(lv_timer_t * timer) {
-    if (s_is_paused) return; // No hacer nada si está pausado
+    if (s_is_paused) return;
 
     lv_disp_t * disp = lv_display_get_default();
     if (!disp) return;
@@ -107,16 +110,14 @@ static void inactivity_timer_cb(lv_timer_t * timer) {
     uint32_t inactivity_ms = lv_display_get_inactive_time(disp);
     bool is_off = screen_manager_is_off();
 
-    if (inactivity_ms < 30000 && s_is_dimmed) {
-        s_is_dimmed = false;
-    }
-
     if (!is_off && inactivity_ms > 60000) {
+        ESP_LOGI(TAG, "Inactividad > 60s. Apagando pantalla.");
         screen_manager_turn_off();
-        s_is_dimmed = false;
+        s_is_dimmed = false; 
     } else if (!is_off && !s_is_dimmed && inactivity_ms > 30000) {
-        read_user_brightness_from_nvs();
-        screen_manager_set_brightness(10);
+        ESP_LOGI(TAG, "Inactividad > 30s. Atenuando pantalla al 5%%.");
+        read_user_brightness_from_nvs(); // Asegurarse de tener el brillo del usuario
+        screen_manager_set_brightness(5, false); // Atenuar sin guardar
         s_is_dimmed = true;
     }
 }
@@ -124,6 +125,7 @@ static void inactivity_timer_cb(lv_timer_t * timer) {
 // --- Funciones de inicialización y control públicas ---
 
 void state_manager_init(void) {
+    read_user_brightness_from_nvs(); // Carga inicial
     s_inactivity_timer = lv_timer_create(inactivity_timer_cb, 5000, NULL);
     lv_obj_t * scr = lv_screen_active();
     if (scr) {
@@ -164,7 +166,5 @@ void state_manager_destroy(void) {
         lv_timer_del(s_wake_prime_timer);
         s_wake_prime_timer = NULL;
     }
-    // No es necesario eliminar el screen_touch_event_cb, ya que la pantalla
-    // a la que está asociado será eliminada por el llamante.
     ESP_LOGI(TAG, "Gestor de estado DESTRUIDO. Todos los temporizadores liberados.");
 }
