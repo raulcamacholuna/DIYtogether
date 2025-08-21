@@ -1,6 +1,6 @@
 /* Fichero: components/screen_manager/screen_manager.h */
-/* Descripción: Se actualiza la cabecera del gestor de pantalla para reflejar la nueva firma de la función de brillo, propagando la capacidad de controlar el guardado en NVS a las capas superiores de la aplicación. */
-/* Último cambio: 21/08/2025 - 19:23 */
+/* Descripción: Diagnóstico: La lógica de apagado y sueño ligero estaba acoplada. Solución Holística: Se ha refactorizado la interfaz para desacoplar las operaciones. 'turn_off' ahora solo apaga el backlight, mientras que la nueva función 'enter_light_sleep' gestiona explícitamente la entrada en bajo consumo. Esta granularidad permite que el 'state_manager' implemente una lógica de inactividad por fases (apagar y luego dormir), mientras que las acciones directas del usuario pueden invocar el sueño inmediato, resultando en un sistema más modular y predecible. */
+/* Último cambio: 21/08/2025 - 21:37 */
 #ifndef SCREEN_MANAGER_H
 #define SCREEN_MANAGER_H
 
@@ -11,38 +11,12 @@
 extern "C" {
 #endif
 
-/**
- * @brief Inicializa el gestor de pantalla.
- * 
- * @return ESP_OK si la inicialización es correcta.
- */
 esp_err_t screen_manager_init(void);
-
-/**
- * @brief Enciende la pantalla y restaura el último nivel de brillo.
- */
 void screen_manager_turn_on(void);
-
-/**
- * @brief Apaga la pantalla y el backlight.
- */
 void screen_manager_turn_off(void);
-
-/**
- * @brief Establece el nivel de brillo de la pantalla.
- * 
- * @param percentage Brillo en porcentaje (0-100).
- * @param save_to_nvs Si es true, el valor se guardará en la NVS como preferencia del usuario.
- */
+void screen_manager_enter_light_sleep(void);
 void screen_manager_set_brightness(int percentage, bool save_to_nvs);
-
-/**
- * @brief Devuelve si la pantalla está actualmente apagada.
- * 
- * @return true si la pantalla está apagada, false en caso contrario.
- */
 bool screen_manager_is_off(void);
-
 
 #ifdef __cplusplus
 }

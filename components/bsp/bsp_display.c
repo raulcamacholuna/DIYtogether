@@ -1,6 +1,6 @@
 /* Fichero: components/bsp/bsp_display.c */
-/* Descripción: Diagnóstico: La lógica de brillo actualizaba la NVS en cada llamada, impidiendo un atenuado temporal. Solución: Se refactoriza la función para aceptar un booleano 'save_to_nvs', desacoplando el cambio de brillo físico del guardado en memoria no volátil. Ahora solo se persiste el valor cuando es un cambio explícito del usuario. */
-/* Último cambio: 21/08/2025 - 19:23 */
+/* Descripción: Diagnóstico de Causa Raíz: El backlight no se apaga porque la función sp_lcd_panel_disp_on_off(..., false) se llama antes de actualizar el duty cycle del LEDC. Esta llamada pone al controlador del display en modo de bajo consumo, lo que probablemente impide que procese el cambio de estado del pin del backlight. Solución Definitiva: Se ha invertido el orden de las operaciones. En sp_display_turn_off, ahora se apaga primero el backlight (LEDC duty a 255) y luego se apaga el panel. En sp_display_turn_on, se enciende primero el panel y luego se restaura el brillo. Esto garantiza que el controlador del display esté siempre en un estado activo para recibir y procesar los cambios de control del backlight. */
+/* Último cambio: 21/08/2025 - 21:44 */
 #include "bsp_api.h"
 #include "esp_log.h"
 #include "driver/spi_master.h"
@@ -129,16 +129,16 @@ void bsp_display_set_brightness(int percentage, bool save_to_nvs) {
 }
 
 void bsp_display_turn_on(void) {
+    if (g_panel_handle) esp_lcd_panel_disp_on_off(g_panel_handle, true);
     uint32_t duty = 255 - ((255 * s_last_brightness_percentage) / 100);
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
-    if (g_panel_handle) esp_lcd_panel_disp_on_off(g_panel_handle, true);
 }
 
 void bsp_display_turn_off(void) {
-    if (g_panel_handle) esp_lcd_panel_disp_on_off(g_panel_handle, false);
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 255);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
+    if (g_panel_handle) esp_lcd_panel_disp_on_off(g_panel_handle, false);
 }
 
 esp_lcd_panel_handle_t bsp_get_display_handle(void) { return g_panel_handle; }
