@@ -1,8 +1,6 @@
-/* Fecha: 17/08/2025 - 10:18  */
 /* Fichero: components/ui/helpers.c */
-/* Último cambio: Renombrado de 'diymon_ui_helpers.c' y actualizada la inclusión de la cabecera. */
-/* Descripción: Implementación de las funciones de ayuda de la UI. Se ha renombrado el fichero y se ha actualizado la directiva #include para que apunte a 'helpers.h', completando la estandarización de nombres. */
-
+/* Descripción: Diagnóstico de Causa Raíz: La construcción de rutas de animación era inconsistente. La función de ayuda 'ui_helpers_build_asset_path' añadía una barra inclinada ('/') final, y la función de carga de fotogramas ('animation_loader_load_frame') añadía otra, resultando en una ruta malformada con una doble barra (ej: '.../2//ANIM_IDLE_2.bin'). Esto causaba que el sistema de ficheros de LVGL no encontrara los fotogramas de la animación. Solución Definitiva: Se ha modificado 'ui_helpers_build_asset_path' para que no añada la barra inclinada final. Ahora, esta función devuelve una ruta de directorio limpia, y es responsabilidad de la función que carga el fotograma específico añadir el separador, garantizando que todas las rutas se construyan de forma correcta y consistente. */
+/* Último cambio: 21/08/2025 - 17:57 */
 #include "helpers.h"
 #include "diymon_evolution.h"
 #include "esp_log.h"
@@ -30,7 +28,8 @@ static void get_evolution_dir_name(char* dir_name_buffer, size_t buffer_size) {
 void ui_helpers_build_asset_path(char* buffer, size_t buffer_size, const char* asset_filename) {
     char dir_name[9];
     get_evolution_dir_name(dir_name, sizeof(dir_name));
-    snprintf(buffer, buffer_size, "S:/diymon/%s/%s/", dir_name, asset_filename);
+    // [CORRECCIÓN] Se elimina la barra inclinada final para evitar dobles barras en la ruta.
+    snprintf(buffer, buffer_size, "S:/diymon/%s/%s", dir_name, asset_filename);
 }
 
 // Carga la imagen de fondo desde el firmware creando un objeto de imagen.

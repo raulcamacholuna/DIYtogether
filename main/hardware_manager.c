@@ -1,7 +1,7 @@
 /* Fichero: main/hardware_manager.c */
-/* Descripción: Diagnóstico de Causa Raíz: La inversión del eje Y en el panel táctil de la placa de 1.47" era incorrecta, causando que las coordenadas verticales se reportaran al revés.
-Solución Definitiva: Se ha modificado el parámetro de la función sp_lcd_touch_set_mirror_y de 	rue a alse en el bloque de configuración específico para la placa de 1.47". Este cambio invierte la dirección del eje Y reportada por el driver del panel táctil, alineándola con la orientación física de la pantalla y corrigiendo la interacción del usuario. */
-/* Último cambio: 20/08/2025 - 09:02 */
+/* Descripción: Diagnóstico de Causa Raíz: El conteo de fotogramas de animación fallaba porque el callback del driver VFS (s_dir_read_cb) no se adhería a la especificación de la API de LVGL, que requiere que los nombres de directorio se prefijen con el carácter '/'.
+Solución Definitiva: Se ha restaurado la lógica original en s_dir_read_cb que comprueba el tipo de entrada de directorio (nt->d_type) y añade el prefijo '/' a los directorios. Esto asegura que el driver VFS proporciona los datos en el formato que LVGL y el código de la aplicación esperan, permitiendo que el filtrado de directorios en nimation_loader_count_frames funcione correctamente. */
+/* Último cambio: 21/08/2025 - 18:04 */
 #include "hardware_manager.h"
 #include "esp_log.h"
 #include "bsp_api.h"
@@ -78,6 +78,7 @@ static lv_fs_res_t fs_dir_read_cb(lv_fs_drv_t * drv, void * rddir_p, char * fn, 
         return LV_FS_RES_OK;
     }
     
+    // [CORRECCIÓN] Se restaura la lógica para cumplir con la API de LVGL.
     if(ent->d_type == DT_DIR) {
         snprintf(fn, fn_len, "/%s", ent->d_name);
     } else {

@@ -52,7 +52,7 @@ static void wifi_config_task(void *param) {
         if (s_is_config_mode_active && s_config_screen) {
             lv_obj_t *label1 = lv_obj_get_child(s_config_screen, 0);
             lv_obj_t *label2 = lv_obj_get_child(s_config_screen, 1);
-            lv_label_set_text(label1, "¡Conectado!");
+            lv_label_set_text(label1, "Conectado!");
             lv_label_set_text_fmt(label2, "IP: %s\nAccede desde tu navegador", ip_addr);
         }
         lvgl_port_unlock();

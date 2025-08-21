@@ -1,8 +1,6 @@
-/* Fecha: 18/08/2025 - 08:59  */
 /* Fichero: components/ui/animation_loader.c */
-/* Último cambio: Restaurado el formato de color a RGB565A8 y el tamaño del buffer a 3 bytes por píxel para corregir la pérdida de transparencias. */
-/* Descripción: Se ha revertido un cambio incorrecto que establecía el formato de color en RGB565 (2 bytes/píxel). El formato correcto para los assets de animación es RGB565A8 (3 bytes/píxel), que incluye un canal alfa de 8 bits. Esta corrección restaura la transparencia de las animaciones y asegura que el buffer de animación se reserve con el tamaño adecuado. */
-
+/* Descripción: Diagnóstico de Causa Raíz: La función nimation_loader_count_frames contaba cualquier fichero que coincidiera con el prefijo de la animación (ej: 'ANIM_IDLE_'), incluyendo ficheros fuente como '.png' que se habían dejado en la tarjeta SD. Esto inflaba el conteo de fotogramas y causaba intentos de cargar ficheros con el formato incorrecto. Solución Definitiva: Se ha añadido una comprobación explícita de la extensión del fichero. La función ahora solo cuenta los ficheros que, además de coincidir con el prefijo, terminan en '.bin'. Esto asegura un conteo preciso de los fotogramas de animación válidos y resuelve los errores de carga. */
+/* Último cambio: 21/08/2025 - 18:11 */
 #include "animation_loader.h"
 #include "esp_log.h"
 #include <stdio.h>
@@ -20,7 +18,6 @@ animation_t animation_loader_init(const char *path, uint16_t width, uint16_t hei
     anim.height = height;
     
     uint32_t rgb_stride = width * 2; 
-    // [CORRECCIÓN] Restaurado a 3 bytes por píxel para soportar el canal alfa (A8).
     size_t buffer_size = (size_t)width * height * 3;
 
     anim.img_dsc.data = (uint8_t *)malloc(buffer_size);
@@ -33,7 +30,6 @@ animation_t animation_loader_init(const char *path, uint16_t width, uint16_t hei
     anim.img_dsc.header.w = width;
     anim.img_dsc.header.h = height;
     anim.img_dsc.header.stride = rgb_stride;
-    // [CORRECCIÓN] Restaurado el formato de color que incluye el canal alfa.
     anim.img_dsc.header.cf = LV_COLOR_FORMAT_RGB565A8;
     anim.img_dsc.data_size = buffer_size;
     
@@ -94,8 +90,19 @@ uint16_t animation_loader_count_frames(const char *path, const char *prefix) {
     size_t prefix_len = strlen(prefix);
 
     while(lv_fs_dir_read(&d, fn, sizeof(fn)) == LV_FS_RES_OK && fn[0] != '\0') {
-        // Compara si el nombre del fichero empieza con el prefijo deseado.
-        if (strncmp(fn, prefix, prefix_len) == 0) {
+        // Ignorar directorios y ficheros que no sean de animación.
+        if (fn[0] == '/' || strcmp(fn, ".") == 0 || strcmp(fn, "..") == 0) {
+            continue;
+        }
+
+        size_t fn_len = strlen(fn);
+        const char *extension = ".bin";
+        size_t ext_len = strlen(extension);
+
+        // [CORRECCIÓN] Comprobar prefijo Y extensión del fichero.
+        if (strncmp(fn, prefix, prefix_len) == 0 && 
+            fn_len > ext_len && 
+            strcmp(fn + fn_len - ext_len, extension) == 0) {
             count++;
         }
     }
