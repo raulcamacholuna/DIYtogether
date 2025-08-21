@@ -1,6 +1,6 @@
 /* Fichero: components/bsp/bsp_display.c */
-/* Descripción: Diagnóstico de Causa Raíz: El backlight no se apaga porque la función sp_lcd_panel_disp_on_off(..., false) se llama antes de actualizar el duty cycle del LEDC. Esta llamada pone al controlador del display en modo de bajo consumo, lo que probablemente impide que procese el cambio de estado del pin del backlight. Solución Definitiva: Se ha invertido el orden de las operaciones. En sp_display_turn_off, ahora se apaga primero el backlight (LEDC duty a 255) y luego se apaga el panel. En sp_display_turn_on, se enciende primero el panel y luego se restaura el brillo. Esto garantiza que el controlador del display esté siempre en un estado activo para recibir y procesar los cambios de control del backlight. */
-/* Último cambio: 21/08/2025 - 21:44 */
+/* Descripción: Diagnóstico: El control de brillo y apagado del backlight está invertido en la placa de 1.47". Causa Raíz: La circuitería del pin del backlight (BL) en la placa de 1.47" es activa-alta, mientras que en la de 1.9" es activa-baja. La misma fórmula de cálculo del duty cycle del LEDC produce el efecto opuesto. Solución Definitiva: Se ha refactorizado sp_display.c para centralizar la lógica en sp_display_set_brightness. Se utiliza una directiva de preprocesador para aplicar una fórmula de duty cycle invertida (duty = (255 * percentage) / 100) solo para la placa de 1.47". Las funciones 	urn_on y 	urn_off ahora llaman a set_brightness con el porcentaje adecuado (el último guardado o 0), asegurando un comportamiento correcto y mantenible para ambas placas. */
+/* Último cambio: 21/08/2025 - 23:53 */
 #include "bsp_api.h"
 #include "esp_log.h"
 #include "driver/spi_master.h"
@@ -113,7 +113,15 @@ void bsp_display_set_brightness(int percentage, bool save_to_nvs) {
     if (percentage > 100) percentage = 100;
     if (percentage < 0) percentage = 0;
     
-    uint32_t duty = 255 - ((255 * percentage) / 100);
+    uint32_t duty;
+#if defined(CONFIG_DIYTOGETHER_BOARD_WAVESHARE_C6_147)
+    // Lógica de brillo invertida para la placa de 1.47" (activa-alta)
+    duty = (255 * percentage) / 100;
+#else
+    // Lógica de brillo estándar para la placa de 1.9" (activa-baja)
+    duty = 255 - ((255 * percentage) / 100);
+#endif
+
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
 
@@ -129,16 +137,11 @@ void bsp_display_set_brightness(int percentage, bool save_to_nvs) {
 }
 
 void bsp_display_turn_on(void) {
-    if (g_panel_handle) esp_lcd_panel_disp_on_off(g_panel_handle, true);
-    uint32_t duty = 255 - ((255 * s_last_brightness_percentage) / 100);
-    ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty);
-    ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
+    bsp_display_set_brightness(s_last_brightness_percentage, false);
 }
 
 void bsp_display_turn_off(void) {
-    ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 255);
-    ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
-    if (g_panel_handle) esp_lcd_panel_disp_on_off(g_panel_handle, false);
+    bsp_display_set_brightness(0, false);
 }
 
 esp_lcd_panel_handle_t bsp_get_display_handle(void) { return g_panel_handle; }
