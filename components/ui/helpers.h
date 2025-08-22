@@ -7,6 +7,8 @@
 
 #include "lvgl.h"
 
+extern lv_obj_t *g_wallpaper_img;
+
 void ui_helpers_build_asset_path(char* buffer, size_t buffer_size, const char* asset_filename);
 void ui_helpers_load_background(lv_obj_t* parent);
 void ui_helpers_free_background_buffer(void);

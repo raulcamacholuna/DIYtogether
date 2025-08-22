@@ -24,7 +24,7 @@ static void btn_8_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_CLICKED) {
         ESP_LOGI(TAG, "Botón 8 (placeholder) presionado.");
-        execute_diymon_action(ACTION_ID_CONFIG_PLACEHOLDER);
+        execute_diymon_action(ACTION_ID_PERFORMANCE_MODE);
     }
 }
 

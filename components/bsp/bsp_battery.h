@@ -1,7 +1,7 @@
 /* Fichero: components/bsp/bsp_battery.h */
 /* Último cambio: Creado como fichero de cabecera privado y unificado para el driver de la batería. */
 /* Descripción: Cabecera privada para el driver de la batería. Define las constantes de configuración del ADC. Al ser idénticas para ambas placas, este fichero es común y no requiere directivas de preprocesador. */
-/* Último cambio: 20/08/2025 - 05:06 */
+/* Último cambio:   */
 #ifndef __BSP_BATTERY_H__
 #define __BSP_BATTERY_H__
 

@@ -13,6 +13,7 @@
 #include "actions/action_interaction.h"
 #include "actions/action_screen.h"
 #include "actions/action_system.h"
+#include "actions/action_performance_mode.h"
 
 static const char *TAG = "DIYMON_ACTIONS";
 
@@ -68,8 +69,11 @@ void execute_diymon_action(diymon_action_id_t action_id) {
         
         // --- Acciones Placeholder (no hacen nada) ---
         case ACTION_ID_ADMIN_PLACEHOLDER:
-        case ACTION_ID_CONFIG_PLACEHOLDER:
             ESP_LOGI(TAG, "Acción Placeholder (ID %d) ejecutada. No se realiza ninguna operación.", action_id);
+            break;
+
+        case ACTION_ID_PERFORMANCE_MODE:
+            action_performance_mode_toggle();
             break;
 
         default:

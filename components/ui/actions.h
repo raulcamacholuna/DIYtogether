@@ -34,7 +34,7 @@ typedef enum {
     // Acciones del panel de configuración (superior 3)
     ACTION_ID_ACTIVATE_CONFIG_MODE,   // 11
     ACTION_ID_RESET_ALL,              // 12
-    ACTION_ID_CONFIG_PLACEHOLDER,     // 13
+    ACTION_ID_PERFORMANCE_MODE,       // 13
 
     ACTION_ID_COUNT 
 } diymon_action_id_t;

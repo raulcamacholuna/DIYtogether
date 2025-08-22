@@ -12,6 +12,8 @@
 
 static const char* TAG_HELPERS = "UI_HELPERS";
 
+lv_obj_t *g_wallpaper_img = NULL;
+
 // Función interna para obtener el nombre del directorio de evolución (ej: "1.1.1" -> "111")
 static void get_evolution_dir_name(char* dir_name_buffer, size_t buffer_size) {
     const char* evo_code = diymon_get_current_code();
@@ -35,10 +37,10 @@ void ui_helpers_build_asset_path(char* buffer, size_t buffer_size, const char* a
 // Carga la imagen de fondo desde el firmware creando un objeto de imagen.
 void ui_helpers_load_background(lv_obj_t* parent) {
     ESP_LOGI(TAG_HELPERS, "Creando objeto de imagen para el fondo desde firmware.");
-    lv_obj_t *bg_img = lv_image_create(parent);
-    lv_image_set_src(bg_img, &bg_0); // Usa el asset declarado en ui_assets.h
-    lv_obj_set_pos(bg_img, 0, 0); 
-    lv_obj_move_background(bg_img); 
+    g_wallpaper_img = lv_image_create(parent);
+    lv_image_set_src(g_wallpaper_img, &bg_0); // Usa el asset declarado en ui_assets.h
+    lv_obj_set_pos(g_wallpaper_img, 0, 0); 
+    lv_obj_move_background(g_wallpaper_img); 
 }
 
 // La función para liberar el buffer de fondo ya no es necesaria.

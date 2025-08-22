@@ -25,7 +25,7 @@ static void btn_9_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_CLICKED) {
         ESP_LOGI(TAG, "¡Evento CLICKED recibido! Ejecutando acción de placeholder.");
-        execute_diymon_action(ACTION_ID_CONFIG_PLACEHOLDER);
+        execute_diymon_action(ACTION_ID_RESET_ALL);
     }
 }
 
