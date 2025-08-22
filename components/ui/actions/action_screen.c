@@ -1,13 +1,18 @@
 /* Fichero: components/ui/actions/action_screen.c */
-/* Descripción: Se ha refactorizado la acción del botón de pantalla. Ahora, en lugar de un 'toggle', invoca directamente la nueva función 'screen_manager_enter_light_sleep'. Esto alinea el comportamiento del botón con el requisito del usuario de entrar en modo de bajo consumo de forma inmediata, utilizando la nueva interfaz modular del 'screen_manager'. */
-/* Último cambio: 21/08/2025 - 21:37 */
+/* Descripción: Se ha refactorizado la acción para implementar un 'sueño de UI'. En lugar de invocar el light sleep del sistema, ahora se pausan explícitamente los componentes de la UI que consumen CPU (state_manager, animación de idle) y luego se apaga el backlight. Esto mantiene el manejador de eventos de LVGL activo para detectar el despertar. */
+/* Último cambio: 22/2025 - 08:07
+*/
 #include "actions/action_screen.h"
 #include "screen_manager.h"
-#include "ui_actions_panel.h" // Necesario para ocultar los paneles
+#include "ui_actions_panel.h"
+#include "core/state_manager.h"
+#include "ui_idle_animation.h"
 
 void action_screen_toggle(void) {
     if (!screen_manager_is_off()) {
         ui_actions_panel_hide_all(); 
-        screen_manager_enter_light_sleep();
+        state_manager_pause();
+        ui_idle_animation_pause();
+        screen_manager_turn_off();
     }
 }
