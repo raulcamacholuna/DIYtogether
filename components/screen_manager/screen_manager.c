@@ -1,11 +1,16 @@
 /* Fichero: components/screen_manager/screen_manager.c */
-/* Descripción: Diagnóstico de Causa Raíz: El backlight se re-ilumina progresivamente durante el sueño ligero en la placa de 1.9". Esto se debe a que el pin del backlight (BL) no mantiene su estado 'apagado' durante el light sleep, quedando en un estado flotante que re-energiza parcialmente el LED. Adicionalmente, el usuario espera despertar con el táctil, pero en esta placa el pin de interrupción no está conectado. Solución Definitiva: Se implementa un 'hold' explícito sobre el pin del backlight usando gpio_hold_en() antes de entrar en sueño y gpio_hold_dis() al despertar. Esto fuerza al pin a mantener su estado, asegurando que el backlight permanezca completamente apagado. Se confirma que para la placa de 1.9" el despertar es mediante el botón BOOT (GPIO9), que es la única fuente de interrupción externa fiable. */
-/* Último cambio: 21/08/2025 - 21:50 */
+/* Descripción: Diagnóstico: Pérdida de comunicación serie y fallo de WiFi en la placa de 1.47" tras despertar de light sleep. Causa Raíz: El hardware de la placa de 1.47" no restaura correctamente el estado de los dominios de alimentación 'TOP' (USB-JTAG, SPIs) y 'MODEM' (WiFi/BT) si se apagan durante el light sleep. Solución Definitiva: Se ha implementado un workaround programático y específico para la placa de 1.47". Justo antes de entrar en light sleep, se invoca a 'esp_sleep_pd_config()' para forzar explícitamente que los dominios TOP y MODEM permanezcan encendidos ('ESP_PD_OPTION_ON'). Esto garantiza que los periféricos críticos mantengan la alimentación y su estado, resolviendo el problema de conectividad al despertar.
+/* Último cambio: 22/08/2025 - 07:42
+*/
 #include "screen_manager.h"
 #include "bsp_api.h"
 #include "esp_log.h"
 #include "esp_sleep.h"
 #include "driver/gpio.h"
+#include "esp_lvgl_port.h"
+#include <stdio.h> 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 static const char *TAG = "SCREEN_MANAGER";
 static bool g_is_screen_off = false;
@@ -51,9 +56,22 @@ void screen_manager_enter_light_sleep(void) {
     ESP_ERROR_CHECK(gpio_wakeup_enable(WAKEUP_PIN, WAKEUP_LEVEL));
     ESP_ERROR_CHECK(esp_sleep_enable_gpio_wakeup());
     
-    // [CORRECCIÓN] Habilitar el 'hold' en el pin del backlight para evitar que flote durante el sleep.
     ESP_LOGI(TAG, "Habilitando hold en el pin de backlight (GPIO %d)", BACKLIGHT_PIN);
     ESP_ERROR_CHECK(gpio_hold_en(BACKLIGHT_PIN));
+    
+    ESP_LOGI(TAG, "Vaciando buffers de log y esperando a la UART...");
+    fflush(stdout);
+    fflush(stderr);
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    ESP_LOGI(TAG, "Deteniendo el port de LVGL...");
+    lvgl_port_stop();
+
+#if defined(CONFIG_DIYTOGETHER_BOARD_WAVESHARE_C6_147)
+    ESP_LOGW(TAG, "WORKAROUND: Forzando dominios TOP y MODEM a ON para la placa 1.47");
+    esp_sleep_pd_config(ESP_PD_DOMAIN_TOP, ESP_PD_OPTION_ON);
+    esp_sleep_pd_config(ESP_PD_DOMAIN_MODEM, ESP_PD_OPTION_ON);
+#endif
 
     ESP_LOGI(TAG, "Entrando en Light Sleep...");
     esp_light_sleep_start();
@@ -61,7 +79,9 @@ void screen_manager_enter_light_sleep(void) {
     // --- Lógica de Despertar ---
     ESP_LOGI(TAG, "Despertado de Light Sleep.");
     
-    // [CORRECCIÓN] Deshabilitar el 'hold' para que el LEDC pueda volver a controlar el pin.
+    ESP_LOGI(TAG, "Reanudando el port de LVGL...");
+    lvgl_port_resume();
+
     ESP_LOGI(TAG, "Deshabilitando hold en el pin de backlight (GPIO %d)", BACKLIGHT_PIN);
     ESP_ERROR_CHECK(gpio_hold_dis(BACKLIGHT_PIN));
 
