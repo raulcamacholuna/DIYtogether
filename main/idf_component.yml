@@ -7,38 +7,44 @@
 dependencies:
   # --- Componentes Locales ---
   bsp:
-    path: "../components/bsp"
+    path: ../components/bsp
   core:
-    path: "../components/core"
+    path: ../components/core
   ui:
-    path: "../components/ui"
+    path: ../components/ui
   web_server:
-    path: "../components/web_server"
+    path: ../components/web_server
   screen_manager:
-    path: "../components/screen_manager"
+    path: ../components/screen_manager
   service_screen:
-    path: "../components/service_screen"
+    path: ../components/service_screen
   iot_button:
-    path: "../components/iot_button"
-  
+    path: ../components/iot_button
+
   # --- Dependencias Sobrescritas ---
   espressif/esp_lvgl_port:
-    version: "*"
-    override_path: "../components_dependencies/esp_lvgl_port"
-  
+    version: '*'
+    override_path: ../components_dependencies/esp_lvgl_port
   espressif/esp_lcd_touch_cst816s:
-    version: "*"
-    override_path: "../components/esp_lcd_touch_cst816s" 
-  
+    version: '*'
+    override_path: ../components/esp_lcd_touch_cst816s
   espressif/esp_lcd_touch_axs5106:
-    version: "*"
-    override_path: "../components_dependencies/esp_lcd_touch_axs5106"
+    version: '*'
+    override_path: ../components_dependencies/esp_lcd_touch_axs5106
 
   # [CORRECCIÓN] Se añade el driver de display correcto para la placa 1.47"
   espressif/esp_lcd_jd9853:
-    version: "*"
-    override_path: "../components_dependencies/esp_lcd_jd9853"
+    version: '*'
+    override_path: ../components_dependencies/esp_lcd_jd9853
 
   espressif/esp_lcd_touch:
-    version: "*"
-    override_path: "../components_dependencies/esp_lcd_touch"
+    version: '*'
+    override_path: ../components_dependencies/esp_lcd_touch
+
+  espressif/esp-zigbee-lib:
+    version: '*'
+    override_path: ../components_dependencies/esp-zigbee-lib
+
+  espressif/esp-zboss-lib:
+    version: '*'
+    override_path: ../components_dependencies/esp-zboss-lib

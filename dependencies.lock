@@ -17,6 +17,22 @@ dependencies:
       path: Z:\DIYTOGETHER\DIYtogether\components_dependencies\espressif__cmake_utilities
       type: local
     version: 1.1.1
+  espressif/esp-zboss-lib:
+    dependencies:
+    - name: idf
+      version: '>=5.0'
+    source:
+      path: Z:\DIYTOGETHER\DIYtogether\components_dependencies\esp-zboss-lib
+      type: local
+    version: 1.4.0
+  espressif/esp-zigbee-lib:
+    dependencies:
+    - name: idf
+      version: '>=5.0'
+    source:
+      path: Z:\DIYTOGETHER\DIYtogether\components_dependencies\esp-zigbee-lib
+      type: local
+    version: 1.6.6
   espressif/esp_lcd_jd9853:
     dependencies: []
     source:
@@ -110,6 +126,8 @@ direct_dependencies:
 - bsp
 - core
 - espressif/cmake_utilities
+- espressif/esp-zboss-lib
+- espressif/esp-zigbee-lib
 - espressif/esp_lcd_jd9853
 - espressif/esp_lcd_touch
 - espressif/esp_lcd_touch_axs5106
@@ -123,6 +141,6 @@ direct_dependencies:
 - service_screen
 - ui
 - web_server
-manifest_hash: 754fb63d505c1648db66c1cc58e3fe334798898679bc5fb78c9a76c9ac5b6c73
+manifest_hash: 9ab2c314459a65b96e2a1e705b8fab9ac4554a76f5243ac68c13a5e96c886513
 target: esp32c6
 version: 2.0.0
