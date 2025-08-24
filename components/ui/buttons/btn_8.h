@@ -17,7 +17,7 @@ extern "C" {
  * 
  * @param parent El objeto LVGL padre sobre el cual se creará el botón.
  */
-void btn_8_create(lv_obj_t *parent);
+void btn_8_create(lv_obj_t *parent, bool animations_enabled);
 
 /**
  * @brief Obtiene el manejador del botón 'Servidor de Ficheros'.

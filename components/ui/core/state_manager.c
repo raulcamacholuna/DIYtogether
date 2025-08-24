@@ -1,6 +1,6 @@
 /* Fichero: components/ui/core/state_manager.c */
 /* Descripción: Diagnóstico: El despertar de la pantalla con un solo toque era demasiado sensible. Causa Raíz: La lógica de despertar anterior fue simplificada en exceso. Solución Definitiva: Se ha reintroducido una máquina de estados robusta para el despertar. Ahora se requiere una secuencia de 'doble-doble toque' para encender la pantalla. El primer doble toque 'prepara' el sistema por 3 segundos, y un segundo doble toque dentro de ese periodo completa el despertar. Se utilizan dos temporizadores de LVGL para gestionar las ventanas de tiempo entre clics y para el estado 'preparado', garantizando que solo una secuencia deliberada reactive la pantalla y evitando encendidos accidentales.
-/* Último cambio: 22/08/2025 - 08:13
+// Último cambio: 22/08/2025 - 08:13
 */
 #include "state_manager.h"
 #include "screen_manager.h"

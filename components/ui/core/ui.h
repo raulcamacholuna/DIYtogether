@@ -3,6 +3,8 @@
 /* Último cambio: Movido a ui/core/ como parte de la refactorización del núcleo de la UI. */
 /* Descripción: Interfaz PÚBLICA del componente de la UI. Define las funciones de alto nivel para controlar la UI desde el exterior. Se ha movido a este subdirectorio para encapsular la lógica principal. */
 
+#include <stdbool.h>
+
 #ifndef UI_H
 #define UI_H
 
@@ -36,7 +38,7 @@ void ui_preinit(void);
  * Esta es la función principal que se debe llamar desde fuera del componente
  * (por ejemplo, desde main.c) para poner en marcha toda la UI.
  */
-void ui_init(void);
+void ui_init(bool animations_enabled);
 
 
 #ifdef __cplusplus

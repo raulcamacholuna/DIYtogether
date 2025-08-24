@@ -22,7 +22,7 @@ extern lv_obj_t *g_main_screen_obj;
  * @brief Crea todas las pantallas de la aplicación.
  *        Actualmente, solo invoca la creación de la pantalla principal.
  */
-void create_screens(void);
+void create_screens(bool animations_enabled);
 
 /**
  * @brief Destruye la pantalla principal y libera sus recursos.

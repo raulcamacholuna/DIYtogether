@@ -52,7 +52,7 @@ static void cleanup_main_screen_resources(void) {
     ESP_LOGI(TAG, "[CLEANUP] Saliendo de cleanup_main_screen_resources.");
 }
 
-void create_screen_main(void) {
+void create_screen_main(bool animations_enabled) {
     g_main_screen_obj = lv_obj_create(NULL);
     lv_obj_remove_style_all(g_main_screen_obj);
     lv_obj_set_style_bg_color(g_main_screen_obj, lv_color_black(), 0);
@@ -70,7 +70,7 @@ void create_screen_main(void) {
     ui_helpers_load_background(g_main_screen_obj);
     ui_action_animations_create(g_main_screen_obj);
     g_idle_animation_obj = ui_idle_animation_start(g_main_screen_obj);
-    ui_actions_panel_create(g_main_screen_obj);
+    ui_actions_panel_create(g_main_screen_obj, animations_enabled);
     telemetry_manager_create(g_main_screen_obj);
 
     ESP_LOGI(TAG, "Pantalla principal creada.");
@@ -141,6 +141,6 @@ void delete_screen_main(void) {
     ESP_LOGI(TAG, "Saliendo de delete_screen_main.");
 }
 
-void create_screens(void) {
-    create_screen_main();
+void create_screens(bool animations_enabled) {
+    create_screen_main(animations_enabled);
 }

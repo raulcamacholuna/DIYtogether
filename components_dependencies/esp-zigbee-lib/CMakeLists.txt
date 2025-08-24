@@ -11,8 +11,9 @@ if(CONFIG_ZB_RADIO_SPINEL_UART)
 endif()
 
 idf_component_register(SRC_DIRS "${src_dirs}"
-                       INCLUDE_DIRS "${include_dirs}"
-                       REQUIRES driver vfs ieee802154 openthread espressif__esp-zboss-lib
+                       INCLUDE_DIRS "${include_dirs}" "${CMAKE_CURRENT_SOURCE_DIR}/../esp-zboss-lib/include"
+                       PRIV_REQUIRES esp-zboss-lib
+                       REQUIRES ieee802154
 )
 
 if(CONFIG_ZB_ENABLED)

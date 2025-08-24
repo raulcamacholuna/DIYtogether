@@ -18,6 +18,8 @@ dependencies:
     path: ../components/screen_manager
   service_screen:
     path: ../components/service_screen
+  zigbee_comm:
+    path: ../components/zigbee_comm
   iot_button:
     path: ../components/iot_button
 
@@ -48,3 +50,5 @@ dependencies:
   espressif/esp-zboss-lib:
     version: '*'
     override_path: ../components_dependencies/esp-zboss-lib
+    
+  

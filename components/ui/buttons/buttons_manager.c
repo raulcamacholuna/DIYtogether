@@ -24,7 +24,7 @@
 /**
  * @brief Inicializa y crea todos los botones de la UI llamando a los constructores de cada módulo.
  */
-void ui_buttons_init(lv_obj_t *parent) {
+void ui_buttons_init(lv_obj_t *parent, bool animations_enabled) {
     // --- Panel de Jugador (3 botones) ---
     btn_1_create(parent);
     btn_2_create(parent);
@@ -37,7 +37,7 @@ void ui_buttons_init(lv_obj_t *parent) {
     
     // --- Panel de Configuración (3 botones) ---
     btn_7_create(parent);
-    btn_8_create(parent);
+    btn_8_create(parent, animations_enabled);
     btn_9_create(parent);
 
     // --- Panel Lateral de Evolución (5 botones) ---

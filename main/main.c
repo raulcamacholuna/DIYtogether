@@ -1,8 +1,5 @@
-/* Fecha: 18/08/2025 - 08:25  */
 /* Fichero: main/main.c */
-/* Último cambio: Eliminada la inicialización y conexión automática de WiFi en el arranque. */
-/* Descripción: Se ha eliminado toda la lógica de inicialización de WiFi del arranque principal (app_main). Ahora, el dispositivo arranca sin activar la red. La responsabilidad de gestionar el ciclo de vida de WiFi (activar, conectar, desactivar) se delega completamente al módulo 'action_config_mode', que se invoca por interacción del usuario. */
-
+/* Último cambio: 24/08/2025 - 16:06 */
 #include <stdio.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
@@ -26,6 +23,8 @@
 #include "actions.h"
 #include "core/state_manager.h"
 #include "telemetry/telemetry_task.h"
+#include "zigbee_comm.h"
+#include "service_screen.h"
 
 #include "esp_err.h"
 #include "esp_check.h"
@@ -34,23 +33,27 @@ static const char *TAG = "DIYMON_MAIN";
 
 // --- Declaraciones de funciones ---
 static void run_main_application_mode(void);
+static bool run_game_mode(zigbee_role_t role);
+static bool check_and_run_game_mode(void);
 static bool verify_sdcard_contents(void);
+static void zigbee_data_cb(uint16_t src_addr, game_packet_t* packet);
+static void exit_game_mode(void);
 
 void app_main(void) {
-    // 1. Inicializar la memoria no volátil.
     nvs_flash_init();
+    
+    // Comprobar si debemos arrancar en modo juego. Si es así, esta función no retorna.
+    if (check_and_run_game_mode()) {
+        // El dispositivo está ahora en un bucle de modo juego.
+        // El código aquí abajo no se ejecutará.
+        return; 
+    }
 
-    // [CORRECCIÓN] Se elimina la inicialización de WiFi del arranque.
-    // La red solo se activará bajo demanda desde el menú de configuración.
-    ESP_LOGI(TAG, "Arrancando en modo offline. WiFi se activará bajo demanda.");
-
-    // 2. Pre-reservar los buffers de memoria más grandes para la UI para evitar fragmentación.
+    // Si check_and_run_game_mode retorna false, procedemos con el arranque normal.
+    ESP_LOGI(TAG, "Arrancando en modo aplicación completa.");
     ui_preinit();
-
-    // 3. El sistema ahora arranca directamente en el modo de aplicación principal.
     run_main_application_mode();
     
-    // Este bucle no debería alcanzarse, pero es una buena práctica tenerlo.
     while (1) { 
         vTaskDelay(pdMS_TO_TICKS(10000));
     }
@@ -68,40 +71,116 @@ static bool verify_sdcard_contents(void) {
     return true;
 }
 
+static void zigbee_data_cb(uint16_t src_addr, game_packet_t* packet)
+{
+    ESP_LOGI(TAG, "Paquete Zigbee (Modo Juego) recibido desde 0x%04x", src_addr);
+    ESP_LOGI(TAG, "  ID de Juego: %d", packet->game_id);
+    ESP_LOGI(TAG, "  Longitud de Payload: %d", packet->len);
+    ESP_LOG_BUFFER_HEX(TAG, packet->payload, packet->len);
+    
+    // TODO: Aquí se procesaría la lógica del minijuego.
+    // Por ahora, para salir del modo juego, se puede usar un botón físico
+    // o una condición específica del paquete.
+}
+
 static void run_main_application_mode(void) {
     ESP_LOGI(TAG, "Cargando aplicación principal...");
     
-    // 1. Inicializa todo el hardware y LVGL.
     hardware_manager_init();
-    
-    // 2. Verifica la tarjeta SD.
     bool is_sd_ok = verify_sdcard_contents();
-
-    // 3. Inicializa los sistemas de software (Evolución y Assets).
     diymon_evolution_init();
     ui_assets_init();
 
-    // 4. Construye la UI completa.
     if (lvgl_port_lock(0)) {
         if (is_sd_ok) {
             hardware_manager_mount_lvgl_filesystem();
         }
         
-        ui_init(); // Crea todos los elementos.
-        state_manager_init(); // Inicia el gestor de inactividad.
+                ui_init(is_sd_ok);
+        state_manager_init();
         lvgl_port_unlock();
     }
     ESP_LOGI(TAG, "Interfaz de Usuario principal inicializada.");
 
-    // 5. Decide el siguiente paso basado en el estado de la SD.
     if (!is_sd_ok) {
-        // Si la SD falla, se invoca la acción de modo configuración.
         ESP_LOGW(TAG, "Fallo en la SD. Entrando automáticamente en modo de configuración WiFi...");
         vTaskDelay(pdMS_TO_TICKS(500));
         execute_diymon_action(ACTION_ID_ACTIVATE_CONFIG_MODE);
     } else {
-        // Si todo está bien, inicia la tarea de telemetría en segundo plano.
         telemetry_task_start();
         ESP_LOGI(TAG, "¡Firmware DIYMON en marcha!");
     }
+}
+
+static void exit_game_mode(void) {
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
+    if (err == ESP_OK) {
+        nvs_erase_key(nvs_handle, "game_mode");
+        nvs_commit(nvs_handle);
+        nvs_close(nvs_handle);
+        ESP_LOGW(TAG, "Clave 'game_mode' borrada. Reiniciando a modo UI...");
+        esp_restart();
+    } else {
+        ESP_LOGE(TAG, "Error crítico: no se pudo abrir NVS para salir del modo juego. Reiniciando de todas formas.");
+        esp_restart();
+    }
+}
+
+static bool run_game_mode(zigbee_role_t role) {
+    ESP_LOGW(TAG, "Dispositivo arrancando en MODO JUEGO DEDICADO.");
+    
+    // 1. Inicializar solo el hardware mínimo necesario
+    bsp_init_service_mode();
+    service_screen_show_from_rom(); // Muestra una pantalla estática
+    
+    // 2. Inicializar Zigbee con el rol seleccionado
+    zigbee_comm_init(role);
+    zigbee_comm_register_data_callback(zigbee_data_cb);
+    zigbee_comm_start();
+
+    // TODO: Implementar un mecanismo para salir del modo juego
+    // Por ejemplo, mantener pulsado un botón físico durante 5 segundos
+    // gpio_set_direction(GPIO_NUM_0, GPIO_MODE_INPUT);
+    // gpio_set_pull_mode(GPIO_NUM_0, GPIO_PULLUP_ONLY);
+
+    ESP_LOGW(TAG, "Modo Juego activo. El dispositivo está en un bucle. Reiniciar para salir.");
+    while(1) {
+        // Bucle principal del modo juego
+        // if(gpio_get_level(GPIO_NUM_0) == 0) {
+        //     vTaskDelay(pdMS_TO_TICKS(5000));
+        //     if(gpio_get_level(GPIO_NUM_0) == 0) {
+        //         exit_game_mode();
+        //     }
+        // }
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+    return true; // Aunque nunca se alcanza, indica que entramos en el modo
+}
+
+static bool check_and_run_game_mode(void) {
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open("storage", NVS_READONLY, &nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGI(TAG, "NVS no encontrado, arrancando en modo UI normal.");
+        return false;
+    }
+
+    char game_mode_str[16];
+    size_t required_size = sizeof(game_mode_str);
+    err = nvs_get_str(nvs_handle, "game_mode", game_mode_str, &required_size);
+    nvs_close(nvs_handle);
+
+    if (err == ESP_OK) {
+        if (strcmp(game_mode_str, "coordinator") == 0) {
+            run_game_mode(ZIGBEE_ROLE_COORDINATOR);
+            return true;
+        } else if (strcmp(game_mode_str, "router") == 0) {
+            run_game_mode(ZIGBEE_ROLE_ROUTER);
+            return true;
+        }
+    }
+    
+    ESP_LOGI(TAG, "Clave 'game_mode' no encontrada o inválida. Arrancando en modo UI normal.");
+    return false;
 }

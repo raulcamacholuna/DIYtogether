@@ -76,6 +76,7 @@ typedef enum {
     ZB_HOST_MODE_INIT_UART  = 0x1,
 } zb_esp_uart_init_mode;
 
+#if 0
 typedef enum {
     ZB_RADIO_MODE_NATIVE   = 0x0,      /*!< Use the native 15.4 radio */
     ZB_RADIO_MODE_UART_RCP = 0x1,      /*!< UART connection to a 15.4 capable radio co - processor (RCP) */
@@ -197,5 +198,6 @@ void esp_zb_set_default_long_poll_interval(uint32_t milliseconds);
  *
  */
 uint32_t esp_zb_get_default_long_poll_interval(void);
+#endif
 
 #define ESP_ZB_PIM_DEFAULT_LONG_POLL_INTERVAL  esp_zb_get_default_long_poll_interval()

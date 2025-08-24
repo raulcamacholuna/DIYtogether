@@ -1,8 +1,5 @@
-/* Fecha: 18/08/2025 - 06:53  */
 /* Fichero: components/ui/actions.h */
-/* Último cambio: Eliminada la acción ACTION_ID_ENABLE_FILE_SERVER para unificar la configuración en un único modo. */
-/* Descripción: Define la interfaz para el sistema de acciones, incluyendo los IDs de acción y la función principal de ejecución. Es el punto central para entender qué interacciones de usuario son posibles. */
-
+/* Último cambio: 23/08/2025 - 11:13 */
 #ifndef ACTIONS_H
 #define ACTIONS_H
 
@@ -22,6 +19,7 @@ typedef enum {
     // Acciones del panel de administración (superior 2)
     ACTION_ID_BRIGHTNESS_CYCLE,       // 3
     ACTION_ID_TOGGLE_SCREEN,          // 4
+    ACTION_ID_PERFORMANCE_MODE,       // New entry
     ACTION_ID_ADMIN_PLACEHOLDER,      // 5
 
     // Acciones del panel de evolución (lateral)
@@ -34,7 +32,8 @@ typedef enum {
     // Acciones del panel de configuración (superior 3)
     ACTION_ID_ACTIVATE_CONFIG_MODE,   // 11
     ACTION_ID_RESET_ALL,              // 12
-    ACTION_ID_PERFORMANCE_MODE,       // 13
+    ACTION_ID_ZIGBEE_GAME_CREATE,     // 13 - NUEVO
+    ACTION_ID_ZIGBEE_GAME_JOIN,       // 14 - NUEVO
 
     ACTION_ID_COUNT 
 } diymon_action_id_t;

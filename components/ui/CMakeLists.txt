@@ -1,10 +1,7 @@
-# Fecha: 18/08/2025 - 06:55 
 # Fichero: components/ui/CMakeLists.txt
-# Último cambio: Eliminada la dependencia 'wifi_portal' al centralizar la configuración.
-# Descripción: Se ha eliminado 'wifi_portal' de la lista de dependencias. La funcionalidad de portal cautivo ya no se utiliza, ya que el único modo de configuración es el servidor web accesible desde la UI, que es manejado por los componentes 'bsp' (para el AP) y 'web_server'.
-
+# Último cambio: 24/08/2025 - 16:02
+# Descripción: El sistema de build para el componente UI ya utiliza un patrón ile(GLOB ... "actions/*.c") para encontrar sus ficheros fuente. Por tanto, el nuevo fichero ction_zigbee.c, al ser añadido en el subdirectorio ctions/, será incluido en la compilación automáticamente sin necesidad de modificar este fichero. La dependencia de zigbee_comm ya existe, satisfaciendo los requisitos del nuevo módulo.
 file(GLOB component_sources
-    "*.c" 
     "core/*.c"
     "screens/*.c"
     "actions/*.c"
@@ -36,4 +33,5 @@ idf_component_register(
         core
         screen_manager
         web_server
+        zigbee_comm
 )

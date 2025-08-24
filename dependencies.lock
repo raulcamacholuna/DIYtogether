@@ -24,7 +24,7 @@ dependencies:
     source:
       path: Z:\DIYTOGETHER\DIYtogether\components_dependencies\esp-zboss-lib
       type: local
-    version: 1.4.0
+    version: 1.0.0
   espressif/esp-zigbee-lib:
     dependencies:
     - name: idf
@@ -32,7 +32,7 @@ dependencies:
     source:
       path: Z:\DIYTOGETHER\DIYtogether\components_dependencies\esp-zigbee-lib
       type: local
-    version: 1.6.6
+    version: 1.0.0
   espressif/esp_lcd_jd9853:
     dependencies: []
     source:
@@ -55,15 +55,12 @@ dependencies:
     version: '*'
   espressif/esp_lcd_touch_cst816s:
     dependencies:
-    - name: espressif/esp_lcd_touch
-      public: true
-      version: ^1.0.4
     - name: idf
-      version: '>=4.4.2'
+      version: '>=5.0'
     source:
       path: Z:\DIYTOGETHER\DIYtogether\components\esp_lcd_touch_cst816s
       type: local
-    version: 1.1.0
+    version: 1.0.0
   espressif/esp_lvgl_port:
     dependencies:
     - name: idf
@@ -78,13 +75,13 @@ dependencies:
   idf:
     source:
       type: idf
-    version: 5.3.2
+    version: 5.5.0
   iot_button:
     dependencies: []
     source:
       path: Z:\DIYTOGETHER\DIYtogether\components\iot_button
       type: local
-    version: '*'
+    version: 1.0.0
   lvgl/lvgl:
     component_hash: b702d642e03e95928046d5c6726558e6444e112420c77efa5fdb6650b0a13c5d
     dependencies: []
@@ -116,6 +113,12 @@ dependencies:
       path: Z:\DIYTOGETHER\DIYtogether\components\web_server
       type: local
     version: '*'
+  zigbee_comm:
+    dependencies: []
+    source:
+      path: Z:\DIYTOGETHER\DIYtogether\components\zigbee_comm
+      type: local
+    version: '*'
   zlib:
     dependencies: []
     source:
@@ -141,6 +144,7 @@ direct_dependencies:
 - service_screen
 - ui
 - web_server
-manifest_hash: 9ab2c314459a65b96e2a1e705b8fab9ac4554a76f5243ac68c13a5e96c886513
+- zigbee_comm
+manifest_hash: 792cddc21773d13cb46d4bf34cdd9b2f454c2b964ae353d3cdbc47380e736f8c
 target: esp32c6
 version: 2.0.0

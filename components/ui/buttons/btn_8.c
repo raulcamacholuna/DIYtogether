@@ -1,13 +1,12 @@
-/* Fecha: 18/08/2025 - 09:55  */
 /* Fichero: components/ui/buttons/btn_8.c */
-/* Último cambio: Añadida llamada al módulo de feedback y ajustado el evento a LV_EVENT_CLICKED. */
-/* Descripción: Implementación del botón placeholder (antes Servidor Ficheros). Se invoca a `button_feedback_add` para respuesta visual y se usa el evento 'CLICKED' para disparar la acción. */
-
+/* Descripción: Diagnóstico: Se necesita una forma de probar la comunicación Zigbee desde la UI. Causa Raíz: El botón 8 estaba asignado a una acción de modo rendimiento. Solución Definitiva: Se ha modificado el callback 'btn_8_event_cb'. Ahora, si el dispositivo está compilado como Router ('CONFIG_ESP_ZB_ZR_ENABLED'), al pulsar el botón se crea un paquete de prueba ('game_packet_t') y se envía al Coordinador (dirección 0x0000) usando la nueva API 'zigbee_comm_send_unicast'. Esto proporciona un método de prueba simple y directo para la nueva funcionalidad Zigbee. */
+/* Último cambio: 23/08/2025 - 10:52 */
 #include "btn_8.h"
 #include "ui_asset_loader.h"
 #include "actions.h"
 #include "esp_log.h"
 #include "button_feedback.h"
+#include "zigbee_comm.h" // Incluir la nueva cabecera
 
 // --- Definiciones de diseño locales ---
 #define BUTTON_SIZE 50
@@ -16,22 +15,46 @@ static const char *TAG = "BTN_8";
 
 // --- Variable estática para el manejador del botón ---
 static lv_obj_t *s_btn_8_handle = NULL;
+static bool s_animations_enabled = false; // Nueva variable para el estado de las animaciones
 
 /**
- * @brief Callback de evento para el botón 8.
+ * @brief Callback de evento para el botón 8. Ahora envía un paquete Zigbee de prueba o activa el modo rendimiento.
  */
 static void btn_8_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_CLICKED) {
-        ESP_LOGI(TAG, "Botón 8 (placeholder) presionado.");
-        execute_diymon_action(ACTION_ID_PERFORMANCE_MODE);
+        if (s_animations_enabled) {
+            ESP_LOGI(TAG, "Botón 8 presionado. Activando modo rendimiento.");
+            execute_diymon_action(ACTION_ID_PERFORMANCE_MODE);
+        } else {
+        #if defined(CONFIG_ESP_ZB_ZR_ENABLED) // Solo el Router (cliente) envía el paquete de prueba
+            ESP_LOGI(TAG, "Botón 8 (Enviar Test Zigbee) presionado.");
+            game_packet_t test_packet = {
+                .game_id = 1, // ID de juego de prueba
+                .len = 5,
+            };
+            memcpy(test_packet.payload, "HELLO", 5);
+            
+            // El coordinador siempre tiene la dirección 0x0000
+            esp_err_t err = zigbee_comm_send_unicast(0x0000, &test_packet);
+            if (err == ESP_OK) {
+                ESP_LOGI(TAG, "Paquete de prueba Zigbee enviado al coordinador.");
+            } else {
+                ESP_LOGE(TAG, "Fallo al enviar paquete de prueba Zigbee: %s", esp_err_to_name(err));
+            }
+        #else
+            ESP_LOGI(TAG, "Botón 8 presionado. (Acción de envío solo para Routers)");
+        #endif
+        }
     }
 }
 
 /**
  * @brief Crea el objeto del botón 8.
  */
-void btn_8_create(lv_obj_t *parent) {
+void btn_8_create(lv_obj_t *parent, bool animations_enabled) {
+    s_animations_enabled = animations_enabled; // Almacenar el estado de las animaciones
+    s_btn_8_handle = lv_btn_create(parent);
     s_btn_8_handle = lv_btn_create(parent);
     lv_obj_remove_style_all(s_btn_8_handle);
     lv_obj_set_size(s_btn_8_handle, BUTTON_SIZE, BUTTON_SIZE);
@@ -60,7 +83,7 @@ void btn_8_create(lv_obj_t *parent) {
     // --- Añadir feedback visual ---
     button_feedback_add(s_btn_8_handle);
     
-    ESP_LOGI(TAG, "Botón 8 (placeholder) creado con feedback visual.");
+    ESP_LOGI(TAG, "Botón 8 (Enviar Test Zigbee) creado con feedback visual.");
 }
 
 /**

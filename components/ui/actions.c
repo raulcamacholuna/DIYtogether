@@ -1,8 +1,5 @@
-/* Fecha: 18/08/2025 - 06:54  */
 /* Fichero: components/ui/actions.c */
-/* Último cambio: Eliminado el case para ACTION_ID_ENABLE_FILE_SERVER para reflejar la unificación de los modos de configuración. */
-/* Descripción: Orquestador de acciones refactorizado. Se ha eliminado el punto de entrada para el antiguo modo de servidor de ficheros. Ahora, toda la funcionalidad de configuración se inicia a través de ACTION_ID_ACTIVATE_CONFIG_MODE, que activa una UI con un servidor web integrado. */
-
+/* Último cambio: 23/08/2025 - 11:13 */
 #include "actions.h"
 #include "esp_log.h"
 
@@ -14,14 +11,24 @@
 #include "actions/action_screen.h"
 #include "actions/action_system.h"
 #include "actions/action_performance_mode.h"
+#include "actions/action_zigbee.h"
 
 static const char *TAG = "DIYMON_ACTIONS";
 
 void execute_diymon_action(diymon_action_id_t action_id) {
     ESP_LOGI(TAG, "Ejecutando acción ID: %d", action_id);
 
+    // Acciones que requieren un tratamiento especial o son de alta prioridad
     if (action_id == ACTION_ID_ACTIVATE_CONFIG_MODE) {
         action_config_mode_start();
+        return;
+    }
+    if (action_id == ACTION_ID_ZIGBEE_GAME_CREATE) {
+        action_zigbee_create_game();
+        return;
+    }
+    if (action_id == ACTION_ID_ZIGBEE_GAME_JOIN) {
+        action_zigbee_join_game();
         return;
     }
     
@@ -72,12 +79,8 @@ void execute_diymon_action(diymon_action_id_t action_id) {
             ESP_LOGI(TAG, "Acción Placeholder (ID %d) ejecutada. No se realiza ninguna operación.", action_id);
             break;
 
-        case ACTION_ID_PERFORMANCE_MODE:
-            action_performance_mode_toggle();
-            break;
-
         default:
-            ESP_LOGW(TAG, "Acción con ID %d desconocida.", action_id);
+            ESP_LOGW(TAG, "Acción con ID %d desconocida o ya gestionada.", action_id);
             break;
     }
 }

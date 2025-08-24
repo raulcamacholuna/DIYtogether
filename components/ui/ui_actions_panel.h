@@ -12,7 +12,7 @@
  * @brief Crea todos los paneles de acción, delegando la creación de botones al `buttons_manager`.
  * @param parent El objeto padre sobre el cual se crearán los botones.
  */
-void ui_actions_panel_create(lv_obj_t *parent);
+void ui_actions_panel_create(lv_obj_t *parent, bool animations_enabled);
 
 /**
  * @brief Procesa un gesto de deslizamiento para mostrar u ocultar paneles.

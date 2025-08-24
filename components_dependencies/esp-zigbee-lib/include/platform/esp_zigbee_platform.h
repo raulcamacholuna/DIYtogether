@@ -6,6 +6,8 @@
 
 #pragma once
 
+#define ESP_ZIGBEE_PLATFORM_H
+
 #include "hal/gpio_types.h"
 #include "hal/uart_types.h"
 #include "driver/uart.h"

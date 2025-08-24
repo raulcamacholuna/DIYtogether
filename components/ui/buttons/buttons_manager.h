@@ -17,7 +17,7 @@ extern "C" {
  * 
  * @param parent El objeto LVGL padre sobre el cual se crearán todos los botones.
  */
-void ui_buttons_init(lv_obj_t *parent);
+void ui_buttons_init(lv_obj_t *parent, bool animations_enabled);
 
 // --- Getters para los botones del panel superior ---
 lv_obj_t* ui_buttons_get_btn_1(void); // Comer

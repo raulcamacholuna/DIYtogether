@@ -379,7 +379,9 @@ constants etc.
 Ideally should rework the whole zb_config.h to suit better for that new concept.
 
  */
+#ifndef ESP_ZIGBEE_PLATFORM_H
 #include "zb_config_platform.h"
+#endif
 
 #ifndef ZB_ZGPD_GPFS_SIZE
 #define ZB_ZGPD_GPFS_SIZE 4U

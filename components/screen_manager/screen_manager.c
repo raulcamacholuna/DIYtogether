@@ -1,7 +1,7 @@
-/* Fichero: components/screen_manager/screen_manager.c */
-/* Descripción: Diagnóstico: La pantalla mostraba una imagen fantasma al apagar el backlight. Causa Raíz: Existía una condición de carrera entre la invalidación de la UI (hacer visible la pantalla negra) y el apagado físico del backlight. El uso de un temporizador asíncrono no garantizaba que el ciclo de renderizado de LVGL se completara a tiempo. Solución Definitiva: Se ha implementado un apagado síncrono. La función 'screen_manager_turn_off' ahora, después de hacer visible el 'blackout_screen', invoca 'lv_refr_now(NULL)'. Esta función bloquea la ejecución y fuerza un redibujado inmediato de la pantalla. Una vez que retorna, se tiene la garantía de que el framebuffer contiene una imagen negra, y solo entonces se apaga el backlight. Esto elimina la condición de carrera y resuelve el problema de la imagen fantasma de forma determinista.
-/* Último cambio: 22/08/2025 - 08:18
-*/
+/* Fecha: 24/08/2025 - 10:05
+Fichero: components/screen_manager/screen_manager.c
+Último cambio: Corrección de error de comentario y actualización de encabezado.
+Descripción: */
 #include "screen_manager.h"
 #include "bsp_api.h"
 #include "esp_log.h"

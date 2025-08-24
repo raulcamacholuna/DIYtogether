@@ -66,7 +66,7 @@ static void animation_finish_cb(lv_anim_t *a);
 
 // --- Implementación de Funciones Públicas ---
 
-void ui_actions_panel_create(lv_obj_t *parent) {
+void ui_actions_panel_create(lv_obj_t *parent, bool animations_enabled) {
     // --- Crear Contenedor Panel Player ---
     s_panel_player = lv_obj_create(parent);
     lv_obj_remove_style_all(s_panel_player);
@@ -102,7 +102,7 @@ void ui_actions_panel_create(lv_obj_t *parent) {
     lv_obj_remove_flag(s_panel_config, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_flag(s_panel_config, LV_OBJ_FLAG_GESTURE_BUBBLE);
     btn_7_create(s_panel_config);
-    btn_8_create(s_panel_config);
+    btn_8_create(s_panel_config, animations_enabled);
     btn_9_create(s_panel_config);
     ESP_LOGI(TAG, "Panel 'Config' creado.");
 

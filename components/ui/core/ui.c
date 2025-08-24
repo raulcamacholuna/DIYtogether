@@ -1,11 +1,12 @@
 /* Fichero: components/ui/core/ui.c */
 /* Descripción: Diagnóstico de Causa Raíz: El 'Load access fault' ocurre porque la función delete_screen_main se llamaba a sí misma de forma recursiva. El flujo era: 1.  action_config_mode_start llama a delete_screen_main. 2. delete_screen_main llama a lv_obj_del(g_main_screen_obj). 3. lv_obj_del dispara el evento LV_EVENT_DELETE. 4. Un callback incorrectamente registrado para este evento era la propia función delete_screen_main, provocando una segunda llamada concurrente que intentaba liberar recursos ya en proceso de liberación, causando el crash.
 Solución Definitiva: Se ha eliminado la línea que registraba el callback recursivo. La limpieza de la pantalla principal ahora se inicia de forma única y explícita desde el orquestador de acciones, y el callback de limpieza correcto ('main_screen_cleanup_cb' en 'screens.c') se ejecuta una sola vez, garantizando que los recursos se liberen de forma segura. */
-/* Último cambio: 20/08/2025 - 07:32 */
+/* Último cambio: 24/08/2025 - 16:06 */
 #include "ui.h"
 #include "screens.h"
 #include "ui_action_animations.h"
 #include "esp_log.h"
+#include "buttons_manager.h" // Incluir para ui_buttons_init
 
 extern lv_obj_t *g_main_screen_obj; 
 
@@ -16,8 +17,8 @@ void ui_preinit(void) {
     ui_action_animations_preinit_buffer();
 }
 
-void ui_init(void) {
-    create_screens();
+void ui_init(bool animations_enabled) {
+    create_screens(animations_enabled);
     
     // [CORRECCIÓN] Se elimina el callback recursivo que causaba el crash.
     // La limpieza ahora se gestiona explícitamente desde el modo de configuración,
@@ -26,6 +27,7 @@ void ui_init(void) {
     //     lv_obj_add_event_cb(g_main_screen_obj, (lv_event_cb_t)delete_screen_main, LV_EVENT_DELETE, NULL);
     // }
     
+    ui_buttons_init(g_main_screen_obj, animations_enabled); // Pasar el estado de las animaciones
     lv_screen_load(g_main_screen_obj);
     ESP_LOGI(TAG, "UI modularizada y lista.");
 }

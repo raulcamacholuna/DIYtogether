@@ -1,7 +1,6 @@
 # Fichero: main/CMakeLists.txt
-# Último cambio: Eliminada la directiva 'target_link_libraries' explícita, que ya no es necesaria.
-# Descripción: Con la refactorización de 'platformio.ini' que ahora filtra los ficheros fuente a nivel de entorno, el sistema de build de ESP-IDF gestiona correctamente las dependencias transitivas a través de la directiva 'REQUIRES'. La eliminación de este enlace explícito ('target_link_libraries') simplifica el fichero, lo alinea con las prácticas estándar del framework y elimina una solución que abordaba un síntoma, no la causa raíz del problema de enlazado.
-# Último cambio: 20/08/2025 - 04:56
+# Último cambio: Añadida la dependencia 'zigbee_comm' para permitir que el 'main' utilice la nueva API de comunicación Zigbee.
+# Descripción: Diagnóstico: La aplicación principal (main.c) necesita inicializar y controlar el nuevo componente Zigbee. Sin una dependencia explícita, el enlazador no encontrará las funciones de 'zigbee_comm'. Solución: Se añade 'zigbee_comm' a la lista 'REQUIRES'. Esto asegura que el sistema de build enlace correctamente el componente, permitiendo que 'main.c' invoque a 'zigbee_comm_init()' y otras funciones de la API.
 idf_component_register(
     SRCS 
         "main.c"
@@ -22,6 +21,5 @@ idf_component_register(
         esp_lvgl_port
         esp_lcd
         esp_lcd_touch
+        zigbee_comm
 )
-
-# La directiva 'target_link_libraries' ha sido eliminada. La dependencia se resuelve correctamente a través de 'REQUIRES bsp'.
