@@ -12,8 +12,7 @@ endif()
 
 idf_component_register(SRC_DIRS "${src_dirs}"
                        INCLUDE_DIRS "${include_dirs}" "${CMAKE_CURRENT_SOURCE_DIR}/../esp-zboss-lib/include"
-                       PRIV_REQUIRES esp-zboss-lib
-                       REQUIRES ieee802154
+                       REQUIRES ieee802154 esp-zboss-lib
 )
 
 if(CONFIG_ZB_ENABLED)
@@ -24,18 +23,18 @@ if(CONFIG_ZB_ENABLED)
 
     if(CONFIG_ZB_ZCZR)
         if(CONFIG_ZB_DEBUG_MODE)
-            add_prebuilt_library(esp_zigbee_api_lib "${CMAKE_CURRENT_SOURCE_DIR}/lib/${idf_target}/libesp_zb_api.zczr.debug.a" REQUIRES espressif__esp-zboss-lib)
+            add_prebuilt_library(esp_zigbee_api_lib "${CMAKE_CURRENT_SOURCE_DIR}/lib/${idf_target}/libesp_zb_api.zczr.debug.a" REQUIRES esp-zboss-lib)
         else()
-            add_prebuilt_library(esp_zigbee_api_lib "${CMAKE_CURRENT_SOURCE_DIR}/lib/${idf_target}/libesp_zb_api.zczr.a" REQUIRES espressif__esp-zboss-lib)
+            add_prebuilt_library(esp_zigbee_api_lib "${CMAKE_CURRENT_SOURCE_DIR}/lib/${idf_target}/libesp_zb_api.zczr.a" REQUIRES esp-zboss-lib)
         endif()
     elseif(CONFIG_ZB_ZED)
         if(CONFIG_ZB_DEBUG_MODE)
-            add_prebuilt_library(esp_zigbee_api_lib "${CMAKE_CURRENT_SOURCE_DIR}/lib/${idf_target}/libesp_zb_api.ed.debug.a" REQUIRES espressif__esp-zboss-lib)
+            add_prebuilt_library(esp_zigbee_api_lib "${CMAKE_CURRENT_SOURCE_DIR}/lib/${idf_target}/libesp_zb_api.ed.debug.a" REQUIRES esp-zboss-lib)
         else()
-            add_prebuilt_library(esp_zigbee_api_lib "${CMAKE_CURRENT_SOURCE_DIR}/lib/${idf_target}/libesp_zb_api.ed.a" REQUIRES espressif__esp-zboss-lib)
+            add_prebuilt_library(esp_zigbee_api_lib "${CMAKE_CURRENT_SOURCE_DIR}/lib/${idf_target}/libesp_zb_api.ed.a" REQUIRES esp-zboss-lib)
         endif()
     elseif(CONFIG_ZB_ZGPD)
-        add_prebuilt_library(esp_zigbee_api_lib "${CMAKE_CURRENT_SOURCE_DIR}/lib/${idf_target}/libesp_zb_api.gpd.a" REQUIRES espressif__esp-zboss-lib)
+        add_prebuilt_library(esp_zigbee_api_lib "${CMAKE_CURRENT_SOURCE_DIR}/lib/${idf_target}/libesp_zb_api.gpd.a" REQUIRES esp-zboss-lib)
     endif()
 
     if (CONFIG_ZB_RADIO_SPINEL_UART)

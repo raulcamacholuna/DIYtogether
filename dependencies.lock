@@ -27,12 +27,15 @@ dependencies:
     version: 1.0.0
   espressif/esp-zigbee-lib:
     dependencies:
+    - name: espressif/esp-zboss-lib
+      override_path: ../esp-zboss-lib
+      version: '*'
     - name: idf
       version: '>=5.0'
     source:
       path: Z:\DIYTOGETHER\DIYtogether\components_dependencies\esp-zigbee-lib
       type: local
-    version: 1.0.0
+    version: '*'
   espressif/esp_lcd_jd9853:
     dependencies: []
     source:
@@ -145,6 +148,6 @@ direct_dependencies:
 - ui
 - web_server
 - zigbee_comm
-manifest_hash: 792cddc21773d13cb46d4bf34cdd9b2f454c2b964ae353d3cdbc47380e736f8c
+manifest_hash: c4eb7f8d9c2bd452f52c539d579e966c1fecb3174dea67592899910790f29a3d
 target: esp32c6
 version: 2.0.0

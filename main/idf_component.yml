@@ -47,8 +47,5 @@ dependencies:
     version: '*'
     override_path: ../components_dependencies/esp-zigbee-lib
 
-  espressif/esp-zboss-lib:
-    version: '*'
-    override_path: ../components_dependencies/esp-zboss-lib
     
   

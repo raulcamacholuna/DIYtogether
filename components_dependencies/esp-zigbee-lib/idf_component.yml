@@ -1,5 +1,6 @@
 ## IDF Component Manager Manifest File
-version: "1.0.0"
-description: ESP Zigbee SDK library
 dependencies:
+  espressif/esp-zboss-lib:
+    version: '*'
+    override_path: ../esp-zboss-lib
   idf: ">=5.0"
